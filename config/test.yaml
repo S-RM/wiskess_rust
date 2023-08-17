@@ -1,0 +1,9 @@
+wiskers:
+  - name: test
+    binary: ls
+    args:  -lah
+    outfolder: TestBinary
+  - name: test
+    binary: echo
+    args:  hello yes, got it working
+    outfolder: TestBinary
