@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
+clap = { version = "4.3.21", features = ["derive"] }
+serde = { version = "1.0.183", features = ["derive"] }
+serde_yaml = "0.9.25"
