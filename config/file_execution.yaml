@@ -1,0 +1,10 @@
+wiskers:
+  - name: evtx_dump
+    binary: fd
+    args:  . -e evtx -p D:\wiskess_testing_files\Logs\ -x .\tools\evtx_dump-v0.8.1.exe -o json
+    outfolder: FileExecution
+    outfile: evtx_dump.json
+    choco:
+    github: https://github.com/omerbenamram/evtx.git
+    deps_choco: fd
+    deps_github:
