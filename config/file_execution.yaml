@@ -1,10 +1,20 @@
+artefacts:
+  - name: winevt
+    path: ?:\Windows\System32\winevt\Logs
+    type: folder 
+
 wiskers:
   - name: evtx_dump
     binary: fd
-    args:  . -e evtx -p D:\wiskess_testing_files\Logs\ -x .\tools\evtx_dump-v0.8.1.exe -o json
+    args:  . -e evtx -p {input_eventlog_folder} -x .\tools\evtx_dump-v0.8.1.exe -o json
     outfolder: FileExecution
     outfile: evtx_dump.json
     choco:
     github: https://github.com/omerbenamram/evtx.git
     deps_choco: fd
     deps_github:
+  - name: rust_registry
+    binary: reg_dump 
+    args: --recover --recurse -t jsonl --input {input} --output {output}
+    outfolder: Registry
+    github: https://github.com/strozfriedberg/notatin
