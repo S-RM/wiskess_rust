@@ -1,7 +1,7 @@
 artefacts:
   - name: winevt
     path: ?:\Windows\System32\winevt\Logs
-    type: folder 
+    path_type: folder 
 
 wiskers:
   - name: evtx_dump

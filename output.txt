@@ -2,14 +2,14 @@ total 64K
 drwxrwxrwx+ 7 codespace root      4.0K Aug 17 19:32 .
 drwxr-xrwx+ 5 codespace root      4.0K Jul 28 11:19 ..
 drwxrwxrwx+ 2 codespace codespace 4.0K Aug 17 06:43 .devcontainer
-drwxrwxrwx+ 9 codespace root      4.0K Aug 17 15:41 .git
+drwxrwxrwx+ 9 codespace root      4.0K Aug 17 19:36 .git
 -rw-rw-rw-  1 codespace codespace    8 Aug 17 06:43 .gitignore
--rw-rw-rw-  1 codespace codespace  17K Aug 17 12:14 Cargo.lock
--rw-rw-rw-  1 codespace codespace  356 Aug 17 06:43 Cargo.toml
+-rw-rw-rw-  1 codespace codespace  20K Aug 18 07:07 Cargo.lock
+-rw-rw-rw-  1 codespace codespace  373 Aug 18 07:06 Cargo.toml
 -rw-rw-rw-  1 codespace root        14 Jul 18 08:53 README.md
 drwxrwxrwx+ 2 codespace codespace 4.0K Aug 17 19:27 config
 -rw-rw-rw-  1 codespace codespace  131 Jul 18 09:01 main.rs
--rw-rw-rw-  1 codespace codespace    0 Aug 17 19:32 output.txt
-drwxrwxrwx+ 2 codespace codespace 4.0K Aug 17 06:43 src
+-rw-rw-rw-  1 codespace codespace    0 Aug 18 09:59 output.txt
+drwxrwxrwx+ 2 codespace codespace 4.0K Aug 18 07:04 src
 drwxrwxrwx+ 3 codespace codespace 4.0K Aug 17 12:15 target
 hello yes, got it working

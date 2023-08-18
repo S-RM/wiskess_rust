@@ -1,3 +1,8 @@
+artefacts:
+  - name: winevt
+    path: ?:\Windows\System32\winevt\Logs
+    path_type: folder 
+    
 wiskers:
   - name: test
     binary: ls
