@@ -1,0 +1,14 @@
+artefacts:
+  - name: winevt
+    path: ?:\Windows\System32\winevt\Logs
+    path_type: folder 
+    
+wiskers:
+  - name: test
+    binary: calc.exe
+    args: 
+    outfolder: TestBinary
+  - name: test
+    binary: notepad.exe
+    args: 
+    outfolder: TestBinary

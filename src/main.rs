@@ -1,6 +1,8 @@
 mod configs;
+mod ops;
 
 use crate::configs::config;
+use crate::ops::file_ops;
 use serde_yaml::{self};
 use std::process::{Command, Output};
 use std::time::Duration;
@@ -8,9 +10,9 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::thread;
 use inquire::Confirm;
-use std::fs;
 use clap::Parser;
 use std::path::Path;
+use chrono::Utc;
 
 /// Structure of the command line args
 #[derive(Parser, Debug)]
@@ -20,60 +22,44 @@ struct Args {
     #[arg(short, long)]
     config: String,
 
-    /// Output file
+    /// Output folder
     #[arg(short, long)]
-    logfile: String,
-}
-
-fn file_exists(file_path: &String) {
-    println!("[+] Opening file: {file_path}");
-    // match fs::metadata(file_path) {
-    //     Ok(_) => exists = true,
-    //     Err(_) => exists = false,
-    // }
-
-    let path = Path::new(&file_path);
-    if path.exists() {
-        let ans = Confirm::new("File exists. Do you want to overwrite the file?")
-            .with_default(false)
-            .with_help_message("Overwrite the file if you want to rerun the command.")
-            .prompt();
-
-        match ans {
-            Ok(true) => {
-                println!("That's awesome!");
-                let _ = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&file_path)
-                    .expect("Failed to overwrite file");
-            } 
-            Ok(false) => println!("Keeping original file."),
-            Err(_) => println!("No valid response to question."),
-        }
-    } else {
-        println!("File does not exist!");
-    }    
+    out_path: String,
 }
 
 fn main() {
     // Get the args
     let args = Args::parse();
 
+    // Set the start time
+    let start_time = Utc::now().format("%Y%m%dT%H%M%S").to_string();
+    // TODO: Make a logger for stdout and log file messages
+    println!("Starting wiskess at: {}", start_time);
+
+    // Set output directories
+    let out_path = args.out_path;
+    file_ops::make_folders(&out_path);
+    // Set main log
+    let out_log = format!("{}/wiskess_{}.log", &out_path, start_time);
+    file_ops::file_exists(&out_log);
+
+    // TODO: Get time frame
+    // TODO: Get iocs from file
+
     // Read the config
-    let f = std::fs::File::open(args.config).expect("Could not open file.");
+    let f = OpenOptions::new()
+        .read(true)
+        .open(args.config)
+        .expect("Unable to open config file.");
     let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
-    println!("{:?}", scrape_config);
 
-    // Set log
-    let log_file = args.logfile;
-    file_exists(&log_file);
-
-    // let mut commands = Vec::new();
+    // Run each binary in parallel
     let mut children = vec![];
 
+    // TODO: Check if the wisker can be run in parallel, i.e. is set share_cpu: true in config
+    // TODO: limit the number of threads to the max available on device
     for wisker in scrape_config.wiskers {
+        // TODO: Check the binary path exist, if not warn about installing
         // Create thread per binary in config        
         let child = thread::spawn(move || {
             let output = Command::new(&wisker.binary)
@@ -93,11 +79,11 @@ fn main() {
         .write(true)
         .create(true)
         .append(true)
-        .open(&log_file)
+        .open(&out_log)
         .expect("Failed to open log file");
         
     for child in children {
         let output = child.join().unwrap();
-        file.write_all(&output).expect("Failed to write to 'output.txt'");
+        file.write_all(&output).expect("Failed to write to log file");
     }
 }
