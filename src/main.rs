@@ -25,6 +25,18 @@ struct Args {
     /// Output folder
     #[arg(short, long)]
     out_path: String,
+
+    /// Start date
+    #[arg(short, long)]
+    start_date: String,
+    
+    /// End date
+    #[arg(short, long)]
+    end_date: String,
+
+    /// IOC list file
+    #[arg(short, long)]
+    ioc_file: String,
 }
 
 fn main() {
@@ -32,18 +44,20 @@ fn main() {
     let args = Args::parse();
 
     // Set the start time
-    let start_time = Utc::now().format("%Y%m%dT%H%M%S").to_string();
+    let wiskess_start = Utc::now().format("%Y%m%dT%H%M%S").to_string();
     // TODO: Make a logger for stdout and log file messages
-    println!("Starting wiskess at: {}", start_time);
+    println!("Starting wiskess at: {}", wiskess_start);
 
     // Set output directories
     let out_path = args.out_path;
     file_ops::make_folders(&out_path);
     // Set main log
-    let out_log = format!("{}/wiskess_{}.log", &out_path, start_time);
+    let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);
     file_ops::file_exists(&out_log);
 
-    // TODO: Get time frame
+    // Confirm date is valid
+    let start_date = file_ops::check_date(args.start_date, &"start date".to_string());
+    let end_date = file_ops::check_date(args.end_date, &"end date".to_string());
     // TODO: Get iocs from file
 
     // Read the config
@@ -71,7 +85,6 @@ fn main() {
             output.stdout
         });
 
-        
         children.push(child);
     }
 
