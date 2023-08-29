@@ -15,6 +15,7 @@ pub mod config {
     pub binary: String,
     pub args: String,
     pub outfolder: String,
+    pub input: String,
     #[serde(default)]
     pub outfile: String,
     #[serde(default)]

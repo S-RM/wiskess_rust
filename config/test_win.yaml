@@ -1,14 +1,77 @@
 artefacts:
   - name: winevt
-    path: ?:\Windows\System32\winevt\Logs
-    path_type: folder 
+    path: '{root}/Windows/System32/winevt/Logs'
+    path_type: folder
+  - name: base
+    path: '{root}'
+    path_type: folder
+  - name: j_file
+    path: '{root}/$Extend/$UsnJrnl:$J'
+    path_type: file
+  - name: mft
+    path: '{root}/$MFT'
+    path_type: file
+  - name: recycle_bin
+    path: '{root}/$Recycle.Bin'
+    path_type: folder
+  - name: pagefile
+    path: '{root}/pagefile.sys'
+    path_type: file
+  - name: user_dir
+    path: '{root}/Users'
+    path_type: folder
+  - name: consolehost_history
+    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
+    path_type: file
+  - name: amcache
+    path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    path_type: file
+  - name: recentFileCache
+    path: '{root}/Windows/AppCompat/Programs/RecentFileCache.bcf'
+    path_type: file
+  - name: prefetch
+    path: '{root}/Windows/Prefetch'
+    path_type: folder
+  - name: system32
+    path: '{root}/Windows/System32'
+    path_type: folder
+  - name: system
+    path: '{root}/Windows/System32/config/SYSTEM'
+    path_type: file
+  - name: sum
+    path: '{root}/Windows/System32/LogFiles/Sum'
+    path_type: folder
+  - name: objects
+    path: '{root}/Windows/System32/wbem/Repository/OBJECTS.DATA'
+    path_type: file
+  - name: winevt
+    path: '{root}/Windows/System32/winevt/Logs'
+    path_type: folder
+  - name: chrome
+    path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
+    path_type: folder
+  - name: temp
+    path: '{root}/Windows/Temp'
+    path_type: folder
     
 wiskers:
-  - name: test
+  - name: calc
     binary: calc.exe
-    args: 
+    args: this also will "not" work {input}
     outfolder: TestBinary
-  - name: test
+    input: winevt
+  - name: calc two
+    binary: calc.exe
+    args: this also will "not not" work {input}
+    outfolder: TestBinary
+    input: winevt
+  - name: notepad
     binary: notepad.exe
-    args: 
+    args: this isn't a arg {input}
     outfolder: TestBinary
+    input: objects
+  - name: polars timeline
+    binary: py
+    args: C:/Users/Gavin/Documents/GitHub/wiskess_srm/tools/polars_tln.py {input} {start_time} {end_time}
+    outfolder: C:/Users/Gavin/code/win7-c-drive.E01/Analysis/Timeline
+    input: consolehost_history

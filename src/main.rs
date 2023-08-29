@@ -1,8 +1,10 @@
 mod configs;
 mod ops;
+mod art;
 
 use crate::configs::config;
 use crate::ops::file_ops;
+use crate::art::paths;
 use serde_yaml::{self};
 use std::process::{Command, Output};
 use std::time::Duration;
@@ -10,9 +12,10 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::thread;
 use inquire::Confirm;
-use clap::Parser;
+use clap::{Parser, ArgAction};
 use std::path::Path;
 use chrono::Utc;
+use std::collections::HashMap;
 
 /// Structure of the command line args
 #[derive(Parser, Debug)]
@@ -22,21 +25,29 @@ struct Args {
     #[arg(short, long)]
     config: String,
 
+    /// Data source
+    #[arg(short, long)]
+    data_source: String,
+
     /// Output folder
     #[arg(short, long)]
     out_path: String,
 
     /// Start date
-    #[arg(short, long)]
+    #[arg(long)]
     start_date: String,
     
     /// End date
-    #[arg(short, long)]
+    #[arg(long)]
     end_date: String,
 
     /// IOC list file
     #[arg(short, long)]
     ioc_file: String,
+
+    /// Silent mode, no user input
+    #[arg(short, long, action = ArgAction::SetTrue)]
+    silent: bool,
 }
 
 fn main() {
@@ -67,6 +78,9 @@ fn main() {
         .expect("Unable to open config file.");
     let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
 
+    // check the file paths in the config exist and return a hash of the art paths
+    let data_paths = paths::check_art(scrape_config.artefacts, &args.data_source);
+
     // Run each binary in parallel
     let mut children = vec![];
 
@@ -74,14 +88,23 @@ fn main() {
     // TODO: limit the number of threads to the max available on device
     for wisker in scrape_config.wiskers {
         // TODO: Check the binary path exist, if not warn about installing
+        // TODO: replace {placeholder} strings in the confirg with variables of the config or from local variables, i.e. start_date
+        // replace the wisker.args with those from config_placeholders
+        let wisker_arg = wisker.args
+            .replace("{input}", data_paths[&wisker.input].as_str())
+            .replace("{outfile}", &wisker.outfile.as_str())
+            .replace("{outfolder}", &wisker.outfolder.as_str());
         // Create thread per binary in config        
         let child = thread::spawn(move || {
             let output = Command::new(&wisker.binary)
-                .arg(&wisker.args)
+                .arg(&wisker_arg)
                 .output()
                 .expect("Failed to execute command");
             
-            println!("[+] Ran {}", &wisker.name);
+            println!("[+] Ran {} with command: {} {}", 
+                &wisker.name, 
+                &wisker.binary,
+                &wisker_arg);
             output.stdout
         });
 
