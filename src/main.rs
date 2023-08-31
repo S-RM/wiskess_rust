@@ -6,16 +6,16 @@ use crate::configs::config;
 use crate::ops::file_ops;
 use crate::art::paths;
 use serde_yaml::{self};
-use std::process::{Command, Output};
-use std::time::Duration;
+use std::process::{Command, Stdio};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::thread;
-use inquire::Confirm;
+use std::env;
 use clap::{Parser, ArgAction};
-use std::path::Path;
 use chrono::Utc;
-use std::collections::HashMap;
+use execute::{Execute, command, shell};
+
+
 
 /// Structure of the command line args
 #[derive(Parser, Debug)]
@@ -45,6 +45,10 @@ struct Args {
     #[arg(short, long)]
     ioc_file: String,
 
+    /// tool path, where binaries are stored. default gets from env var set internaly
+    #[arg(short, long, default_value = "")]
+    tool_path: String,
+
     /// Silent mode, no user input
     #[arg(short, long, action = ArgAction::SetTrue)]
     silent: bool,
@@ -66,6 +70,13 @@ fn main() {
     let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);
     file_ops::file_exists(&out_log);
 
+    // Set tool path
+    let mut tool_path = args.tool_path;
+    if tool_path == "" {
+        tool_path = format!("{}\\tools", env::current_dir().unwrap().display());
+        println!("[ ] tool path: {}", tool_path);
+    }
+
     // Confirm date is valid
     let start_date = file_ops::check_date(args.start_date, &"start date".to_string());
     let end_date = file_ops::check_date(args.end_date, &"end date".to_string());
@@ -79,7 +90,11 @@ fn main() {
     let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
 
     // check the file paths in the config exist and return a hash of the art paths
-    let data_paths = paths::check_art(scrape_config.artefacts, &args.data_source);
+    let data_paths = paths::check_art(
+        scrape_config.artefacts, 
+        &args.data_source,
+        args.silent
+    );
 
     // Run each binary in parallel
     let mut children = vec![];
@@ -88,18 +103,38 @@ fn main() {
     // TODO: limit the number of threads to the max available on device
     for wisker in scrape_config.wiskers {
         // TODO: Check the binary path exist, if not warn about installing
-        // TODO: replace {placeholder} strings in the confirg with variables of the config or from local variables, i.e. start_date
-        // replace the wisker.args with those from config_placeholders
+        // Make the output folders from the yaml config
+        let folder_path = format!("{}/{}", &out_path, &wisker.outfolder);
+        file_ops::make_folders(&folder_path);
+        // replace the placeholders, i.e. {input}, in wisker.args with those from local variables, the yaml config, etc.
         let wisker_arg = wisker.args
             .replace("{input}", data_paths[&wisker.input].as_str())
             .replace("{outfile}", &wisker.outfile.as_str())
-            .replace("{outfolder}", &wisker.outfolder.as_str());
+            .replace("{outfolder}", &folder_path)
+            .replace("{start_date}", &start_date)
+            .replace("{end_date}", &end_date)
+            .replace("{tool_path}", &tool_path);
+
+        let wisker_binary = wisker.binary
+            .replace("{tool_path}", &tool_path);
+
+        
+        // TODO: Check if wisker_arg contains any other placeholder
         // Create thread per binary in config        
         let child = thread::spawn(move || {
-            let output = Command::new(&wisker.binary)
-                .arg(&wisker_arg)
-                .output()
-                .expect("Failed to execute command");
+            let wisker_cmd = format!("{} {}", 
+                &wisker_binary, 
+                &wisker_arg);
+            println!("[ ] Running: {}", wisker_cmd);
+            let mut command = shell(wisker_cmd);
+            command.stdout(Stdio::piped());
+            let output = command.execute_output().unwrap();
+            // println!("{}", String::from_utf8(&output.stdout).unwrap());
+
+        //     let output = Command::new(&wisker.binary)
+        //         .arg(&wisker_arg)
+        //         .output()
+        //         .expect("Failed to execute command");
             
             println!("[+] Ran {} with command: {} {}", 
                 &wisker.name, 

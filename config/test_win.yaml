@@ -53,25 +53,29 @@ artefacts:
   - name: temp
     path: '{root}/Windows/Temp'
     path_type: folder
+  - name: polars_test
+    path: C:\Users\Gavin\code\win7-c-drive.E01
+    path_type: folder
     
 wiskers:
-  - name: calc
-    binary: calc.exe
-    args: this also will "not" work {input}
-    outfolder: TestBinary
+  - name: evtx_dump
+    binary: '{tool_path}\evtx_dump-v0.8.1.exe'
+    args: -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite C:\Users\Gavin\code\win7-c-drive.E01\Artefacts\d\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx
+    outfolder: EventLogs
+    outfile: evtx_dump.json
     input: winevt
-  - name: calc two
-    binary: calc.exe
-    args: this also will "not not" work {input}
-    outfolder: TestBinary
-    input: winevt
-  - name: notepad
-    binary: notepad.exe
-    args: this isn't a arg {input}
-    outfolder: TestBinary
-    input: objects
+  # - name: calc two
+  #   binary: calc.exe
+  #   args: this also will "not not" work {input}
+  #   outfolder: Calculator with space
+  #   input: winevt
+  # - name: notepad
+  #   binary: calc.exe
+  #   args: this isn't a arg {input}
+  #   outfolder: Notes\mynotes
+  #   input: objects
   - name: polars timeline
     binary: py
-    args: C:/Users/Gavin/Documents/GitHub/wiskess_srm/tools/polars_tln.py {input} {start_time} {end_time}
-    outfolder: C:/Users/Gavin/code/win7-c-drive.E01/Analysis/Timeline
-    input: consolehost_history
+    args: C:/Users/Gavin/Documents/GitHub/wiskess_srm/tools/polars_tln.py {input} {start_date} {end_date}
+    outfolder: Timeline
+    input: polars_test
