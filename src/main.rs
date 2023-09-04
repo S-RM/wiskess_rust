@@ -3,9 +3,10 @@ mod ops;
 mod art;
 
 use crate::configs::config;
-use crate::ops::file_ops;
+use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
 use serde_yaml::{self};
+use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -14,7 +15,7 @@ use std::env;
 use clap::{Parser, ArgAction};
 use chrono::Utc;
 use execute::{Execute, command, shell};
-
+use rayon::prelude::*; 
 
 
 /// Structure of the command line args
@@ -68,7 +69,7 @@ fn main() {
     file_ops::make_folders(&out_path);
     // Set main log
     let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);
-    file_ops::file_exists(&out_log);
+    file_ops::file_exists(&out_log, args.silent);
 
     // Set tool path
     let mut tool_path = args.tool_path;
@@ -80,7 +81,16 @@ fn main() {
     // Confirm date is valid
     let start_date = file_ops::check_date(args.start_date, &"start date".to_string());
     let end_date = file_ops::check_date(args.end_date, &"end date".to_string());
-    // TODO: Get iocs from file
+
+    // let mut main_args = HashMap::new();
+    let main_args = config::MainArgs {
+        out_path: out_path,
+        start_date: start_date,
+        end_date: end_date,
+        tool_path: tool_path,
+        ioc_file: args.ioc_file,
+        silent: args.silent
+    };
 
     // Read the config
     let f = OpenOptions::new()
@@ -89,62 +99,78 @@ fn main() {
         .expect("Unable to open config file.");
     let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
 
+    // TODO: check or gracefully error when the yaml config misses keys
+    // TODO: Check the binary path exist, if not warn about installing
+
     // check the file paths in the config exist and return a hash of the art paths
     let data_paths = paths::check_art(
         scrape_config.artefacts, 
         &args.data_source,
         args.silent
     );
-
+    
     // Run each binary in parallel
-    let mut children = vec![];
+    let multi_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(0)
+        .build()
+        .unwrap();
+    
+    let single_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
 
-    // TODO: Check if the wisker can be run in parallel, i.e. is set share_cpu: true in config
-    // TODO: limit the number of threads to the max available on device
+    // let wiskers = scrape_config.wiskers;
+    // let multi_wiskers = &wiskers.clone();
+    // let single_wiskers = wiskers.clone();
+    
+
+    // let multi_wiskers: Vec<config::Wiskers> = wiskers
+    //     .into_iter()
+    //     .filter(|w| w.para == true)
+    //     .collect();
+
+    // let single_wiskers: Vec<config::Wiskers> = scrape_config.clone().wiskers
+    //     .into_iter()
+    //     .filter(|w| w.para == false)
+    //     .collect();
+
     for wisker in scrape_config.wiskers {
-        // TODO: Check the binary path exist, if not warn about installing
-        // Make the output folders from the yaml config
-        let folder_path = format!("{}/{}", &out_path, &wisker.outfolder);
-        file_ops::make_folders(&folder_path);
-        // replace the placeholders, i.e. {input}, in wisker.args with those from local variables, the yaml config, etc.
-        let wisker_arg = wisker.args
-            .replace("{input}", data_paths[&wisker.input].as_str())
-            .replace("{outfile}", &wisker.outfile.as_str())
-            .replace("{outfolder}", &folder_path)
-            .replace("{start_date}", &start_date)
-            .replace("{end_date}", &end_date)
-            .replace("{tool_path}", &tool_path);
-
-        let wisker_binary = wisker.binary
-            .replace("{tool_path}", &tool_path);
-
         
-        // TODO: Check if wisker_arg contains any other placeholder
-        // Create thread per binary in config        
-        let child = thread::spawn(move || {
-            let wisker_cmd = format!("{} {}", 
-                &wisker_binary, 
-                &wisker_arg);
-            println!("[ ] Running: {}", wisker_cmd);
-            let mut command = shell(wisker_cmd);
-            command.stdout(Stdio::piped());
-            let output = command.execute_output().unwrap();
-            // println!("{}", String::from_utf8(&output.stdout).unwrap());
+        let tx = tx.clone();
+        let main_args_c = main_args.clone();
+        let data_paths_c = data_paths.clone();
 
-        //     let output = Command::new(&wisker.binary)
-        //         .arg(&wisker_arg)
-        //         .output()
-        //         .expect("Failed to execute command");
+        // Create thread per binary in config        
+        // let child = thread::spawn(move || {
+        let mut pool = &multi_pool;            
+        if !wisker.para {
+            // wisker config set to non-parallel, may need those ran in parallel to finish
+            // TODO: collect all the wiskers that are single and run in a separate loop
+            pool = &single_pool;
+        }
+        pool.spawn(move || {
+        
+            let (wisker_arg, wisker_binary) = exe_ops::load_wisker(
+                main_args_c, 
+                &wisker, 
+                data_paths_c);
+            
+            let output = exe_ops::run_wisker(&wisker_binary, &wisker_arg);
             
             println!("[+] Ran {} with command: {} {}", 
                 &wisker.name, 
-                &wisker.binary,
+                &wisker_binary,
                 &wisker_arg);
-            output.stdout
+            // output.stdout
+            tx.send(output.stdout).unwrap();
         });
 
-        children.push(child);
+        // children.push(child);
     }
+    drop(tx);
+    let children: Vec<_> = rx.into_iter().collect();
 
     let mut file = OpenOptions::new()
         .write(true)
@@ -153,8 +179,8 @@ fn main() {
         .open(&out_log)
         .expect("Failed to open log file");
         
-    for child in children {
-        let output = child.join().unwrap();
-        file.write_all(&output).expect("Failed to write to log file");
-    }
+    // for child in children {
+    //     let output = child.join().unwrap();
+        // file.write_all(&output).expect("Failed to write to log file");
+    // }
 }

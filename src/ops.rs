@@ -3,6 +3,7 @@ pub mod file_ops {
     use std::fs::OpenOptions;
     use inquire::Confirm;
     use inquire::CustomType;
+    use inquire::InquireError;
     use std::path::Path;
     use chrono::NaiveDate;
 
@@ -10,15 +11,18 @@ pub mod file_ops {
         fs::create_dir_all(out_path).expect("Failed to create folder");
     }
 
-    pub(crate) fn file_exists(file_path: &String) {
+    pub(crate) fn file_exists(file_path: &String, silent: bool) {
         println!("[+] Opening file: {file_path}");
 
         let path = Path::new(&file_path);
-        if path.exists() {
-            let ans = Confirm::new("File exists. Do you want to overwrite the file?")
-                .with_default(false)
-                .with_help_message("Overwrite the file if you want to rerun the command.")
-                .prompt();
+        if path.exists() && path.is_file() {
+            let mut ans: Result<bool, InquireError> = Ok(true);
+            if !silent {
+                ans = Confirm::new("File exists. Do you want to overwrite the file?")
+                    .with_default(false)
+                    .with_help_message("Overwrite the file if you want to rerun the command.")
+                    .prompt();
+            }
 
             match ans {
                 Ok(true) => {
@@ -55,5 +59,60 @@ pub mod file_ops {
             ret_date = format!("{}", new_date).to_string();
         }
         ret_date
+    }
+}
+
+pub mod exe_ops {
+    use std::{collections::HashMap, process::Stdio};
+    use execute::{shell, Execute};
+    use crate::configs::config;
+    use super::file_ops;
+
+    
+    pub fn run_wisker(wisker_binary: &String, wisker_arg: &String) -> std::process::Output {
+        let wisker_cmd = format!("{} {}", 
+            &wisker_binary, 
+            &wisker_arg);
+        println!("[ ] Running: {}", wisker_cmd);
+        let mut command = shell(wisker_cmd);
+        command.stdout(Stdio::piped());
+        let output = command.execute_output().unwrap();
+        output
+    }
+
+    fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, folder_path: &String, main_args: &config::MainArgs) -> (String, String) {
+        // TODO: remove quotes from wisker.args, as it causes issues and isn't needed
+        
+        // replace the placeholders, i.e. {input}, in wisker.args with those from local variables, the yaml config, etc.
+        let wisker_arg = wisker.args
+            .replace("{input}", data_paths[&wisker.input].as_str())
+            .replace("{outfile}", &wisker.outfile.as_str())
+            .replace("{outfolder}", folder_path)
+            .replace("{start_date}", &main_args.start_date)
+            .replace("{end_date}", &main_args.end_date)
+            .replace("{ioc_file}", &main_args.ioc_file)
+            .replace("{tool_path}", &main_args.tool_path);
+        
+        let wisker_binary = wisker.binary
+            .replace("{tool_path}", &main_args.tool_path);
+        
+        // TODO: Check if wisker_arg contains any other placeholder
+        (wisker_arg, wisker_binary)
+    }
+
+    pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String) {
+        // Make the output folders from the yaml config
+        let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
+        file_ops::make_folders(&folder_path);
+        
+        let (wisker_arg, wisker_binary) = set_wisker(wisker, &data_paths_c, &folder_path, &main_args_c);
+                
+        // Check if the outfile already exists, ask user to overwrite
+        let check_outfile = format!("{}/{}", &folder_path, &wisker.outfile);
+        file_ops::file_exists(
+            &check_outfile,
+            main_args_c.silent
+        );
+        (wisker_arg, wisker_binary)
     }
 }

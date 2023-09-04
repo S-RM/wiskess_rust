@@ -64,16 +64,25 @@ wiskers:
     outfolder: EventLogs
     outfile: evtx_dump.json
     input: winevt
-  # - name: calc two
-  #   binary: calc.exe
-  #   args: this also will "not not" work {input}
-  #   outfolder: Calculator with space
-  #   input: winevt
-  # - name: notepad
-  #   binary: calc.exe
-  #   args: this isn't a arg {input}
-  #   outfolder: Notes\mynotes
-  #   input: objects
+  - name: EvtxECmd
+    binary: 'C:\Users\Gavin\code\wiskess\Get-ZimmermanTools\EvtxECmd\EvtxECmd.exe'
+    args: '-d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: EventLogs
+    outfile: EvtxECmd-All.csv
+    input: winevt
+  - name: MFTECmd
+    binary: C:\Users\Gavin\code\wiskess\Get-ZimmermanTools\MFTECmd.exe
+    args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
+    outfolder: FileSystem
+    outfile: MFTECmd.csv
+    input: mft
+  - name: mft
+    binary: '{tool_path}\mft-v0.8.1.exe'
+    args: '-o csv -f {outfolder}/{outfile}'
+    outfolder: FileSystem
+    outfile: mft.csv
+    input: mft
+    github: https://github.com/omerbenamram/mft
   - name: polars timeline
     binary: py
     args: C:/Users/Gavin/Documents/GitHub/wiskess_srm/tools/polars_tln.py {input} {start_date} {end_date}
