@@ -2,7 +2,7 @@ pub mod config {
   use serde::{Deserialize, Serialize};
 
   /// Top level structure of config file
-  #[derive(Debug, Serialize, Deserialize)]
+  #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct Config {
       pub artefacts: Vec<Artefacts>,
       pub wiskers: Vec<Wiskers>,
@@ -35,7 +35,7 @@ pub mod config {
   }
 
   /// Artefact paths and type
-  #[derive(Debug, Serialize, Deserialize)]
+  #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct Artefacts {
     pub name: String,
     pub path: String,

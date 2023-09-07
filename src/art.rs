@@ -2,7 +2,7 @@ pub mod paths {
     use std::{path::Path, collections::HashMap};
     use glob::glob;
     use inquire::Text;
-    use crate::{configs::config::Artefacts, art::paths};
+    use crate::{configs::config::Artefacts};
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool) -> HashMap<String, String> {
         let mut art_paths = HashMap::new();
@@ -19,7 +19,6 @@ pub mod paths {
                 // if not found, check others: mounted or ask user
                 // TODO: if collected path from live mount, check mounted
                 // if not found, ask the user to enter path
-                // TODO: don't prompt if silent flag set, and set default as the path in the hash
                 if silent {
                     // add path to hash
                     art_paths.insert(

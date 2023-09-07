@@ -56,26 +56,32 @@ artefacts:
   - name: polars_test
     path: C:\Users\Gavin\code\win7-c-drive.E01
     path_type: folder
+  - name: evtx_dump
+    path: C:\Users\Gavin\code\win7-c-drive.E01\Artefacts\d\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx
+    path_type: file
     
 wiskers:
   - name: evtx_dump
     binary: '{tool_path}\evtx_dump-v0.8.1.exe'
-    args: -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite C:\Users\Gavin\code\win7-c-drive.E01\Artefacts\d\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx
+    args: -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite {input}
     outfolder: EventLogs
     outfile: evtx_dump.json
-    input: winevt
+    input: evtx_dump
+    github: https://github.com/omerbenamram/evtx.git
   - name: EvtxECmd
     binary: 'C:\Users\Gavin\code\wiskess\Get-ZimmermanTools\EvtxECmd\EvtxECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: EventLogs
     outfile: EvtxECmd-All.csv
     input: winevt
+    github: https://github.com/EricZimmerman/evtx.git
   - name: MFTECmd
     binary: C:\Users\Gavin\code\wiskess\Get-ZimmermanTools\MFTECmd.exe
     args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
     outfolder: FileSystem
     outfile: MFTECmd.csv
     input: mft
+    github: https://github.com/EricZimmerman/MFTECmd.git
   - name: mft
     binary: '{tool_path}\mft-v0.8.1.exe'
     args: '-o csv -f {outfolder}/{outfile}'
