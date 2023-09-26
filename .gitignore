@@ -1,1 +1,4 @@
 /target
+/tools/*
+!/tools/setup.ps1
+/output_test

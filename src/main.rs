@@ -1,16 +1,18 @@
 mod configs;
 mod ops;
 mod art;
+mod setup;
 
 use crate::configs::config;
 use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
+use crate::setup::init;
 use serde_yaml::{self};
 use std::fs::OpenOptions;
 use std::env;
 use clap::{Parser, ArgAction};
 use chrono::Utc;
-
+use ctrlc;
 
 /// Structure of the command line args
 #[derive(Parser, Debug)]
@@ -28,7 +30,7 @@ struct Args {
     #[arg(short, long)]
     out_path: String,
 
-    /// Start date
+    /// Start date 
     #[arg(long)]
     start_date: String,
     
@@ -50,6 +52,11 @@ struct Args {
 }
 
 fn main() {
+    // Set exit handler
+    ctrlc::set_handler(move || {
+        std::process::exit(0);
+    }).expect("Error setting Ctrl-C handler");
+
     // Get the args
     let args = Args::parse();
 
@@ -94,6 +101,9 @@ fn main() {
     let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
 
     // TODO: check or gracefully error when the yaml config misses keys
+
+    // TODO: check if setup has been run, or if any binaries are missing
+    init::run_setup(&main_args.tool_path);
 
     // check the file paths in the config exist and return a hash of the art paths
     let data_paths = paths::check_art(

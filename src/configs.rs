@@ -11,6 +11,9 @@ pub mod config {
   fn serde_true() -> bool {
     true
   }
+  fn serde_false() -> bool {
+    false
+  }
 
   /// Configuration of the commands to run
   #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,7 +34,22 @@ pub mod config {
     #[serde(default)]
     pub deps_github: String,
     #[serde(default = "serde_true")]
-    pub para: bool
+    pub para: bool,
+    #[serde(default = "serde_false")]
+    pub script: bool
+  }
+
+  // Configuration of the collector commands
+  #[derive(Debug, Serialize, Deserialize)]
+  pub struct Collectors {
+    pub name: String,
+    pub binary: String,
+    pub args: String,
+    pub outfolder: String,
+    #[serde(default)]
+    pub input: String,
+    #[serde(default)]
+    pub outfile: String,
   }
 
   /// Artefact paths and type
