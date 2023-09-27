@@ -60,8 +60,8 @@ function  gitInstall($gitRepo, $outDir) {
 function Install-Rust {
   # Download and install the Rust installer
   Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "$toolPath\rustup-init.exe"
-  Start-Process -FilePath "$toolPath\rustup-init.exe" -ArgumentList "-y"
-  Start-Sleep -Seconds 60
+  Start-Process -FilePath "$toolPath\rustup-init.exe" -ArgumentList "-y" -NoNewWindow -Wait
+  # Start-Sleep -Seconds 60
 }
 
 function Start-MainSetup {
@@ -80,15 +80,15 @@ function Start-MainSetup {
   # Rust is needed for compiling hayabusa and chainsaw
   Install-Rust
 
-  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
-  
+  RefreshEnv.cmd
+
   $gitRepos = @{
     # Format: "URL gitRepo" = "Output Director outDir"
     "https://github.com/EricZimmerman/Get-ZimmermanTools.git" = "Get-ZimmermanTools"
     "https://github.com/SigmaHQ/sigma" = "sigma"
     "https://github.com/countercept/chainsaw" = "chainsaw"
     "https://github.com/Yamato-Security/hayabusa" = "hayabusa"
-    # "https://github.com/omerbenamram/evtx.git" = "evtx"
+    "https://github.com/omerbenamram/evtx.git" = "evtx"
   }
   # Install all listed git repos
   $gitRepos.Keys.Clone() | ForEach-Object {
