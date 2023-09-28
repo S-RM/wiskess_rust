@@ -21,24 +21,27 @@ fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, fo
     // TODO: remove quotes from wisker.args, as it causes issues and isn't needed
     
     // replace the placeholders, i.e. {input}, in wisker.args with those from local variables, the yaml config, etc.
-    let wisker_arg = wisker.args
-        .replace("{input}", data_paths[&wisker.input].as_str())
-        .replace("{outfile}", &wisker.outfile.as_str())
-        .replace("{outfolder}", folder_path)
-        .replace("{start_date}", &main_args.start_date)
-        .replace("{end_date}", &main_args.end_date)
-        .replace("{ioc_file}", &main_args.ioc_file)
-        .replace("{out_path}", &main_args.out_path)
+    if data_paths.contains_key(&wisker.input) {
+        let wisker_arg = wisker.args
+            .replace("{input}", data_paths[&wisker.input].as_str())
+            .replace("{outfile}", &wisker.outfile.as_str())
+            .replace("{outfolder}", folder_path)
+            .replace("{start_date}", &main_args.start_date)
+            .replace("{end_date}", &main_args.end_date)
+            .replace("{ioc_file}", &main_args.ioc_file)
+            .replace("{out_path}", &main_args.out_path)
+            .replace("{tool_path}", &main_args.tool_path);
+        let wisker_binary = wisker.binary
         .replace("{tool_path}", &main_args.tool_path);
-    
-    let wisker_binary = wisker.binary
-        .replace("{tool_path}", &main_args.tool_path);
-    
-    // TODO: Check if wisker_arg contains any other placeholder
-    (wisker_arg, wisker_binary)
+        
+        // TODO: Check if wisker_arg contains any other placeholder
+        (wisker_arg, wisker_binary)
+    } else {
+        panic!("Unable to find the input data path. Check the config.")
+    }
 }
 
-pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String) {
+pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, bool) {
     // Make the output folders from the yaml config
     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
     file_ops::make_folders(&folder_path);
@@ -50,11 +53,11 @@ pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data
             
     // Check if the outfile already exists, ask user to overwrite
     let check_outfile = format!("{}/{}", &folder_path, &wisker.outfile);
-    file_ops::file_exists(
+    let overwrite_file = file_ops::file_exists(
         &check_outfile,
         main_args_c.silent
     );
-    (wisker_arg, wisker_binary)
+    (wisker_arg, wisker_binary, overwrite_file)
 }
 
 pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, out_log: &String) {
@@ -84,19 +87,21 @@ pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::Ma
         
         pool.spawn(move || {
     
-            let (wisker_arg, wisker_binary) = load_wisker(
+            let (wisker_arg, wisker_binary, overwrite_file) = load_wisker(
                 main_args_c, 
                 &wisker, 
                 data_paths_c);
         
-            let output = run_wisker(&wisker_binary, &wisker_arg);
-        
-            println!("[+] Ran {} with command: {} {}", 
-                &wisker.name, 
-                &wisker_binary,
-                &wisker_arg);
-                
-            tx.send(output.stdout).unwrap();
+            if overwrite_file {
+                let output = run_wisker(&wisker_binary, &wisker_arg);
+            
+                println!("[+] Ran {} with command: {} {}", 
+                    &wisker.name, 
+                    &wisker_binary,
+                    &wisker_arg);
+                    
+                tx.send(output.stdout).unwrap();
+            }
         });
     }
     drop(tx);
@@ -118,7 +123,6 @@ pub fn run_posh(script: &String) {
     if !check_binary(&pwsh) {
         pwsh = "powershell".to_string();
     }
-    let cmdline = format!("-f '{}'", script);
     let mut command = Command::new(pwsh);
 
     // command.arg(cmdline);
@@ -135,24 +139,6 @@ pub fn run_posh(script: &String) {
     } else {
         eprintln!("Interrupted!");
     }
-    // run_wisker(&pwsh, &cmdline);
-    // let code = load_file::load_str!(&script);
-    // let ps = powershell_script::PsScriptBuilder::new()
-    //     .no_profile(false)
-    //     .non_interactive(false)
-    //     .hidden(false)
-    //     .print_commands(true)
-    //     .build();
-    // let output = ps.run(code);
-
-    // match output {
-    //     Ok(output) => {
-    //         println!("{}", output);
-    //     }
-    //     Err(e) => {
-    //         println!("[!] Script was unable to run. Error: {}", e);
-    //     }
-    // }
 }
 
 fn check_binary(binary: &String) -> bool {

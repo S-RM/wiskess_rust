@@ -1,4 +1,7 @@
 artefacts:
+  - name: none
+    path: ''
+    path_type: file
   - name: winevt
     path: '{root}/Windows/System32/winevt/Logs'
     path_type: folder
@@ -21,7 +24,7 @@ artefacts:
     path: '{root}/Users'
     path_type: folder
   - name: consolehost_history
-    path: '{root}/Users//AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
+    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
     path_type: file
   - name: amcache
     path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
@@ -48,7 +51,7 @@ artefacts:
     path: '{root}/Windows/System32/winevt/Logs'
     path_type: folder
   - name: chrome
-    path: '{root}/Users//AppData/Local/Google/Chrome/User Data/Default'
+    path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
     path_type: folder
   - name: temp
     path: '{root}/Windows/Temp'
@@ -59,7 +62,19 @@ artefacts:
   - name: evtx_dump
     path: C:\Users\Gavin\code\win7-c-drive.E01\Artefacts\d\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx
     path_type: file
-    
+  - name: chrome
+    path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
+    path_type: folder
+  - name: actCache
+    path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'
+    path_type: file
+  - name: mcafee_nflow
+    path: '{root}\ProgramData\McAfee\MAR\data\nflow.db'
+    path_type: file
+  - name: mcafee_edrtrace
+    path: '{root}\ProgramData\McAfee\MAR\data\edrtrace.db'
+    path_type: file
+
 wiskers:
   - name: evtx_dump
     binary: '{tool_path}\evtx_dump-v0.8.1.exe'
@@ -205,7 +220,7 @@ wiskers:
     binary: pwsh.exe
     args: -c echo 'testing pwsh.exe'
     outfolder: Network
-    outfile: 'SumECmd.csv'
+    outfile: '*SumECmd*.csv'
     input: sum
     github: https://github.com/EricZimmerman/SumECmd.git
     script: true
@@ -227,14 +242,14 @@ wiskers:
     binary: '{tool_path}\Get-ZimmermanTools\SBECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: UserActivity
-    outfile: '.csv'
+    outfile: '*.csv'
     input: user_dir
     github:
   - name: JLECmd
     binary: '{tool_path}\Get-ZimmermanTools\JLECmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: UserActivity
-    outfile: Destinations.csv
+    outfile: '*Destinations.csv'
     input: user_dir
     github:
   - name: polars timeline

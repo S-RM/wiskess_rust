@@ -8,7 +8,7 @@ use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
 use crate::setup::init;
 use serde_yaml::{self};
-use std::fs::OpenOptions;
+use std::fs::{canonicalize, OpenOptions};
 use std::env;
 use clap::{Parser, ArgAction, Subcommand, Command};
 use chrono::Utc;
@@ -94,7 +94,7 @@ fn main() {
             ioc_file 
         } => {
             // Set output directories
-            let out_path = out_path;
+            let out_path = canonicalize(out_path).unwrap().display().to_string();
             file_ops::make_folders(&out_path);
             // Set main log
             let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);

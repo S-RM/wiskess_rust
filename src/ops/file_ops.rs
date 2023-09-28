@@ -5,39 +5,71 @@ use inquire::CustomType;
 use inquire::InquireError;
 use std::path::Path;
 use chrono::NaiveDate;
+use glob::glob;
 
 pub fn make_folders(out_path: &String) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
 }
 
-pub(crate) fn file_exists(file_path: &String, silent: bool) {
+pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
     println!("[+] Opening file: {file_path}");
 
+    let mut ret = true;
     let path = Path::new(&file_path);
     if path.exists() && path.is_file() {
-        let mut ans: Result<bool, InquireError> = Ok(true);
-        if !silent {
-            ans = Confirm::new("File exists. Do you want to overwrite the file?")
-                .with_default(false)
-                .with_help_message("Overwrite the file if you want to rerun the command.")
-                .prompt();
-        }
-
-        match ans {
-            Ok(true) => {
-                let _ = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&file_path)
-                    .expect("Failed to overwrite file");
-            } 
-            Ok(false) => println!("Keeping original file."),
-            Err(_) => println!("No valid response to question."),
-        }
+        ret = user_file_overwrite(silent, file_path);
     } else {
-        println!("File does not exist!");
-    }    
+        let file_path_glob = find_file_glob(&file_path);
+        if file_path_glob.len() > 0 {
+            ret = user_file_overwrite(silent, &file_path_glob);
+        } else {
+            println!("File does not exist!");
+        }
+    }
+        
+    return ret;
+}
+
+fn find_file_glob(path_str: &String) -> String {
+    // Get path from glob based path  
+    for entry in glob(path_str).expect("Unable to read glob pattern") {
+        match entry {
+            Ok(path) => {
+                return path.display().to_string();
+            }
+            Err(e) => println!("{:?}", e),
+        }
+    }
+    return "".to_string();
+}
+
+fn user_file_overwrite(silent: bool, file_path: &String) -> bool {
+    let mut ans: Result<bool, InquireError> = Ok(true);
+    if !silent {
+        ans = Confirm::new("File exists. Do you want to overwrite the file?")
+            .with_default(false)
+            .with_help_message("Overwrite the file if you want to rerun the command.")
+            .prompt();
+    }
+
+    match ans {
+        Ok(true) => {
+            let _ = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&file_path)
+                .expect("Failed to overwrite file");
+            return true;
+        } 
+        Ok(false) => {
+            println!("Keeping original file.");
+        }
+        Err(_) => {
+            println!("No valid response to question.");
+        }
+    }
+    return false;
 }
 
 pub fn check_date(date: String, date_type: &String) -> String {

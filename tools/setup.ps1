@@ -96,8 +96,8 @@ function Start-MainSetup {
   }
 
   # Hayabusa post process, move exe to sibling of rules
-  if ($(Test-Path -PathType Leaf "$toolPath\hayabusa\release\target\hayabusa.exe") -eq $True) {
-    Copy-Item "$toolPath\hayabusa\release\target\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
+  if ($(Test-Path -PathType Leaf "$toolPath\hayabusa\target\release\hayabusa.exe") -eq $True) {
+    Copy-Item "$toolPath\hayabusa\target\release\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
   } else {
     Copy-Item "$toolPath\tools\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
   }
