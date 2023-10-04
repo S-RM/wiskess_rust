@@ -1,13 +1,14 @@
 mod configs;
 mod ops;
 mod art;
-mod setup;
+mod scripts;
 
 use crate::configs::config;
 use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
-use crate::setup::init;
+use crate::scripts::init;
 use serde_yaml::{self};
+use std::collections::HashMap;
 use std::fs::{canonicalize, OpenOptions};
 use std::env;
 use clap::{Parser, ArgAction, Subcommand, Command};
@@ -39,6 +40,44 @@ enum Commands {
         config: String,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long)]
+        data_source_list: String,
+        /// file path where the data is temporarily downloaded to and Wiskess output is stored locally
+        #[arg(short, long)]
+        local_storage: String,
+        /// Start date - typically the earliest time of the incident, or a few days before
+        #[arg(long)]
+        start_date: String,
+        /// End date - the current date or end of the incident timeframe
+        #[arg(long)]
+        end_date: String,
+        /// IOC list file
+        #[arg(short, long)]
+        ioc_file: String,
+        /// Either 'azure' or 'aws' - based on where the data source is stored.
+        #[arg(short, long)]
+        storage_type: String,
+        /// The link that the data is stored on, i.e https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
+        #[arg(long)]
+        in_link: String,
+        /// The link where you need the wiskess output uploaded to, 
+        /// i.e. https://myaccount.file.core.windows.net/results/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s
+        #[arg(long)]
+        out_link: String,
+        /// Set this flag to update the Wiskess results, such as changing the timeframe or after adding new IOCs to the list.
+        #[arg(short, long)]
+        update: bool,
+        /// Set this flag to keep the downloaded data on your local storage. Useful if wanting to process the data after Wiskess. 
+        /// Caution: make sure you have enough disk space for all the data source list.
+        #[arg(short, long)]
+        keep_evidence: bool,
+    },
+    /// process the data with wiskess
+    Wiskess {
+        /// config file of the artefact file paths and binaries to run as processors
+        #[arg(short, long)]
+        config: String,
+        /// file path to the data source; either mounted or the root folder
+        #[arg(short, long)]
         data_source: String,
         /// output folder that will be the destination of the processed results
         #[arg(short, long)]
@@ -52,9 +91,6 @@ enum Commands {
         /// IOC list file
         #[arg(short, long)]
         ioc_file: String,
-    },
-    /// report generation of the processed results
-    Report {
     }
 }
 
@@ -86,6 +122,39 @@ fn main() {
             init::run_setup(&tool_path);
         },
         Commands::Whipped { 
+            config,
+            data_source_list,
+            local_storage,
+            start_date,
+            end_date,
+            ioc_file,
+            storage_type,
+            in_link,
+            out_link,
+            update,
+            keep_evidence,
+        } => {            
+            // Confirm date is valid
+            let start_date = file_ops::check_date(start_date, &"start date".to_string());
+            let end_date = file_ops::check_date(end_date, &"end date".to_string());
+
+            // put the args into a whipped structure
+            let args = config::WhippedArgs {
+                config,
+                data_source_list,
+                local_storage,
+                start_date,
+                end_date,
+                ioc_file,                
+                storage_type,
+                in_link,
+                out_link,
+                update,
+                keep_evidence,
+            };
+            init::run_whipped(&tool_path, args)
+        },
+        Commands::Wiskess { 
             config, 
             data_source, 
             out_path, 
@@ -94,7 +163,7 @@ fn main() {
             ioc_file 
         } => {
             // Set output directories
-            let out_path = canonicalize(out_path).unwrap().display().to_string();
+            // let out_path = canonicalize(out_path).unwrap().display().to_string();
             file_ops::make_folders(&out_path);
             // Set main log
             let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);
@@ -132,9 +201,9 @@ fn main() {
             // Run each binary in parallel    
             exe_ops::run_commands(&scrape_config.wiskers, &main_args, &data_paths, 0, &out_log);
             // Run each binary one after the other
-            exe_ops::run_commands(&scrape_config.wiskers, &main_args, &data_paths, 1, &out_log);
+            exe_ops::run_commands(&scrape_config.wiskers, &main_args, &data_paths, 1, &out_log); 
+
         },
-        Commands::Report {  } => todo!(),
     }
 
 }

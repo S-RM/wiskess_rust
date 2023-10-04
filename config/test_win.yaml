@@ -60,19 +60,13 @@ artefacts:
     path: C:\Users\Gavin\code\win7-c-drive.E01
     path_type: folder
   - name: evtx_dump
-    path: C:\Users\Gavin\code\win7-c-drive.E01\Artefacts\d\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx
+    path: '{root}/Windows/System32/winevt/Logs/Microsoft-Windows-TaskScheduler%4Operational.evtx'
     path_type: file
   - name: chrome
     path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     path_type: folder
   - name: actCache
     path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'
-    path_type: file
-  - name: mcafee_nflow
-    path: '{root}\ProgramData\McAfee\MAR\data\nflow.db'
-    path_type: file
-  - name: mcafee_edrtrace
-    path: '{root}\ProgramData\McAfee\MAR\data\edrtrace.db'
     path_type: file
 
 wiskers:
@@ -155,14 +149,14 @@ wiskers:
     github: https://github.com/EricZimmerman/RecentFileCacheParser.git
   - name: SCCM_RecentlyUsedApplication
     binary: py
-    args: '{tool_path}\tools\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
+    args: '{tool_path}\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
     input: objects
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
-    args: '-3 {tool_path}\tools\PyWMIPersistenceFinder.py {input}'
+    args: '-3 {tool_path}\PyWMIPersistenceFinder.py {input}'
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects
@@ -174,13 +168,6 @@ wiskers:
     outfile: prefetch.csv
     input: prefetch
     github: https://github.com/EricZimmerman/Prefetch.git
-  - name: SqlECmd
-    binary: '{tool_path}\Get-ZimmermanTools\SQLECmd\SQLECmd.exe'
-    args: '-f {input} --csv {outfolder}'
-    outfolder: FileExecution
-    outfile: '_Trace_Data.csv'
-    input: mcafee_edrtrace
-    github: https://github.com/EricZimmerman/SQLECmd.git
   - name: iocs_analysis
     binary: rg.exe
     args: '--hidden --trim -zUiFf {ioc_file} {out_path}\Analysis'
@@ -210,7 +197,7 @@ wiskers:
     input: system32
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: hindsight
-    binary: '{tool_path}\tools\hindsight.exe'
+    binary: '{tool_path}\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
     outfolder: Network
     outfile: hindsight
@@ -226,16 +213,16 @@ wiskers:
     script: true
   - name: RegSystem
     binary: '{tool_path}\Get-ZimmermanTools\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\tools\Good_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    args: '--bn {tool_path}\Get-ZimmermanTools\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
-    outfile: reg-System_Good_Batch.csv
+    outfile: reg-System.csv
     input: system
     github:
   - name: RegUser
     binary: '{tool_path}\Get-ZimmermanTools\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\tools\Good_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    args: '--bn {tool_path}\Get-ZimmermanTools\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
-    outfile: reg-User_Good_Batch.csv
+    outfile: reg-User.csv
     input: user_dir
     github:
   - name: SBE
@@ -261,7 +248,7 @@ wiskers:
 claws_out:
   - name: chainsaw_evtx
     binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
-    args: 'hunt {input} -s {tool_path}\sigma -r {tool_path}\tools\chainsaw\rules --mapping {tool_path}\tools\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
+    args: 'hunt {input} -s {tool_path}\sigma -r {tool_path}\chainsaw\rules --mapping {tool_path}\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
     outfolder: EventLogs\chainsaw
     outfile: sigma.csv
     input: winevt

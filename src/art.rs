@@ -3,6 +3,7 @@ pub mod paths {
     use glob::glob;
     use inquire::Text;
     use crate::{configs::config::Artefacts};
+    use urlencoding::encode;
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool) -> HashMap<String, String> {
         let mut art_paths = HashMap::new();
@@ -15,18 +16,32 @@ pub mod paths {
             let art_name = format!("{}", art.name);
             get_path(path_str, &mut art_paths, &art_name);
             if art_paths.get(&art.name).is_none() {
-                println!("[-] Path for {} not found at {}", art.name, path_str);
-                // if not found, check others: mounted or ask user
-                // TODO: if collected path from live mount, check mounted
-                // if not found, ask the user to enter path
-                if silent {
-                    // add path to hash
-                    art_paths.insert(
-                        art.name,
-                        path_str.to_string()
-                    );
-                } else {
-                    get_users_path(&art_name, &mut art_paths);
+                // TODO: check urlencoded filename
+                let path = Path::new(path_str);
+                let filename = path.file_name();
+                if filename != None {
+                    let parent = path.parent().unwrap();
+                    let filename_str = filename.unwrap().to_str().unwrap().replace(":","%3A");
+                    let enc_path = format!(
+                        "{}/{}", 
+                        parent.to_str().unwrap(), 
+                        filename_str);
+                    get_path(&enc_path, &mut art_paths, &art_name);
+                }
+                if art_paths.get(&art.name).is_none() {
+                    println!("[-] Path for {} not found at {}", art.name, path_str);
+                    // if not found, check others: mounted or ask user
+                    // TODO: if collected path from live mount, check mounted
+                    // if not found, ask the user to enter path
+                    if silent {
+                        // add path to hash
+                        art_paths.insert(
+                            art.name,
+                            path_str.to_string()
+                        );
+                    } else {
+                        get_users_path(&art_name, &mut art_paths);
+                    }
                 }
             }
         }

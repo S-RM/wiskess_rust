@@ -12,8 +12,6 @@ pub fn make_folders(out_path: &String) {
 }
 
 pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
-    println!("[+] Opening file: {file_path}");
-
     let mut ret = true;
     let path = Path::new(&file_path);
     if path.exists() && path.is_file() {
@@ -23,7 +21,7 @@ pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
         if file_path_glob.len() > 0 {
             ret = user_file_overwrite(silent, &file_path_glob);
         } else {
-            println!("File does not exist!");
+            println!("[-] File does not exist: {}", file_path);
         }
     }
         
@@ -44,9 +42,10 @@ fn find_file_glob(path_str: &String) -> String {
 }
 
 fn user_file_overwrite(silent: bool, file_path: &String) -> bool {
-    let mut ans: Result<bool, InquireError> = Ok(true);
+    let mut ans: Result<bool, InquireError> = Ok(false);
     if !silent {
-        ans = Confirm::new("File exists. Do you want to overwrite the file?")
+        let msg = format!("File exists: {}\nDo you want to overwrite the file?", file_path);
+        ans = Confirm::new(&msg)
             .with_default(false)
             .with_help_message("Overwrite the file if you want to rerun the command.")
             .prompt();
@@ -63,7 +62,7 @@ fn user_file_overwrite(silent: bool, file_path: &String) -> bool {
             return true;
         } 
         Ok(false) => {
-            println!("Keeping original file.");
+            println!("[ ] The file already exists: {}", file_path);
         }
         Err(_) => {
             println!("No valid response to question.");

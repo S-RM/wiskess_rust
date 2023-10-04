@@ -36,7 +36,9 @@ pub mod config {
     #[serde(default = "serde_true")]
     pub para: bool,
     #[serde(default = "serde_false")]
-    pub script: bool
+    pub script: bool,
+    #[serde(default)]
+    pub script_posh: String,
   }
 
   // Configuration of the collector commands
@@ -69,5 +71,21 @@ pub mod config {
       pub tool_path: String,
       pub ioc_file: String,
       pub silent: bool
+  }
+
+  // Set struct for whipped args
+  #[derive(Debug, Clone)]
+  pub struct WhippedArgs {
+    pub config: String,
+    pub data_source_list: String,
+    pub local_storage: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub ioc_file: String,
+    pub storage_type: String,
+    pub in_link: String,
+    pub out_link: String,
+    pub update: bool,
+    pub keep_evidence: bool
   }
 }

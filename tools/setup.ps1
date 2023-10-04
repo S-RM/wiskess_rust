@@ -39,10 +39,10 @@ function  gitInstall($gitRepo, $outDir) {
   if ($(Test-Path -PathType Container -Path "$outDir\.git") -eq $False) {
     write-host "Installing $outDir" -ForegroundColor Magenta
     git clone "$gitRepo" "$toolPath\$outDir" --recursive
-    cd "$toolPath\$outDir"
+    Set-Location "$toolPath\$outDir"
   } else {
     write-host "Updating $outDir" -ForegroundColor Magenta
-    cd "$toolPath\$outDir"
+    Set-Location "$toolPath\$outDir"
     git pull
   }
   if ($(Test-Path -PathType Leaf -Path "$toolPath\$outDir\requirements.txt") -eq $True) {
@@ -52,23 +52,33 @@ function  gitInstall($gitRepo, $outDir) {
     py "$toolPath\$outDir\setup.py" install
   }
   if ($(Test-Path -PathType Leaf -Path "$toolPath\$outDir\Cargo.toml") -eq $True) {
-    cargo build --release
+    & "$env:USERPROFILE\.cargo\bin\cargo.exe" build --release
   }
-  cd "$toolPath"
+  Set-Location "$toolPath"
 }
 
 function Install-Rust {
+  choco uninstall rust
   # Download and install the Rust installer
   Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "$toolPath\rustup-init.exe"
   Start-Process -FilePath "$toolPath\rustup-init.exe" -ArgumentList "-y" -NoNewWindow -Wait
+  & "$env:USERPROFILE\.cargo\bin\rustup.exe" uninstall toolchain stable-x86_64-pc-windows-msvc
+  & "$env:USERPROFILE\.cargo\bin\rustup.exe" toolchain install stable-x86_64-pc-windows-gnu
+  & "$env:USERPROFILE\.cargo\bin\rustup.exe" default stable-x86_64-pc-windows-gnu
   # Start-Sleep -Seconds 60
+}
+
+function Install-Azcopy {
+  Invoke-WebRequest -Uri "https://aka.ms/downloadazcopy-v10-windows" -OutFile "$toolPath\AzCopy.zip" -UseBasicParsing
+  7z e "$toolPath\AzCopy.zip" -o"$toolPath\azcopy\" azcopy.exe -r -aoa
+  Remove-Item "$toolPath\AzCopy.zip"
 }
 
 function Start-MainSetup {
   # install chocolatey, git, 7zip, ripgrep, python2/3, EZ-Tools, chainsaw, hayabusa, osfmount, fd
   Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
-  choco install -y git 7zip ripgrep python2 fd osfmount
+  choco install -y git 7zip ripgrep python2 fd osfmount awscli mingw
   $chkPython = checkPython
   if ($chkPython.ToLower().Contains("python 3")) {
     write-host "Python already installed" -ForegroundColor White -BackgroundColor DarkGreen
@@ -80,6 +90,9 @@ function Start-MainSetup {
   # Rust is needed for compiling hayabusa and chainsaw
   Install-Rust
 
+  # Download azcopy to tools folder
+  Install-Azcopy
+
   RefreshEnv.cmd
 
   $gitRepos = @{
@@ -89,6 +102,9 @@ function Start-MainSetup {
     "https://github.com/countercept/chainsaw" = "chainsaw"
     "https://github.com/Yamato-Security/hayabusa" = "hayabusa"
     "https://github.com/omerbenamram/evtx.git" = "evtx"
+    "https://github.com/Neo23x0/Loki.git" = "loki"
+    "https://github.com/Neo23x0/Loki2.git" = "loki2"
+    "https://github.com/omerbenamram/mft.git" = "mft"
   }
   # Install all listed git repos
   $gitRepos.Keys.Clone() | ForEach-Object {
@@ -99,12 +115,11 @@ function Start-MainSetup {
   if ($(Test-Path -PathType Leaf "$toolPath\hayabusa\target\release\hayabusa.exe") -eq $True) {
     Copy-Item "$toolPath\hayabusa\target\release\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
   } else {
-    Copy-Item "$toolPath\tools\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
+    Copy-Item "$toolPath\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
   }
 
   # EZ Tools
   & "$toolPath\Get-ZimmermanTools\Get-ZimmermanTools.ps1" -NetVersion 4 -Dest "$toolPath\Get-ZimmermanTools\"
-  Copy-Item "$toolPath\sqlecmd_maps\*" "$toolPath\Get-ZimmermanTools\SQLECmd\Maps\"
 
   # installPython-CIM -- needs python2
   py -3 -m pip install PyQt6
@@ -116,11 +131,7 @@ function Start-MainSetup {
   py -m pip install datetime
 
   # Reprting - Out-HTMLView and New-HTMLTable
-  Install-Module -Force PSWriteHTML
-
-  # update thor-lite
-  & "$toolPath\tools\thor-lite\thor-lite-util.exe" upgrade
-  & "$toolPath\tools\thor-lite\thor-lite-util.exe" update
+  Install-Module -Force PSWriteHTML -SkipPublisherCheck
 }
 
 Start-MainSetup
