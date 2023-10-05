@@ -48,6 +48,7 @@ wiskess_rust.exe whipped --config ./config/win_all.yml
 ## Parameters
 <details>
     <summary>Click to show the parameters for `wiskess_rust.exe whipped`</summary>
+    
     --config <String>
         Required. The paths to the configuration file, i.e. ./config/win_all.yml
             
@@ -102,6 +103,7 @@ run `wiskess_rust.exe setup` using PowerShell as Administrator
 ## Parameters
 <details>
     <summary>Click to show the parameters for `wiskess_rust.exe wiskess`</summary>
+        
     --config <String>
         Required. The paths to the configuration file, i.e. ./config/win_all.yml
             
