@@ -1,6 +1,7 @@
 # wiskess_rust
 
-<div><img src=https://github.com/vividDuck/wiskess_posh/assets/122105925/2e407444-7a1a-48cb-8d1e-e4e130467a33" alt="Image"></div>
+![271793948-27e9b4b3-0a7f-4efb-a844-2eda7a8a6385](https://github.com/vividDuck/wiskess_rust/assets/122105925/46cacffc-a0d0-4ec7-b1cb-60bca314d2bb)
+
 WISKESS automates the Windows evidence processing for Incident Response investigations. Rust version is a program that has been developed with enhanced parallel processing and reliability.
 
 This is the Rust version of WISKESS, which uses parallel processing of multiple tools including Hayabusa, Chainsaw, EZ-Tools, Loki, SCCM Recently Used, WMI Persistence, python-cim, Browsing History, Hindsight, ripgrep, velociraptor, and more can be added. 
