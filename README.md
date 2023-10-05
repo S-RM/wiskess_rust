@@ -13,8 +13,8 @@ The results are structured into folders in CSV files that can be opened with tex
 The output is generated into reports of a timeline that is compatible with ingesting into visualisation tools including, timesketch, elastic and splunk.
 
 
-# Whipped by WISKESS `whipped.ps1`
-This script will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
+# Whipped by WISKESS `wiskess_rust.exe whipped`
+This command will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
 
 ## Usage
 This can be used to process Windows data sources stored on either an Azure or AWS S3 cloud account. It can also be used to process data from a network share or local drive.
@@ -34,61 +34,63 @@ This can be used to process Windows data sources stored on either an Azure or AW
 
 ## Example
 ```
-whipped.ps1 -dataSourceList "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
-        -local_storage x:
-        -storageType azure
-        -in_link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
-        -out_link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
-        -time_start 2023-01-01 `
-        -time_end 2023-02-01
+wiskess_rust.exe whipped --config ./config/win_all.yml
+        --data-source-list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
+        --local-storage x:
+        --storage-type azure
+        --in-link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
+        --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
+        --start-date 2023-01-01 `
+        --end-date 2023-02-01 `
+        --ioc-file ./iocs.txt
 ```
 
 ## Parameters
 <details>
-    <summary>Click to show the parameters for `whipped.ps1`</summary>
-    -dataSourceList <String>
-        Required. The paths to the file, folder of images, collections, etc. Must be separated by comma ','
+    <summary>Click to show the parameters for `wiskess_rust.exe whipped`</summary>
+    --config <String>
+        Required. The paths to the configuration file, i.e. ./config/win_all.yml
+            
+    --data-source-list <String>
+        Required. The paths to the file, folder of images, collections, etc. Must be separated by comma ',' or new line
 
-    -local_storage <String>
+    --local-storage <String>
         Required. The path to where the data is temporarily downloaded to and Wiskess output is stored locally
 
-    -storageType <String>
+    --storage-type <String>
         Requried. Either 'azure' or 'aws' - based on where the data source is stored.
 
-    -in_link <String>
+    --in-link <String>
         Required. The link that the data is stored on, i.e.
         https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
 
-    -out_link <String>
+    --out-link <String>
         Required. The link where you need the wiskess output uploaded to, i.e.
         https://myaccount.file.core.windows.net/results/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s
 
-    -ioc_file <String>
+    --ioc-file <String>
 
-    -time_start <String>
+    --start-date <String>
         Required. The start time from when we want to look for interesting information. Normally aligned with the incident timeframe.    
         Caution: specifying a wide timeframe will cause performance issues.
 
-    -time_end <String>
+    --end-date <String>
         Required. The end time to when we want to look for interesting information. Normally aligned with the incident timeframe.        
         Caution: specifying a wide timeframe will cause performance issues.
 
-    -update [<SwitchParameter>]
+    --update
         Optional. Set this flag to update the Wiskess results, such as changing the timeframe or after adding new IOCs to the list.      
 
-    -keepEvidence [<SwitchParameter>]
+    --keep-evidence
         Optional. Set this flag to keep the downloaded data on your local storage. Useful if wanting to process the data after Wiskess.  
         Caution: make sure you have enough disk space for all the data source list.
-
-    -toolPath <String>
-        Optional. The path to the directory of the whipped.ps1 script
 </details>
     
-# WISKESS `wiskess.ps1`
-This is the PowerShell version of WISKESS, which uses parallel processing of multiple processors, enriches the data and creates reports. It is invoked by `whipped.ps1`, but can also be used independently.
+# WISKESS `wiskess_rust.exe wiskess`
+This is the Rust version of WISKESS, which uses parallel processing of multiple processors, enriches the data and creates reports. It is invoked by the command `wiskess_rust.exe whipped`, but can also be used independently with the command `wiskess_rust.exe wiskess`.
 
 ## Requirements
-run `setup.ps1` using PowerShell as Administrator
+run `wiskess_rust.exe setup` using PowerShell as Administrator
 
 ## Usage
 * Mount the image to a drive, i.e. using Arsenal Image Mounter. Can be skipped if using a folder of artefacts.
@@ -99,81 +101,36 @@ run `setup.ps1` using PowerShell as Administrator
 
 ## Parameters
 <details>
-    <summary>Click to show the parameters for `wiskess.ps1`</summary>
-    -dataSource <String>
+    <summary>Click to show the parameters for `wiskess_rust.exe wiskess`</summary>
+    --config <String>
+        Required. The paths to the configuration file, i.e. ./config/win_all.yml
+            
+    --data-source <String>
         Required. The drive letter the image is mounted on.
 
-    -outFilePath <String>
+    --out-path <String>
         Required. Where you want to store the analysis and artefact results.
 
-    -iocFile <String>
+    --ioc-file <String>
         Optional. The path to a file containing a list of indicators of compromise. Each indicator is on a separate line.
 
-    -time_start <String>
+    --start-date <String>
         Optional. The start time from when we want to look for interesting information. Normally aligned with the incident timeframe.    
         Caution: specifying a high number of days will cause performance issues.
 
-    -time_end <String>
+    --end-date <String>
         Optional. The end time to when we want to look for interesting information. Normally aligned with the incident timeframe.        
         Caution: specifying a high number of days will cause performance issues.
 
-    -noVelociraptor [<SwitchParameter>]
-        Optional. Flag to skip the collection using Velociraptor to speed up analysis. Can cause access control issues if set.
-
-    -clawsOut [<SwitchParameter>]
-        Optional. Run an intense system-wide scan for IOCs using ripgrep and thor
-
-    -wmiParse [<SwitchParameter>]
-        Optional. Parse the WMI artefacts using WMI-CIM. Can cause performance issues.
-
-    -noInput [<SwitchParameter>]
-        Optional. Skip all actions needing a user input. Useful for batch processes or benchmarking.
-
-    -collection [<SwitchParameter>]
-
-    -toolPath <String>
-        Optional. The path to the directory of the wiskess.ps1 script
+    --claws-out
+        Optional. Run an intense system-wide scan for IOCs using ripgrep and loki
 </details>
 
 ## Examples for wiskess
 ## EXAMPLE 1
 
-Minimum arguments required to collect artefacts from E:, with a quick triage of the last 7 days and storing results to Z:\Project file path.
+Minimum arguments required to collect artefacts from E:, with a quick triage of the last 7 days and storing results to Z:\Project file path. And provide a list of indicators in a file path.
 ```
-    .\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-02-01
+    ./wiskess_rust.exe wiskess --config ./config/all_win.yml --data-source E: -out-path "Z:\Project" --start-date 2023-01-01 --end-date 2023-02-01 --ioc-file ./iocs.txt
 
-```
-## EXAMPLE 2
-
-Don't ask for any user input, just do it. Also only collect the minimum files and only look back the past 1 day. Useful for batch processes or benchmarking.
-```
-    .\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-01-02 -noInput -noVelociraptor
-
-```
-## EXAMPLE 3
-
-Only collect the minimum files. Useful for saving disk space and time.
-```
-.\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-02-01 -noVelociraptor
-
-```
-## EXAMPLE 4
-
-Run an intense scan of the artefacts. This includes processing of WMI with python-cim, full scans of the mounted drive using ripgrep with the iocs.txt list, and loki with all flags enabled
-```
-    .\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-02-01 -clawsOut
-
-```
-## EXAMPLE 5
-
-Provide a list of indicators in a file path.
-```
-.\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-02-01 -iocFile "Z:\Project\iocs.txt"    
-```
-
-## EXAMPLE 6
-
-Run the WMI parsing functions.
-```
-.\wiskess.ps1 -dataSource E: -outFilePath "Z:\Project" -time_start 2023-01-01 -time_end 2023-02-01 -wmiParse
 ```
