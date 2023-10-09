@@ -92,7 +92,7 @@ def df_time(df, art, file, art_time, art_msg, fmt_time, host):
   art_tln = df.select([
     # pl.col(art_time).alias('datetime').str.replace(r"(?:Z|\s*\+\d{2}.*)$","").str.strptime(pl.Datetime, format=fmt_time, strict=False).dt.cast_time_unit("ms"),
     # pl.col(art_time).alias('datetime').str.replace(r"(?:Z|\s*\+\d{2}.*)$","").str.to_datetime(format=fmt_time).dt.cast_time_unit("ms"),
-    pl.col(art_time).alias('datetime'),
+    pl.col(art_time).str.replace(r"(?:Z|\s*\+\d{2}.*)$","").str.to_datetime(format=fmt_time).alias('datetime'),
     pl.lit(f'{art} - {filename}: {art_time}').alias('timestamp_desc'),
     pl.concat_str(pl.col(art_msg).fill_null(pl.lit(""),), separator="; ").alias('message'),
     pl.col(art_msg),
@@ -215,7 +215,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'out': f'{out_filepath}\\Timeline\\browser-hist.csv',
       'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
       'times': ['Visit Time'],
-      'fmt_time': '%D %r'
+      'fmt_time': '%d/%m/%Y %T'
     },
     'shellbags': {
       'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
