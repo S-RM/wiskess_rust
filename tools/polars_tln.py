@@ -257,8 +257,8 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'fmt_time': '%F %T'    
     },
     'mft':{
-      'file': f'{out_filepath}\\FileSystem\\mft.csv',
-      'out': f'{out_filepath}\\Timeline\\mft.csv',
+      'file': f'{out_filepath}\\FileSystem\\MFTECmd.csv',
+      'out': f'{out_filepath}\\Timeline\\MFTECmd.csv',
       'msg':['ParentPath','FileName','Extension','FileSize'],
       'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
       'fmt_time': '%F %T%.f'
