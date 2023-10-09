@@ -11,6 +11,6 @@ pub mod init {
     pub fn run_whipped(tool_path: &String, args: config::WhippedArgs) {
         println!("[+] Running whipped...");
         let script = format!("{}/{}", &tool_path, "whipped.ps1");
-        exe_ops::run_whipped_script(&tool_path, &script, args);
+        exe_ops::run_whipped_script(&script, args);
     }
 }

@@ -1,5 +1,4 @@
 use std::{collections::HashMap, process::{Stdio, Command}, io::Write};
-use chrono::format;
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::OpenOptions;
@@ -115,11 +114,11 @@ pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::Ma
                 &wisker, 
                 data_paths_c);
 
-            if wisker.script {
-                run_posh("-c", &wisker_script);
-            }
-        
             if overwrite_file {
+                if wisker.script {
+                    run_posh("-c", &wisker_script);
+                }
+                
                 let output = run_wisker(&wisker_binary, &wisker_arg);
             
                 println!("[+] Done {} with command: {} {}", 
@@ -148,33 +147,23 @@ pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::Ma
     }
 }
 
-pub fn run_whipped_script(tool_path: &String, script: &String, args: config::WhippedArgs) {
+pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     let mut pwsh = "pwsh".to_string();
     if !check_binary(&pwsh, "-h") {
         pwsh = "powershell".to_string();
     }
     let mut command = Command::new(pwsh);
 
-    command.arg("-f");
-    command.arg(script);
-    command.arg("-config");
-    command.arg(args.config);
-    command.arg("-data_source_list");
-    command.arg(args.data_source_list);
-    command.arg("-local_storage");
-    command.arg(args.local_storage);
-    command.arg("-start_date");
-    command.arg(args.start_date);
-    command.arg("-end_date");
-    command.arg(args.end_date);
-    command.arg("-ioc_file");
-    command.arg(args.ioc_file);   
-    command.arg("-storage_type");
-    command.arg(args.storage_type);
-    command.arg("-in_link");
-    command.arg(args.in_link);
-    command.arg("-out_link");
-    command.arg(args.out_link);
+    command.args(["-f", script]);
+    command.args(["-config", &args.config]);
+    command.args(["-data_source_list", &args.data_source_list]);
+    command.args(["-local_storage", &args.local_storage]);
+    command.args(["-start_date", &args.start_date]);
+    command.args(["-end_date", &args.end_date]);
+    command.args(["-ioc_file", &args.ioc_file]);
+    command.args(["-storage_type", &args.storage_type]);
+    command.args(["-in_link", &args.in_link]);
+    command.args(["-out_link", &args.out_link]);
     if args.update {
         command.arg("-update");
     }

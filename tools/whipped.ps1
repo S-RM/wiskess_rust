@@ -71,7 +71,7 @@ param (
 
 function Get-FreeDrives ($start, $end) {
     $mounted_drives = (Get-PSDrive -PSProvider FileSystem).Name
-    $start..$end | ? {$_ -cnotin $mounted_drives}
+    $start..$end | Where-Object {$_ -cnotin $mounted_drives}
 }
 
 function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $ioc_file, $osf_mount) {   
@@ -102,7 +102,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     }
 
     $done = $false
-    $free_drives | % { 
+    $free_drives | ForEach-Object { 
         $drive_mount = "$($_):"
         if (!$done) {
             if ($(Get-PSDrive -Name $($drive_mount -replace ":$","") -ErrorAction SilentlyContinue) -and $(Test-Path -PathType Container "$($drive_mount)\Windows") ) {

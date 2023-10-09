@@ -6,6 +6,9 @@ pub mod config {
   pub struct Config {
       pub artefacts: Vec<Artefacts>,
       pub wiskers: Vec<Wiskers>,
+      pub enrichers: Vec<Wiskers>,
+      pub reporters: Vec<Wiskers>,
+      pub collectors: Vec<Wiskers>,
   }
 
   fn serde_true() -> bool {
@@ -23,12 +26,13 @@ pub mod config {
     pub args: String,
     pub outfolder: String,
     pub input: String,
-    #[serde(default)]
     pub outfile: String,
     #[serde(default)]
     pub choco: String,
     #[serde(default)]
-    pub github: String,
+    pub github: String,    
+    #[serde(default)]
+    pub web_download: String,
     #[serde(default)]
     pub deps_choco: String,
     #[serde(default)]
@@ -39,19 +43,6 @@ pub mod config {
     pub script: bool,
     #[serde(default)]
     pub script_posh: String,
-  }
-
-  // Configuration of the collector commands
-  #[derive(Debug, Serialize, Deserialize)]
-  pub struct Collectors {
-    pub name: String,
-    pub binary: String,
-    pub args: String,
-    pub outfolder: String,
-    #[serde(default)]
-    pub input: String,
-    #[serde(default)]
-    pub outfile: String,
   }
 
   /// Artefact paths and type

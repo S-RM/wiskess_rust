@@ -59,9 +59,6 @@ artefacts:
   - name: temp
     path: '{root}/Windows/Temp'
     path_type: folder
-  - name: polars_test
-    path: C:\Users\Gavin\code\win7-c-drive.E01
-    path_type: folder
   - name: evtx_dump
     path: '{root}/Windows/System32/winevt/Logs/Microsoft-Windows-TaskScheduler%4Operational.evtx'
     path_type: file
@@ -194,6 +191,13 @@ wiskers:
     outfile: hindsight
     input: user_dir
     github:
+  - name: Browsing History
+    binary: '{tool_path}\BrowsingHistoryView.exe'
+    args: '/sort 2 /historysource 3 /historysourcefolder {input} /visittimefiltertype 1 /showTimeInGMT 1 /scomma {outfolder}/{outfile}'
+    outfile: BrowsingHistory.csv
+    outfolder: Network
+    input: user_dir
+    web_download: https://www.nirsoft.net/utils/browsinghistoryview-x64.zip
   - name: SumECmd
     binary: '{tool_path}\Get-ZimmermanTools\SumECmd.exe'
     args: '-d {input} --csv {outfolder}'
@@ -255,6 +259,50 @@ collectors:
     input: base
   - name: 7zip
     binary: 7z
-    args: 'x {outdir}\{outfile} -o{outdir} -aos'
+    args: 'x {outfolder}\{input} -o{out_path} -aos'
     outfolder: Artefacts
+    input: 'velociraptor_collect.zip'
     outfile: 'velociraptor_collect.zip'
+
+reporters:
+  - name: polars timeline
+    binary: py
+    args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
+    outfolder: Timeline
+    outfile: mft.json
+    input: none
+  - name: polars hostinfo
+    binary: py
+    args: '{tool_path}/polars_hostinfo.py {out_path} {outfile}'
+    outfolder: Timeline
+    outfile: 'Host_Information.txt'
+    input: none
+  - name: iocs_summary
+    binary: rg.exe
+    args: '-aiwFf {ioc_file} {outfolder} --json > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: IOCs_summary.json
+    input: none
+    github: https://github.com/BurntSushi/ripgrep.git
+
+enrichers:
+  - name: polars enrich
+    binary: py
+    args: '{tool_path}/polars_enrich.py {out_path} {outfile} {tool_path}'
+    outfolder: IOC_Findings
+    outfile: enriched_indicators.xlsx
+    input: none
+  - name: iocs_analysis
+    binary: rg.exe
+    args: '--hidden --trim -zUiFf {ioc_file} {out_path} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_analysis.txt
+    input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_pagefile
+    binary: rg.exe
+    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_pagefile.txt
+    input: pagefile
+    github: https://github.com/BurntSushi/ripgrep.git

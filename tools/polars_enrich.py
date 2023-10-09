@@ -41,12 +41,12 @@ def cleanup(file):
         
         
 
-def get_indicators(out_filepath, tool_path):
+def get_indicators(out_filepath, out_file, tool_path):
     dict_tln = {
         'amcache': {
             'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
-            'file': f'{out_filepath}\\Analysis\\FileExecution\\',
-            'out': f'{out_filepath}\\Analysis\\Timeline\\amcache.csv',
+            'file': f'{out_filepath}\\FileExecution\\',
+            'out': f'{out_filepath}\\Timeline\\amcache.csv',
             'msg': ['SHA1','FullPath','FileExtension','ProductName'],
             'times': ['FileKeyLastWriteTimestamp','FileIDLastWriteTimestamp'],
             'fmt_time': '%F %T'
@@ -54,8 +54,8 @@ def get_indicators(out_filepath, tool_path):
         'browser-hist': {
             # TODO: resolve parsing error of none utf-8
             'regex_file': r'BrowsingHistory\.csv$',
-            'file': f'{out_filepath}\\Analysis\\Network\\',
-            'out': f'{out_filepath}\\Analysis\\Timeline\\browser-hist.csv',
+            'file': f'{out_filepath}\\Network\\',
+            'out': f'{out_filepath}\\Timeline\\browser-hist.csv',
             'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
             'times': ['Visit Time'],
             'fmt_time': '%D %r'
@@ -66,12 +66,12 @@ def get_indicators(out_filepath, tool_path):
     urls = get_indicator('URL', 'browser-hist', dict_tln)
     indicators = pl.concat([amhashes, urls]).collect()
     
-    indicator_file = f'{out_filepath}\\Analysis\\FindingsIOCs\\temp_indicators.list'
+    indicator_file = f'{out_filepath}\\IOC_Findings\\temp_indicators.list'
     indicators.write_csv(indicator_file, has_header=False)
     
     enrich = f'{tool_path}/enrich.exe'
     config = f'{tool_path}/enrich_config.yaml'
-    output_file = f'{out_filepath}\\Analysis\\FindingsIOCs\\enriched_indicators.xlsx'
+    output_file = f'{out_filepath}\\IOC_Findings\\{out_file}'
     subprocess.run([enrich, '-silent', '-o', output_file, '-config', config, '-otx', '-i', indicator_file])
 
     cleanup(indicator_file)
@@ -80,10 +80,11 @@ def get_indicators(out_filepath, tool_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('out_filepath')
+    parser.add_argument('out_file')
     parser.add_argument('tool_path')
     args = parser.parse_args()
     
-    get_indicators(args.out_filepath, args.tool_path)
+    get_indicators(args.out_filepath, args.out_file, args.tool_path)
   
 
 

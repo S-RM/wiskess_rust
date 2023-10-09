@@ -174,112 +174,112 @@ def csv_to_tln(out_filepath, time_from, time_to):
   dict_tln = {
     'amcache': {
       'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
-      'file': f'{out_filepath}\\Analysis\\FileExecution\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\amcache.csv',
+      'file': f'{out_filepath}\\FileExecution\\',
+      'out': f'{out_filepath}\\Timeline\\amcache.csv',
       'msg': ['SHA1','FullPath','FileExtension','ProductName'],
       'times': ['FileKeyLastWriteTimestamp','FileIDLastWriteTimestamp'],
       'fmt_time': '%F %T'
     },
     'prefetch': {
-      'file': f'{out_filepath}\\Analysis\\FileExecution\\prefetch_Timeline.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\prefetch.csv',
+      'file': f'{out_filepath}\\FileExecution\\prefetch_Timeline.csv',
+      'out': f'{out_filepath}\\Timeline\\prefetch.csv',
       'msg': ['ExecutableName'],
       'times': ['RunTime'],
       'fmt_time': '%F %T%.f'
     },
     'appcompatcache': {
-      'file': f'{out_filepath}\\Analysis\\FileExecution\\appcompatcache.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\appcompatcache.csv',
+      'file': f'{out_filepath}\\FileExecution\\appcompatcache.csv',
+      'out': f'{out_filepath}\\Timeline\\appcompatcache.csv',
       'msg': ['ControlSet','CacheEntryPosition','Path','Executed','Duplicate','SourceFile'],
       'times': ['LastModifiedTimeUTC'],
       'fmt_time': '%F %T'
     },
     'sccm_execution': {
-      'file': f'{out_filepath}\\Analysis\\FileExecution\\SCCM_RecentlyUsedApplication.psv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\sccm_recentlyused.csv',
+      'file': f'{out_filepath}\\FileExecution\\SCCM_RecentlyUsedApplication.psv',
+      'out': f'{out_filepath}\\Timeline\\sccm_recentlyused.csv',
       'msg': ['FolderPath','ExplorerFileName','LastUserName','LaunchCount','FileDescription','CompanyName','ProductName'],
       'times': ['LastUsedTime'],
       'fmt_time': '%F %T'
     },
     'network_sum': {
       'regex_file': r'(?:SumECmd_DETAIL_ClientsDetailed_Output)\.csv$',
-      'file': f'{out_filepath}\\Analysis\\Network\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\network.csv',
+      'file': f'{out_filepath}\\Network\\',
+      'out': f'{out_filepath}\\Timeline\\network.csv',
       'msg': ['Count','DayNumber','RoleGuid','RoleDescription','AuthenticatedUserName','TotalAccesses','IpAddress','ClientName','TenantId','SourceFile'],
       'times': ['InsertDate','LastAccess'],
       'fmt_time': '%F %T'
     },
     'browser-hist': {
       # TODO: resolve parsing error of none utf-8
-      'file': f'{out_filepath}\\Analysis\\Network\\BrowsingHistory.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\browser-hist.csv',
+      'file': f'{out_filepath}\\Network\\BrowsingHistory.csv',
+      'out': f'{out_filepath}\\Timeline\\browser-hist.csv',
       'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
       'times': ['Visit Time'],
       'fmt_time': '%D %r'
     },
     'shellbags': {
       'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
-      'file': f'{out_filepath}\\Analysis\\UserActivity\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\shellbags.csv',
+      'file': f'{out_filepath}\\UserActivity\\',
+      'out': f'{out_filepath}\\Timeline\\shellbags.csv',
       'msg': ['AbsolutePath','ShellType','Value'],
       'times': ['CreatedOn','ModifiedOn','AccessedOn','LastWriteTime','FirstInteracted','LastInteracted'],
       'fmt_time': '%F %T'
     },
     'jump-lists': {
       'regex_file': r'(?:AutomaticDestinations|CustomDestinations)\.csv$',
-      'file': f'{out_filepath}\\Analysis\\UserActivity\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\jump-lists.csv',
+      'file': f'{out_filepath}\\UserActivity\\',
+      'out': f'{out_filepath}\\Timeline\\jump-lists.csv',
       'msg': ['SourceFile','AppIdDescription','MachineID','LocalPath','CommonPath','TargetIDAbsolutePath','FileSize','Arguments'],
       'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
       'fmt_time': '%F %T'      
     },
     'registry': {
       'regex_file': r'reg-System\.csv$',
-      'file': f'{out_filepath}\\Analysis\\Registry\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\registry.csv',
+      'file': f'{out_filepath}\\Registry\\',
+      'out': f'{out_filepath}\\Timeline\\registry.csv',
       'msg': ['HivePath','Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment'],
       'times': ['LastWriteTimestamp'],
       'fmt_time': '%F %T%.f'    
     },
     'lnk-files': {
-      'file': f'{out_filepath}\\Analysis\\FileSystem\\lnk-files.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\lnk-files.csv',
+      'file': f'{out_filepath}\\FileSystem\\lnk-files.csv',
+      'out': f'{out_filepath}\\Timeline\\lnk-files.csv',
       'msg': ['SourceFile','FileSize','RelativePath','WorkingDirectory','LocalPath','NetworkPath','CommonPath','Arguments','MachineID'],
       'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
       'fmt_time': '%F %T'    
     },
     'recycle-bin': {
       'regex_file': r'RBCmd_Output\.csv$',
-      'file': f'{out_filepath}\\Analysis\\FileSystem\\',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\recycle-bin.csv',
+      'file': f'{out_filepath}\\FileSystem\\',
+      'out': f'{out_filepath}\\Timeline\\recycle-bin.csv',
       'msg': ['FileName','FileSize'],
       'times': ['DeletedOn'],
       'fmt_time': '%F %T'    
     },
     'mft':{
-      'file': f'{out_filepath}\\Analysis\\FileSystem\\mft.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\mft.csv',
+      'file': f'{out_filepath}\\FileSystem\\mft.csv',
+      'out': f'{out_filepath}\\Timeline\\mft.csv',
       'msg':['ParentPath','FileName','Extension','FileSize'],
       'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
       'fmt_time': '%F %T%.f'
     },
     'event-logs': {
-      'file': f'{out_filepath}\\Analysis\\EventLogs\\EvtxECmd-All.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\event-logs.csv',
+      'file': f'{out_filepath}\\EventLogs\\EvtxECmd-All.csv',
+      'out': f'{out_filepath}\\Timeline\\event-logs.csv',
       'msg': ['EventId','Level','Provider','Channel','Computer','UserId','MapDescription','UserName','RemoteHost','Payload'],
       'times': ['TimeCreated'],
       'fmt_time': '%F %T%.f'    
     },
     'usnjrnl-j':{
-      'file': f'{out_filepath}\\Analysis\\FileSystem\\usnjrnl-j-file.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\usnjrnl-j-file.csv',
+      'file': f'{out_filepath}\\FileSystem\\usnjrnl-j-file.csv',
+      'out': f'{out_filepath}\\Timeline\\usnjrnl-j-file.csv',
       'msg': ['Name','Extension','EntryNumber','ParentEntryNumber','ParentPath','UpdateReasons','FileAttributes'],
       'times': ['UpdateTimestamp'],
       'fmt_time': '%F %T%.f'
     },
     'hayabusa': {
-      'file': f'{out_filepath}\\Analysis\\EventLogs\\hayabusa.csv',
-      'out': f'{out_filepath}\\Analysis\\Timeline\\hayabusa.csv',
+      'file': f'{out_filepath}\\EventLogs\\hayabusa.csv',
+      'out': f'{out_filepath}\\Timeline\\hayabusa.csv',
       'msg': ['Computer','Channel','EventID','Level','MitreTactics','MitreTags','OtherTags','RecordID','Details','ExtraFieldInfo','RuleFile','EvtxFile'],
       'times': ['datetime'],    
       'fmt_time': '%FT%T%.f'    
@@ -297,8 +297,8 @@ def csv_to_tln(out_filepath, time_from, time_to):
   # Sort the all timeline by datetime col
   # if all_tln.width > 0:
   #   all_tln = all_tln.sort('datetime')
-  #   all_tln.write_csv(f'{out_filepath}\\Analysis\\Timeline\\all.csv')
-  #   all_tln.write_ndjson(f'{out_filepath}\\Analysis\\Timeline\\all.json')
+  #   all_tln.write_csv(f'{out_filepath}\\Timeline\\all.csv')
+  #   all_tln.write_ndjson(f'{out_filepath}\\Timeline\\all.json')
   # else:
   #   print('[!] Nothing found in the time range')
 

@@ -8,10 +8,9 @@ use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
 use crate::scripts::init;
 use serde_yaml::{self};
-use std::collections::HashMap;
-use std::fs::{canonicalize, OpenOptions};
+use std::fs::OpenOptions;
 use std::env;
-use clap::{Parser, ArgAction, Subcommand, Command};
+use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
 use ctrlc;
 
@@ -174,11 +173,11 @@ fn main() {
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
             
             let main_args = config::MainArgs {
-                out_path: out_path,
-                start_date: start_date,
-                end_date: end_date,
-                tool_path: tool_path,
-                ioc_file: ioc_file,
+                out_path,
+                start_date,
+                end_date,
+                tool_path,
+                ioc_file,
                 silent: args.silent
             };
         
@@ -198,11 +197,16 @@ fn main() {
                 args.silent
             );
             
-            // Run each binary in parallel    
-            exe_ops::run_commands(&scrape_config.wiskers, &main_args, &data_paths, 0, &out_log);
-            // Run each binary one after the other
-            exe_ops::run_commands(&scrape_config.wiskers, &main_args, &data_paths, 1, &out_log); 
-
+            // Run in parallel then in series (if applicable) each binary of   
+            // wiskers, enrichers and reporters
+            for func in [
+                &scrape_config.wiskers,
+                &scrape_config.enrichers,
+                &scrape_config.reporters] {
+                    for num_threads in [0, 1] {
+                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads, &out_log);
+                    }
+            }
         },
     }
 

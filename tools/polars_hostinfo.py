@@ -64,19 +64,19 @@ def get_hostname(dict_tln):
 
 
 
-def get_hostinfo(out_filepath):
+def get_hostinfo(out_filepath, out_file):
     dict_tln = {
         'registry': {
         'regex_file': r'reg-System\.csv$',
-        'file': f'{out_filepath}\\Analysis\\Registry\\',
-        'out': f'{out_filepath}\\Analysis\\Timeline\\registry.csv',
+        'file': f'{out_filepath}\\Registry\\',
+        'out': f'{out_filepath}\\Timeline\\registry.csv',
         'msg': ['HivePath','Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment'],
         'times': ['LastWriteTimestamp'],
         'fmt_time': '%F %T%.f'    
         },
         'hayabusa': {
-        'file': f'{out_filepath}\\Analysis\\EventLogs\\hayabusa.csv',
-        'out': f'{out_filepath}\\Analysis\\Timeline\\hayabusa.csv',
+        'file': f'{out_filepath}\\EventLogs\\hayabusa.csv',
+        'out': f'{out_filepath}\\Timeline\\hayabusa.csv',
         'msg': ['Computer','Channel','EventID','Level','MitreTactics','MitreTags','OtherTags','RecordID','Details','ExtraFieldInfo','RuleFile','EvtxFile'],
         'times': ['datetime'],    
         'fmt_time': '%FT%T%.f'    
@@ -101,7 +101,7 @@ def get_hostinfo(out_filepath):
         'Last Logged On User': get_reg_val("LastLoggedOnUser", dict_tln),
     }
 
-    out_file = os.path.join(f"{out_filepath}/Analysis/Host Information.txt")
+    out_file = os.path.join(f"{out_filepath}/{out_file}")
     with open(out_file, 'w') as file:
         file.write("WISKESS\n----------------\n\nHost Information\n----------------\n\n")
     for i in host_info:
@@ -114,9 +114,10 @@ def get_hostinfo(out_filepath):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('out_filepath')
+    parser.add_argument('out_file')
     args = parser.parse_args()
     
-    get_hostinfo(args.out_filepath)
+    get_hostinfo(args.out_filepath, args.out_file)
   
 
 

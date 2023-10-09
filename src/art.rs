@@ -2,8 +2,7 @@ pub mod paths {
     use std::{path::Path, collections::HashMap};
     use glob::glob;
     use inquire::Text;
-    use crate::{configs::config::Artefacts};
-    use urlencoding::encode;
+    use crate::configs::config::Artefacts;
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool) -> HashMap<String, String> {
         let mut art_paths = HashMap::new();
