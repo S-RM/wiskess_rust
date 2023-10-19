@@ -135,6 +135,20 @@ wiskers:
     input: winevt
     github: https://github.com/WithSecureLabs/chainsaw.git
     para: false
+  - name: chainsaw_shim
+    binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
+    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\chainsaw\analysis\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
+    input: base
+    outfolder: FileExecution
+    outfile: chainsaw_shim.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: chainsaw_srum
+    binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
+    args: analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}\{outfile}
+    input: system32
+    outfolder: Network
+    outfile: chainsaw_srum.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AppCompatCache
     binary: '{tool_path}\Get-ZimmermanTools\AppCompatCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
