@@ -211,6 +211,7 @@ wiskers:
     outfile: BrowsingHistory.csv
     outfolder: Network
     input: user_dir
+    chk_exists: false
     web_download: https://www.nirsoft.net/utils/browsinghistoryview-x64.zip
   - name: SumECmd
     binary: '{tool_path}\Get-ZimmermanTools\SumECmd.exe'

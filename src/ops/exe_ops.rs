@@ -63,11 +63,15 @@ pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data
 
     // check binary is installed
     let mut installed = false;
-    for test_arg in ["-h", "help", "--version", "-v", "-V"] {
-        if check_binary(&wisker_binary, test_arg) {
-            installed = true;
-            break;
+    if wisker.chk_exists {
+        for test_arg in ["-h", "help", "--version", "-v", "-V"] {
+            if check_binary(&wisker_binary, test_arg) {
+                installed = true;
+                break;
+            }
         }
+    } else {
+        installed = true;
     }
     if !installed {
         eprintln!("[!] The path `{}` is not a correct executable binary file.", wisker_binary); 

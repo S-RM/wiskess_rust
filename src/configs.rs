@@ -43,6 +43,8 @@ pub mod config {
     pub script: bool,
     #[serde(default)]
     pub script_posh: String,
+    #[serde(default = "serde_true")]
+    pub chk_exists: bool,
   }
 
   /// Artefact paths and type

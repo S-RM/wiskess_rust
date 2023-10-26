@@ -324,7 +324,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
                 # Remove the empty Analysis files
                 Get-ChildItem -Recurse "$local_storage\$($wiskess_folder)" | Where-Object {$_.Length -eq 0} | Remove-Item
                 # Remove the Timeline folder
-                Get-ChildItem -Recurse "$local_storage\$($wiskess_folder)\Analysis\Timeline" | Remove-Item -Recurse -Force
+                Get-ChildItem -Recurse "$local_storage\$($wiskess_folder)\Timeline" | Remove-Item -Recurse -Force
                 # Remove the IOC summary and Analysis Report
                 Get-ChildItem -Recurse "$local_storage\$($wiskess_folder)" | Where-Object {$_.Name -Match "Analysis-Report\.txt|IOCs_summary|IOCs_in_Analysis"} | Remove-Item
             }
