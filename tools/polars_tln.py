@@ -234,7 +234,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'fmt_time': '%F %T'      
     },
     'registry': {
-      'regex_file': r'reg-System\.csv$',
+      'regex_file': r'reg-(?:System|User)\.csv$',
       'file': f'{out_filepath}\\Registry\\',
       'out': f'{out_filepath}\\Timeline\\registry.csv',
       'msg': ['HivePath','Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment'],

@@ -121,7 +121,7 @@ wiskers:
     github: https://github.com/EricZimmerman/evtx.git
   - name: hayabusa
     binary: '{tool_path}\hayabusa\hayabusa.exe'
-    args: 'csv-timeline -d {input} -o {outfolder}\{outfile} -p timesketch-verbose --ISO-8601'
+    args: 'csv-timeline -d {input} -o {outfolder}\{outfile} -p timesketch-verbose --ISO-8601 -w'
     outfolder: EventLogs
     outfile: hayabusa.csv
     input: winevt
@@ -320,4 +320,11 @@ enrichers:
     outfolder: IOC_Findings
     outfile: iocs_pagefile.txt
     input: pagefile
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_datasource
+    binary: rg.exe
+    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_datasource.txt
+    input: base
     github: https://github.com/BurntSushi/ripgrep.git
