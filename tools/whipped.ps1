@@ -148,7 +148,7 @@ function Start-VeloProcess ($velo_collection, $wiskess_folder, $start_date, $end
 }
 
 function Start-Wiskess ($dataSource, $wiskess_folder, $start_date, $end_date, $ioc_file) {
-    $binary = "$tool_path\target\debug\rusty-wisk.exe"
+    $binary = "$tool_path\wiskess_rust.exe"
     $cmdline = "--silent wiskess " +
         "--config $config " +
         "--data-source $dataSource " +
