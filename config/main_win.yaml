@@ -128,22 +128,22 @@ wiskers:
     github: 
     para: false
   - name: chainsaw_evtx
-    binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
-    args: 'hunt {input} -s {tool_path}\chainsaw\sigma -r {tool_path}\chainsaw\rules --mapping {tool_path}\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
+    binary: '{tool_path}\chainsaw\chainsaw.exe'
+    args: 'hunt {input} -s {tool_path}\chainsaw\chainsaw\sigma -r {tool_path}\chainsaw\chainsaw\rules --mapping {tool_path}\chainsaw\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
     outfolder: EventLogs\chainsaw
     outfile: sigma.csv
     input: winevt
     github: https://github.com/WithSecureLabs/chainsaw.git
     para: false
   - name: chainsaw_shim
-    binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
-    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\chainsaw\analysis\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
+    binary: '{tool_path}\chainsaw\chainsaw.exe'
+    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\chainsaw\chainsaw\analysis\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
     input: base
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: chainsaw_srum
-    binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
+    binary: '{tool_path}\chainsaw\chainsaw.exe'
     args: analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}\{outfile}
     input: system32
     outfolder: Network
