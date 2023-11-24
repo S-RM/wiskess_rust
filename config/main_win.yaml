@@ -3,64 +3,64 @@ artefacts:
     path: ''
     path_type: file
   - name: winevt
-    path: '{root}/Windows/System32/winevt/Logs'
+    path: '{root}\Windows\System32\winevt\Logs'
     path_type: folder
   - name: base
     path: '{root}'
     path_type: folder
   - name: j_file
-    path: '{root}/$Extend/$UsnJrnl:$J'
+    path: '{root}\$Extend\$UsnJrnl:$J'
     path_type: file
   - name: mft
-    path: '{root}/$MFT'
+    path: '{root}\$MFT'
     path_type: file
   - name: recycle_bin
-    path: '{root}/$Recycle.Bin'
+    path: '{root}\$Recycle.Bin'
     path_type: folder
   - name: pagefile
-    path: '{root}/pagefile.sys'
+    path: '{root}\pagefile.sys'
     path_type: file
   - name: user_dir
-    path: '{root}/Users'
+    path: '{root}\Users'
     path_type: folder
   - name: consolehost_history
-    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
+    path: '{root}\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt'
     path_type: file
   - name: amcache
-    path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
     path_type: file
   - name: recentFileCache
-    path: '{root}/Windows/AppCompat/Programs/RecentFileCache.bcf'
+    path: '{root}\Windows\AppCompat\Programs\RecentFileCache.bcf'
     path_type: file
   - name: prefetch
-    path: '{root}/Windows/Prefetch'
+    path: '{root}\Windows\Prefetch'
     path_type: folder
   - name: system32
-    path: '{root}/Windows/System32'
+    path: '{root}\Windows\System32'
     path_type: folder
   - name: system
-    path: '{root}/Windows/System32/config/SYSTEM'
+    path: '{root}\Windows\System32\config\SYSTEM'
     path_type: file
   - name: system_config
-    path: '{root}/Windows/System32/config'
+    path: '{root}\Windows\System32\config'
     path_type: folder
   - name: sum
-    path: '{root}/Windows/System32/LogFiles/Sum'
+    path: '{root}\Windows\System32\LogFiles\Sum'
     path_type: folder
   - name: objects
-    path: '{root}/Windows/System32/wbem/Repository/OBJECTS.DATA'
+    path: '{root}\Windows\System32\wbem\Repository\OBJECTS.DATA'
     path_type: file
   - name: winevt
-    path: '{root}/Windows/System32/winevt/Logs'
+    path: '{root}\Windows\System32\winevt\Logs'
     path_type: folder
   - name: chrome
-    path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
+    path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     path_type: folder
   - name: temp
-    path: '{root}/Windows/Temp'
+    path: '{root}\Windows\Temp'
     path_type: folder
   - name: evtx_dump
-    path: '{root}/Windows/System32/winevt/Logs/Microsoft-Windows-TaskScheduler%4Operational.evtx'
+    path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
     path_type: file
   - name: chrome
     path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
@@ -137,14 +137,14 @@ wiskers:
     para: false
   - name: chainsaw_shim
     binary: '{tool_path}\chainsaw\chainsaw.exe'
-    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\chainsaw\chainsaw\analysis\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
+    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
     input: base
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: chainsaw_srum
     binary: '{tool_path}\chainsaw\chainsaw.exe'
-    args: analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}\{outfile}
+    args: analyse srum --software {input}\config\SOFTWARE {input}\SRU\SRUDB.dat --output {outfolder}\{outfile}
     input: system32
     outfolder: Network
     outfile: chainsaw_srum.csv
@@ -179,7 +179,7 @@ wiskers:
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
-    args: '-3 {tool_path}\PyWMIPersistenceFinder.py {input} > {outfolder}/{outfile}'
+    args: '-3 {tool_path}\PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects

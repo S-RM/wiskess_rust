@@ -136,6 +136,9 @@ function Start-MainSetup {
   # EZ Tools
   & "$toolPath\Get-ZimmermanTools\Get-ZimmermanTools.ps1" -NetVersion 4 -Dest "$toolPath\Get-ZimmermanTools\"
 
+  # Chainsaw download shimcache patterns
+  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt" -OutFile "$toolPath\shimcache_patterns.txt"
+
   # installPython-CIM -- needs python2
   py -3 -m pip install PyQt6
   py -2 -m pip install python-cim
