@@ -54,6 +54,9 @@
     Date:   2023-08-29
 #>
 
+#Requires -Version 7.0
+#Requires -RunAsAdministrator
+
 param (
     [Parameter(Mandatory)] [string] $config,
     [Parameter(Mandatory)] [string] $data_source_list,
@@ -91,8 +94,15 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
 
     if (!$osf_mount) {
         # Mount it with AIM if not supported by OSF Mount 
-        & "$tool_path\tools\Arsenal-Image-Mounter-v3.9.239\aim_cli.exe" --mount --readonly --filename="$image" --fakesig --background
-        $dismount = 00000
+        if ($(Test-Path -PathType Leaf -Path "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe") -eq $True) {
+            & "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe" --mount --readonly --filename="$image" --fakesig --background
+            $dismount = 00000
+        } elseif ($image -Match "\.(?:vhdx|vhd)$") {
+            Mount-VHD -ReadOnly -Passthru -Path $image
+        } else {
+            Write-Warning "Unable to mount file, please install Arsenal-Image-Mounter under path $tool_path\Arsenal-Image-Mounter"
+            Start-Sleep -Seconds 5
+        }
     } else {
         $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o ro -f "$image" -v all
         if ($osf_mount -match 'Created device\s') {
@@ -110,12 +120,22 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
                 $done = $true
             } else {
                 Write-Warning "Data source $drive_mount had no Windows folder!"
+                $get_win_dir = Get-ChildItem -Depth 1 $drive_mount -Directory | Where-Object { $_.Name -match "Windows" }
+                if ($get_win_dir) {
+                    Start-Wiskess $get_win_dir.Parent $wiskess_folder $start_date $end_date $ioc_file
+                    $done = $true
+                }
+                Write-Host "[ ] Found Windows folder at dept 1"
             }
         }
     }
     
     if (!$osf_mount) {
-        & "$tool_path\tools\Arsenal-Image-Mounter-v3.9.239\aim_cli.exe" --dismount=$dismount --force
+        if ($(Test-Path -PathType Leaf -Path "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe") -eq $True) {
+            & "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe" --dismount=$dismount --force
+        } elseif ($image -Match "\.(?:vhdx|vhd)$") {
+            Dismount-VHD -Path $image
+        }
     } else {
         $drive_mount_start.Split() | ForEach-Object {
             & 'C:\Program Files\OSFMount\OSFMount.com' -D -m "$($_):"
