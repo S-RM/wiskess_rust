@@ -119,7 +119,7 @@ function Start-MainSetup {
   }
   # Install all listed git releases
   $gitReleases.Keys.Clone() | ForEach-Object {
-    gitRelease -gitRepo $_ -gitKey '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'
+    gitRelease -gitRepo $_ -gitKey ''
   }
   
   # Hayabusa post process, move exe to sibling of rules
