@@ -24,7 +24,7 @@ artefacts:
     path: '{root}/Users'
     path_type: folder
   - name: consolehost_history
-    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
+    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
     path_type: file
   - name: amcache
     path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
@@ -78,7 +78,7 @@ wiskers:
     input: mft
     github: https://github.com/EricZimmerman/MFTECmd.git
   - name: mft
-    binary: '{tool_path}\mft\mft_dump.exe'
+    binary: '{tool_path}\mft\mft.exe'
     args: '-o csv -f {outfolder}/{outfile} {input}'
     outfolder: FileSystem
     outfile: mft.csv
@@ -106,7 +106,7 @@ wiskers:
     input: user_dir
     github: https://github.com/EricZimmerman/LECmd.git
   - name: evtx_dump
-    binary: '{tool_path}\evtx_dump-v0.8.1.exe'
+    binary: '{tool_path}\evtx\evtx.exe'
     args: -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite {input}
     outfolder: EventLogs
     outfile: evtx_dump.json
@@ -129,7 +129,7 @@ wiskers:
     para: false
   - name: chainsaw_evtx
     binary: '{tool_path}\chainsaw\target\release\chainsaw.exe'
-    args: 'hunt {input} -s {tool_path}\sigma -r {tool_path}\chainsaw\rules --mapping {tool_path}\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
+    args: 'hunt {input} -s {tool_path}\chainsaw\sigma -r {tool_path}\chainsaw\rules --mapping {tool_path}\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
     outfolder: EventLogs\chainsaw
     outfile: sigma.csv
     input: winevt
@@ -213,6 +213,20 @@ wiskers:
     input: user_dir
     chk_exists: false
     web_download: https://www.nirsoft.net/utils/browsinghistoryview-x64.zip
+  - name: consolehost_history
+    binary: 'pwsh.exe'
+    args: '-d {input} --csv {outfolder}'
+    outfolder: PSReadLine
+    outfile: '*ConsoleHost_history.txt'
+    input: consolehost_history
+    github: 
+    script: true
+    script_posh: '$hist = "{input}";
+      $outDir = "{outfolder}";
+      Get-ChildItem $hist | ForEach-Object { 
+          $fn = $($_ -Replace ".*Users\\([^\\]+).+","`$1_ConsoleHost_history.txt"); 
+          Get-Content $_ | Out-File -FilePath "$outDir\$fn";
+      }'
   - name: SumECmd
     binary: '{tool_path}\Get-ZimmermanTools\SumECmd.exe'
     args: '-d {input} --csv {outfolder}'
@@ -272,12 +286,14 @@ collectors:
     outfolder: Artefacts
     outfile: 'velociraptor_collect.zip'
     input: base
+    para: false
   - name: 7zip
     binary: 7z
     args: 'x {outfolder}\{input} -o{out_path} -aos'
     outfolder: Artefacts
     input: 'velociraptor_collect.zip'
     outfile: 'velociraptor_collect.zip'
+    para: false
 
 reporters:
   - name: polars timeline
