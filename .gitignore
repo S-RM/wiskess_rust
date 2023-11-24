@@ -1,6 +1,7 @@
 /target
 /tools/*
 !/tools/setup.ps1
+!/tools/setup_get_git.py
 !/tools/whipped.ps1
 !/tools/timeline-wiskess.conf
 !/tools/velociraptor-v0.6.0-windows-amd64.exe
@@ -9,7 +10,6 @@
 !/tools/polars_hostinfo.py
 !/tools/polars_enrich.py
 !/tools/hindsight.exe
-!/tools/hayabusa.exe
 !/tools/enrich.exe
 !/tools/enrich_config.yaml
 !/tools/CCM_RUA_Finder.py
@@ -17,7 +17,6 @@
 !/tools/BrowsingHistoryView.exe
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
-!/tools/Arsenal-Image-Mounter-v3.9.239
 /output_test
 /testing_wr
 /logs

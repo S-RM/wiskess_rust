@@ -199,6 +199,11 @@ fn main() {
             
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
+            if args.mounted {
+                for num_threads in [0, 1] {
+                    exe_ops::run_commands(&scrape_config.collectors, &main_args, &data_paths, num_threads, &out_log);
+                }
+            }
             for func in [
                 &scrape_config.wiskers,
                 &scrape_config.enrichers,

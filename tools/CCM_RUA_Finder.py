@@ -313,12 +313,12 @@ def main():
         "(?P<software_properties_hash>[^\x00]*)")
 
     # Output file header
-    header_string = ('"Format"|"FolderPath"|"ExplorerFileName"|"FileSize"\t'
-                     '"LastUserName"|"LastUsedTime"|"TimeZoneOffset"|"LaunchCount"\t'
-                     '"Timestamp1"|"Timestamp2"|"OriginalFileName"|"FileDescription"\t'
-                     '"CompanyName"|"ProductName"|"ProductVersion"|"FileVersion"\t'
-                     '"AdditionalProductCodes"|"msiVersion"|"msiDisplayName"\t'
-                     '"SoftwarePropertiesHash"|"ProductCode"|"ProductLanguage"\t'
+    header_string = ('"Format"|"FolderPath"|"ExplorerFileName"|"FileSize"|'
+                     '"LastUserName"|"LastUsedTime"|"TimeZoneOffset"|"LaunchCount"|'
+                     '"Timestamp1"|"Timestamp2"|"OriginalFileName"|"FileDescription"|'
+                     '"CompanyName"|"ProductName"|"ProductVersion"|"FileVersion"|'
+                     '"AdditionalProductCodes"|"msiVersion"|"msiDisplayName"|'
+                     '"SoftwarePropertiesHash"|"ProductCode"|"ProductLanguage"|'
                      '"msiPublisher"|"FilePropertiesHash"')
 
     # Print header to either output file or stdout
@@ -520,8 +520,8 @@ def parse_xml_record(ccm_xml_match, output_file):
 
     # Build output string
     raw_print_string = (
-        '"XML"|"{}"|"{}"|"{}"|"{}"|"{}"\t="{}"|"{}"|"{}"|"{}"\t'
-        '"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"\t'
+        '"XML"|"{}"|"{}"|"{}"|"{}"|"{}"\t="{}"|"{}"|"{}"|"{}"|'
+        '"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|"{}"|'
         '"{}"|"{}"|"{}"|"{}"').format(
             folder_path, explorer_file_name, file_size, last_user_name,
             last_used_time, time_zone_offset, launch_count, timestamp_1,
