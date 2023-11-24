@@ -36,13 +36,15 @@ def get_files(response: str, target_dir: str):
 
 def make_symlink(target_dir: str, program: str):
   source_file = ''
+  target_file = os.path.join(target_dir, f'{program}.exe')
+  if os.path.exists(target_file):
+    return
   for root, dirs, files in os.walk(target_dir):
     if root.count(os.sep) - target_dir.count(os.sep) < 2:
       for f in files:
         if re.match(r'.*\.exe$', f):
           source_file = os.path.join(root, f)
           break
-  target_file = os.path.join(target_dir, f'{program}.exe')
   if source_file != '' and source_file != target_file:
     os.symlink(source_file, target_file)
         

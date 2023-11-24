@@ -116,7 +116,7 @@ fn main() {
     }
 
     match args.command {
-        Commands::Setup {  } => {
+        Commands::Setup { } => {
             // TODO: check if setup has been run, or if any binaries are missing
             init::run_setup(&tool_path);
         },
@@ -199,11 +199,11 @@ fn main() {
             
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
-            if args.mounted {
-                for num_threads in [0, 1] {
-                    exe_ops::run_commands(&scrape_config.collectors, &main_args, &data_paths, num_threads, &out_log);
-                }
-            }
+            // if args.mounted {
+            //     for num_threads in [0, 1] {
+            //         exe_ops::run_commands(&scrape_config.collectors, &main_args, &data_paths, num_threads, &out_log);
+            //     }
+            // }
             for func in [
                 &scrape_config.wiskers,
                 &scrape_config.enrichers,

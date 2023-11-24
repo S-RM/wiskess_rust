@@ -8,6 +8,10 @@ This downloads the required tools.
     Date:   2023-06-14
 #>
 
+param (
+    [string] $gitKey
+)
+
 # Admin only mode
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
 {  
@@ -57,9 +61,9 @@ function  gitInstall($gitRepo, $outDir) {
   Set-Location "$toolPath"
 }
 
-function gitRelease($gitRepo, $gitKey) {
+function gitRelease($gitRepo, $gitKeyToken) {
   Write-Host "Getting release of $gitRepo"
-  & py $toolPath\setup_get_git.py $gitKey $gitRepo
+  & py $toolPath\setup_get_git.py $gitKeyToken $gitRepo
 }
 
 function Install-Rust {
@@ -119,7 +123,7 @@ function Start-MainSetup {
   }
   # Install all listed git releases
   $gitReleases.Keys.Clone() | ForEach-Object {
-    gitRelease -gitRepo $_ -gitKey ''
+    gitRelease -gitRepo $_ -gitKey $gitKey
   }
   
   # Hayabusa post process, move exe to sibling of rules
@@ -145,6 +149,10 @@ function Start-MainSetup {
 
   # Reprting - Out-HTMLView and New-HTMLTable
   Install-Module -Force PSWriteHTML -SkipPublisherCheck
+}
+
+if (!$gitKey) {
+  $gitKey = Read-Host -Prompt "[?] What's your git token? Please follow these guidelines if unaware: https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/"
 }
 
 Start-MainSetup
