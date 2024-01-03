@@ -103,6 +103,13 @@ function Start-MainSetup {
   Install-Azcopy
 
   RefreshEnv.cmd
+  
+  # polars install
+  py -m pip install polars
+  py -m pip install chardet
+  py -m pip install datetime
+  py -m pip install filetype
+  py -m pip install requests
 
   $gitRepos = @{
     # Format: "URL gitRepo" = "Output Director outDir"
@@ -142,13 +149,6 @@ function Start-MainSetup {
   # installPython-CIM -- needs python2
   py -3 -m pip install PyQt6
   py -2 -m pip install python-cim
-
-  # polars install
-  py -m pip install polars
-  py -m pip install chardet
-  py -m pip install datetime
-  py -m pip install filetype
-  py -m pip install requests
 
   # Reprting - Out-HTMLView and New-HTMLTable
   Install-Module -Force PSWriteHTML -SkipPublisherCheck
