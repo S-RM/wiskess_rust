@@ -8,7 +8,6 @@ pub mod config {
       pub wiskers: Vec<Wiskers>,
       pub enrichers: Vec<Wiskers>,
       pub reporters: Vec<Wiskers>,
-      pub collectors: Vec<Wiskers>,
   }
 
   fn serde_true() -> bool {

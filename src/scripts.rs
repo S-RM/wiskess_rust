@@ -5,7 +5,7 @@ pub mod init {
         println!("[+] Running setup...");
         let script = format!("{}/{}", tool_path, "setup.ps1");
         // Run the script without any arguments
-        exe_ops::run_posh("-f", &script);
+        exe_ops::run_posh("-f", &script, &"".to_string());
     }
     
     pub fn run_whipped(tool_path: &String, args: config::WhippedArgs) {
