@@ -1,5 +1,6 @@
 use std::fs;
 use std::fs::OpenOptions;
+use std::io::{BufReader, BufRead};
 use std::io::Write;
 use inquire::Confirm;
 use inquire::CustomType;
@@ -10,6 +11,25 @@ use glob::glob;
 
 pub fn make_folders(out_path: &String) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
+}
+
+pub(crate) fn line_count(file_path: &String) -> usize {
+    let path = Path::new(&file_path);
+    if path.exists() && path.is_file() {
+        let file = fs::File::open(file_path).unwrap();
+        let reader = BufReader::new(file);
+        let lines_count: usize = reader.lines().count();
+        return lines_count;
+    } else {
+        let file_path_glob = find_file_glob(&file_path);
+        if file_path_glob.len() > 0 {
+            let file = fs::File::open(file_path_glob).unwrap();
+            let reader = BufReader::new(file);
+            let lines_count: usize = reader.lines().count();
+            return lines_count;
+        }
+    }
+    return 0;
 }
 
 ///  file_exists - will check if a file exists and ask the user if they want to
@@ -23,8 +43,6 @@ pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
         let file_path_glob = find_file_glob(&file_path);
         if file_path_glob.len() > 0 {
             ret = user_file_overwrite(silent, &file_path_glob);
-        } else {
-            println!("[-] File does not exist: {}", file_path);
         }
     }
         

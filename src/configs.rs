@@ -44,6 +44,8 @@ pub mod config {
     pub script_posh: String,
     #[serde(default = "serde_true")]
     pub chk_exists: bool,
+    #[serde(default)]
+    pub valid_path: String,
   }
 
   /// Artefact paths and type
@@ -51,7 +53,6 @@ pub mod config {
   pub struct Artefacts {
     pub name: String,
     pub path: String,
-    pub path_type: String,
   }
 
   // Set struct for interal args

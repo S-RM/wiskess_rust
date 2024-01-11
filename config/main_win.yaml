@@ -258,22 +258,6 @@ wiskers:
     input: user_dir
     github:
 
-collectors:
-  - name: velociraptor
-    binary: '{tool_path}\velociraptor-v0.6.0-windows-amd64.exe'
-    args: '-v artifacts collect Windows.KapeFiles.Targets --output {outfolder}\{outfile} --args Device={input} --args _J=Y --args _MFT=Y --args _WBEM=Y --args _Prefetch=Y --args LogFiles=Y --args RecycleBin=Y --args WindowsTimeline=Y --args LNKFilesAndJumpLists=Y --args RegistryHivesUser=Y --args BrowserCache=Y --args PowerShellConsole=Y --args Antivirus=Y --args EventLogs=Y'
-    outfolder: Artefacts
-    outfile: 'velociraptor_collect.zip'
-    input: base
-    para: false
-  - name: 7zip
-    binary: 7z
-    args: 'x {outfolder}\{input} -o{out_path} -aos'
-    outfolder: Artefacts
-    input: 'velociraptor_collect.zip'
-    outfile: 'velociraptor_collect.zip'
-    para: false
-
 reporters:
   - name: polars timeline
     binary: py

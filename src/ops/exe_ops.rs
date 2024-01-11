@@ -133,12 +133,18 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                         &wisker_arg));
                         
                     tx.send(output.stdout).unwrap();
+                    tx.send(output.stderr).unwrap();
                 } else {    
                     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
                     let file_path = format!("{}/{}", &folder_path, &wisker.outfile);
-                    println!("[ ] The file already exists: {}", file_path);
-                    println!("If wanting to run the module again, {}",
-                        "please delete the output file or run wiskess without --silent mode");
+                    let msg = format!(
+                        "[ ] The file already exists: {}\n{} {}\n{}",
+                        file_path,
+                        "If wanting to run the module again,",
+                        &wisker.name,
+                        "please delete the output file or run wiskess without --silent mode"
+                    );
+                    file_ops::log_msg(&out_log_c, msg);
                 }
             }
         });

@@ -108,7 +108,6 @@ fn main() {
     let mut tool_path = args.tool_path;
     if tool_path == "" {
         tool_path = format!("{}\\tools", env::current_dir().unwrap().display());
-        println!("[ ] tool path: {}", tool_path);
     }
 
     match args.command {
@@ -191,13 +190,13 @@ fn main() {
                 .read(true)
                 .open(config)
                 .expect("Unable to open config file.");
-            let scrape_config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
+            let config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
         
             // TODO: check or gracefully error when the yaml config misses keys
         
             // check the file paths in the config exist and return a hash of the art paths
             let data_paths = paths::check_art(
-                scrape_config.artefacts, 
+                config.artefacts, 
                 &data_source,
                 args.silent,
                 &out_log
@@ -206,16 +205,16 @@ fn main() {
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
             for func in [
-                &scrape_config.wiskers,
-                &scrape_config.enrichers,
-                &scrape_config.reporters] {
+                &config.wiskers,
+                &config.enrichers,
+                &config.reporters] {
                     for num_threads in [0, 1] {
                         exe_ops::run_commands(func, &main_args, &data_paths, num_threads, &out_log);
                     }
             }
 
             // Validate wiskess has processed all input files into output files
-            valid_ops::valid_process(&scrape_config.wiskers, &main_args, &data_paths, &out_log);
+            valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &out_log);
 
             // Set end time
             let wiskess_stop = Utc::now();
