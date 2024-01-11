@@ -7,11 +7,12 @@ use crate::configs::config;
 use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
 use crate::scripts::init;
+use ops::valid_ops;
 use serde_yaml::{self};
 use std::fs::OpenOptions;
 use std::env;
 use clap::{Parser, ArgAction, Subcommand};
-use chrono::Utc;
+use chrono::{Utc, Duration};
 use ctrlc;
 
 /// Structure of the command line args
@@ -102,12 +103,7 @@ fn main() {
     
     // Get the args
     let args = Args::parse();
-    
-    // Set the start time
-    let wiskess_start = Utc::now().format("%Y%m%dT%H%M%S").to_string();
-    // TODO: Make a logger for stdout and log file messages
-    println!("Starting wiskess at: {}", wiskess_start);
-    
+
     // Set tool path
     let mut tool_path = args.tool_path;
     if tool_path == "" {
@@ -162,11 +158,20 @@ fn main() {
             ioc_file 
         } => {
             // Set output directories
-            // let out_path = canonicalize(out_path).unwrap().display().to_string();
             file_ops::make_folders(&out_path);
+            
+            // Set the start time
+            let date_time_fmt = "%Y-%m-%dT%H%M%S";
+            let wiskess_start = Utc::now();
+            let wiskess_start_str = wiskess_start.format(date_time_fmt).to_string();
+            
             // Set main log
-            let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start);
+            let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start_str);
             file_ops::file_exists(&out_log, args.silent);
+            
+            // Write start time to log
+            file_ops::log_msg(&out_log, format!("Starting wiskess at: {}", wiskess_start_str));
+
             
             // Confirm date is valid
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
@@ -194,16 +199,12 @@ fn main() {
             let data_paths = paths::check_art(
                 scrape_config.artefacts, 
                 &data_source,
-                args.silent
+                args.silent,
+                &out_log
             );
             
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
-            // if args.mounted {
-            //     for num_threads in [0, 1] {
-            //         exe_ops::run_commands(&scrape_config.collectors, &main_args, &data_paths, num_threads, &out_log);
-            //     }
-            // }
             for func in [
                 &scrape_config.wiskers,
                 &scrape_config.enrichers,
@@ -212,7 +213,25 @@ fn main() {
                         exe_ops::run_commands(func, &main_args, &data_paths, num_threads, &out_log);
                     }
             }
+
+            // Validate wiskess has processed all input files into output files
+            valid_ops::valid_process(&scrape_config.wiskers, &main_args, &data_paths, &out_log);
+
+            // Set end time
+            let wiskess_stop = Utc::now();
+            let wiskess_duration = wiskess_stop - wiskess_start;
+            let seconds = wiskess_duration.num_seconds() % 60;
+            let minutes = (wiskess_duration.num_seconds() / 60) % 60;
+            let hours = (wiskess_duration.num_seconds() / 60) / 60;
+            let duration = format!("{:0>2}:{:0>2}:{:0>2}", hours, minutes, seconds);
+            file_ops::log_msg(
+                &out_log, 
+                format!(
+                    "Wiskess finished at: {}, which took: {} [H:M:S]", 
+                    wiskess_stop.format(date_time_fmt).to_string(), 
+                    duration
+                )
+            );
         },
     }
-
 }

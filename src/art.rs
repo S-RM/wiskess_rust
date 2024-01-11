@@ -2,9 +2,9 @@ pub mod paths {
     use std::{path::Path, collections::HashMap};
     use glob::glob;
     use inquire::Text;
-    use crate::configs::config::Artefacts;
+    use crate::{configs::config::Artefacts, ops::file_ops};
 
-    pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool) -> HashMap<String, String> {
+    pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool, out_log: &String) -> HashMap<String, String> {
         let mut art_paths = HashMap::new();
         // TODO: Loop through all artefact paths and check if file/folder exists, if not check alt and legacy path
         for art in artefacts {
@@ -27,20 +27,25 @@ pub mod paths {
                         filename_str);
                     get_path(&enc_path, &mut art_paths, &art_name);
                 }
-                if art_paths.get(&art.name).is_none() {
-                    println!("[-] Path for {} not found at {}", art.name, path_str);
+                if art_paths.get(&art.name).is_none() && art.name != "none" {
+                    file_ops::log_msg(&out_log, format!("[-] Path for {} not found at {}", art.name, path_str));
                     // if not found, check others: mounted or ask user
                     // TODO: if collected path from live mount, check mounted
                     // if not found, ask the user to enter path
                     if silent {
-                        // add path to hash
+                        // path not found, set as empty to skip processing
                         art_paths.insert(
                             art.name,
-                            path_str.to_string()
+                            "wiskess_none".to_string()
                         );
                     } else {
                         get_users_path(&art_name, &mut art_paths);
                     }
+                } else if art.name == "none" {
+                    art_paths.insert(
+                        art.name,
+                        art.path.to_string()
+                    );
                 }
             }
         }
@@ -75,23 +80,29 @@ pub mod paths {
                 path_arg.display().to_string()
             );
         } else {
-            get_glob_path(path_str, art_name, art_paths);
+            if get_glob_path(path_str) {
+                // add path to hash
+                art_paths.insert(
+                    art_name.to_string(),
+                    path_arg.display().to_string()
+                );
+            }
         }
     }
 
-    fn get_glob_path(path_str: &String, art_name: &String, art_paths: &mut HashMap<String, String>) {
+    fn get_glob_path(path_str: &String) -> bool {
         // Get path from glob based path  
         for entry in glob(path_str).expect("Unable to read glob pattern") {
             match entry {
-                Ok(path) => {
-                    // add path to hash
-                    art_paths.insert(
-                        art_name.to_string(),
-                        path.display().to_string()
-                    );
+                Ok(_) => {
+                    return true;
                 },
-                Err(e) => println!("{:?}", e),
+                Err(e) => {
+                    println!("{:?}", e);
+                    return false;
+                }
             }
         }
+        return false
     }
 }

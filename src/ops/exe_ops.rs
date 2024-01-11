@@ -5,11 +5,11 @@ use std::fs::OpenOptions;
 use crate::configs::config::{self, Wiskers};
 use super::file_ops;
 
-fn run_wisker(wisker_binary: &String, wisker_arg: &String) -> std::process::Output {
+fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
         &wisker_binary, 
         &wisker_arg);
-    println!("[ ] Running: {}", wisker_cmd);
+    file_ops::log_msg(&out_log, format!("[ ] Running: {}", wisker_cmd));
     let mut command = shell(wisker_cmd);
     command.stdout(Stdio::piped());
     let output = command.execute_output().unwrap();
@@ -49,7 +49,7 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
     wisker_arg
 }
 
-pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
+pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
     // Make the output folders from the yaml config
     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
     file_ops::make_folders(&folder_path);
@@ -86,7 +86,7 @@ pub fn load_wisker(main_args_c: config::MainArgs, wisker: &config::Wiskers, data
     (wisker_arg, wisker_binary, wisker_script, overwrite_file)
 }
 
-pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, out_log: &String) {
+pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, out_log: &String) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
@@ -97,8 +97,8 @@ pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::Ma
         run_para = false;
     }
 
-    let sc = scrape_config_wiskers.clone();
-    let wiskers: Vec<config::Wiskers> = sc
+    let func_c = func.clone();
+    let wiskers: Vec<config::Wiskers> = func_c
         .into_iter()
         .filter(|w| w.para == run_para)
         .collect();
@@ -110,30 +110,36 @@ pub fn run_commands(scrape_config_wiskers: &Vec<Wiskers>, main_args: &config::Ma
         let tx = tx.clone();
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
+        let out_log_c = out_log.clone();
         
         pool.spawn(move || {
-    
-            let (wisker_arg, wisker_binary, wisker_script, overwrite_file) = load_wisker(
-                main_args_c, 
-                &wisker, 
-                data_paths_c);
-
-            if overwrite_file {
-                if wisker.script {
-                    run_posh("-c", &wisker_script);
-                }
+            let input_file = data_paths_c[&wisker.input].as_str();
+            if input_file != "wiskess_none" {
+                let (wisker_arg, wisker_binary, wisker_script, overwrite_file) = load_wisker(
+                    &main_args_c, 
+                    &wisker, 
+                    data_paths_c);
                 
-                let output = run_wisker(&wisker_binary, &wisker_arg);
-            
-                println!("[+] Done {} with command: {} {}", 
-                    &wisker.name, 
-                    &wisker_binary,
-                    &wisker_arg);
+                if overwrite_file {
+                    if wisker.script {
+                        run_posh("-c", &wisker_script, &out_log_c);
+                    }
                     
-                tx.send(output.stdout).unwrap();
-            } else {    
-                println!("If wanting to run the module again, {}",
-                    "please delete the output file or run wiskess without --silent mode");
+                    let output = run_wisker(&wisker_binary, &wisker_arg, &out_log_c);
+                
+                    file_ops::log_msg(&out_log_c, format!("[+] Done {} with command: {} {}", 
+                        &wisker.name, 
+                        &wisker_binary,
+                        &wisker_arg));
+                        
+                    tx.send(output.stdout).unwrap();
+                } else {    
+                    let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
+                    let file_path = format!("{}/{}", &folder_path, &wisker.outfile);
+                    println!("[ ] The file already exists: {}", file_path);
+                    println!("If wanting to run the module again, {}",
+                        "please delete the output file or run wiskess without --silent mode");
+                }
             }
         });
     }
@@ -192,8 +198,10 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// run powershell, checking filepaths for powershell or pwsh
 /// arg payload is either script or command
 /// arg func sets whether the payload is executed as file or command
-pub fn run_posh(func: &str, payload: &String) {
-    println!("[ ] Powershell function running: {} with payload: {}", func, payload);
+pub fn run_posh(func: &str, payload: &String, out_log: &String) {
+    if out_log != "" {
+        file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
+    }
     let mut pwsh = "pwsh".to_string();
     if !check_binary(&pwsh, "-h") {
         pwsh = "powershell".to_string();

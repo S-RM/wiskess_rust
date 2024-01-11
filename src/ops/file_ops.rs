@@ -1,5 +1,6 @@
 use std::fs;
 use std::fs::OpenOptions;
+use std::io::Write;
 use inquire::Confirm;
 use inquire::CustomType;
 use inquire::InquireError;
@@ -11,6 +12,8 @@ pub fn make_folders(out_path: &String) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
 }
 
+///  file_exists - will check if a file exists and ask the user if they want to
+/// overwrite the file. This function returns false if it exists.
 pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
     let mut ret = true;
     let path = Path::new(&file_path);
@@ -62,7 +65,7 @@ fn user_file_overwrite(silent: bool, file_path: &String) -> bool {
             return true;
         } 
         Ok(false) => {
-            println!("[ ] The file already exists: {}", file_path);
+            // println!("[ ] The file already exists: {}", file_path);
         }
         Err(_) => {
             println!("No valid response to question.");
@@ -89,4 +92,15 @@ pub fn check_date(date: String, date_type: &String) -> String {
         ret_date = format!("{}", new_date).to_string();
     }
     ret_date
+}
+
+pub fn log_msg(out_log: &String, msg: String) {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(&out_log)
+        .expect("Failed to open log file");
+    
+    writeln!(file, "[{}] {}", chrono::Local::now().format("%Y%m%dT%H%M%S"), msg).unwrap();
 }
