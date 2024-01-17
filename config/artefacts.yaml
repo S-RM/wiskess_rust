@@ -1,0 +1,45 @@
+artefacts:
+  - name: none
+    path: ''
+  - name: winevt
+    path: '{root}\Windows\System32\winevt\Logs'
+  - name: base
+    path: '{root}'
+  - name: j_file
+    path: '{root}\$Extend\$UsnJrnl:$J'
+  - name: mft
+    path: '{root}\$MFT'
+  - name: recycle_bin
+    path: '{root}\$Recycle.Bin'
+  - name: pagefile
+    path: '{root}\pagefile.sys'
+  - name: user_dir
+    path: '{root}\Users'
+  - name: consolehost_history
+    path: '{root}\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt'
+  - name: amcache
+    path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
+  - name: recentFileCache
+    path: '{root}\Windows\AppCompat\Programs\RecentFileCache.bcf'
+  - name: prefetch
+    path: '{root}\Windows\Prefetch'
+  - name: system32
+    path: '{root}\Windows\System32'
+  - name: system
+    path: '{root}\Windows\System32\config\SYSTEM'
+  - name: system_config
+    path: '{root}\Windows\System32\config'
+  - name: sum
+    path: '{root}\Windows\System32\LogFiles\Sum'
+  - name: objects
+    path: '{root}\Windows\System32\wbem\Repository\OBJECTS.DATA'
+  - name: winevt
+    path: '{root}\Windows\System32\winevt\Logs'
+  - name: temp
+    path: '{root}\Windows\Temp'
+  - name: evtx_dump
+    path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
+  - name: chrome
+    path: '{root}\Users'
+  - name: actCache
+    path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'

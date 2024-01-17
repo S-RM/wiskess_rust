@@ -1,73 +1,48 @@
 artefacts:
   - name: none
     path: ''
-    path_type: file
   - name: winevt
     path: '{root}\Windows\System32\winevt\Logs'
-    path_type: folder
   - name: base
     path: '{root}'
-    path_type: folder
   - name: j_file
     path: '{root}\$Extend\$UsnJrnl:$J'
-    path_type: file
   - name: mft
     path: '{root}\$MFT'
-    path_type: file
   - name: recycle_bin
     path: '{root}\$Recycle.Bin'
-    path_type: folder
   - name: pagefile
     path: '{root}\pagefile.sys'
-    path_type: file
   - name: user_dir
     path: '{root}\Users'
-    path_type: folder
   - name: consolehost_history
     path: '{root}\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt'
-    path_type: file
   - name: amcache
     path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
-    path_type: file
   - name: recentFileCache
     path: '{root}\Windows\AppCompat\Programs\RecentFileCache.bcf'
-    path_type: file
   - name: prefetch
     path: '{root}\Windows\Prefetch'
-    path_type: folder
   - name: system32
     path: '{root}\Windows\System32'
-    path_type: folder
   - name: system
     path: '{root}\Windows\System32\config\SYSTEM'
-    path_type: file
   - name: system_config
     path: '{root}\Windows\System32\config'
-    path_type: folder
   - name: sum
     path: '{root}\Windows\System32\LogFiles\Sum'
-    path_type: folder
   - name: objects
     path: '{root}\Windows\System32\wbem\Repository\OBJECTS.DATA'
-    path_type: file
   - name: winevt
     path: '{root}\Windows\System32\winevt\Logs'
-    path_type: folder
-  - name: chrome
-    path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
-    path_type: folder
   - name: temp
     path: '{root}\Windows\Temp'
-    path_type: folder
   - name: evtx_dump
     path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
-    path_type: file
   - name: chrome
-    path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
-    path_type: folder
+    path: '{root}\Users'
   - name: actCache
     path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'
-    path_type: file
 
 wiskers:
   - name: MFTECmd
@@ -139,6 +114,7 @@ wiskers:
     binary: '{tool_path}\chainsaw\chainsaw.exe'
     args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
     input: base
+    valid_path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
@@ -146,6 +122,7 @@ wiskers:
     binary: '{tool_path}\chainsaw\chainsaw.exe'
     args: analyse srum --software {input}\config\SOFTWARE {input}\SRU\SRUDB.dat --output {outfolder}\{outfile}
     input: system32
+    valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     outfolder: Network
     outfile: chainsaw_srum.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
@@ -197,14 +174,16 @@ wiskers:
     outfolder: Network
     outfile: '*_SrumECmd_*.csv'
     input: system32
+    valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: hindsight
     binary: '{tool_path}\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
     outfolder: Network
     outfile: hindsight
-    input: user_dir
-    github:
+    input: chrome
+    valid_path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
+    github: https://github.com/obsidianforensics/hindsight.git
   - name: Browsing History
     binary: '{tool_path}\BrowsingHistoryView.exe'
     args: '/sort 2 /historysource 3 /historysourcefolder {input} /visittimefiltertype 1 /showTimeInGMT 1 /scomma {outfolder}/{outfile}'
@@ -278,22 +257,6 @@ wiskers:
     outfile: '*Destinations.csv'
     input: user_dir
     github:
-
-collectors:
-  - name: velociraptor
-    binary: '{tool_path}\velociraptor-v0.6.0-windows-amd64.exe'
-    args: '-v artifacts collect Windows.KapeFiles.Targets --output {outfolder}\{outfile} --args Device={input} --args _J=Y --args _MFT=Y --args _WBEM=Y --args _Prefetch=Y --args LogFiles=Y --args RecycleBin=Y --args WindowsTimeline=Y --args LNKFilesAndJumpLists=Y --args RegistryHivesUser=Y --args BrowserCache=Y --args PowerShellConsole=Y --args Antivirus=Y --args EventLogs=Y'
-    outfolder: Artefacts
-    outfile: 'velociraptor_collect.zip'
-    input: base
-    para: false
-  - name: 7zip
-    binary: 7z
-    args: 'x {outfolder}\{input} -o{out_path} -aos'
-    outfolder: Artefacts
-    input: 'velociraptor_collect.zip'
-    outfile: 'velociraptor_collect.zip'
-    para: false
 
 reporters:
   - name: polars timeline

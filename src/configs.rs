@@ -4,10 +4,15 @@ pub mod config {
   /// Top level structure of config file
   #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct Config {
-      pub artefacts: Vec<Artefacts>,
       pub wiskers: Vec<Wiskers>,
       pub enrichers: Vec<Wiskers>,
       pub reporters: Vec<Wiskers>,
+  }
+
+  /// Top level structure of artefacts config file
+  #[derive(Debug, Serialize, Deserialize, Clone)]
+  pub struct ConfigArt {
+      pub artefacts: Vec<Artefacts>,
   }
 
   fn serde_true() -> bool {
@@ -44,6 +49,8 @@ pub mod config {
     pub script_posh: String,
     #[serde(default = "serde_true")]
     pub chk_exists: bool,
+    #[serde(default)]
+    pub valid_path: String,
   }
 
   /// Artefact paths and type
@@ -51,7 +58,6 @@ pub mod config {
   pub struct Artefacts {
     pub name: String,
     pub path: String,
-    pub path_type: String,
   }
 
   // Set struct for interal args
@@ -62,13 +68,15 @@ pub mod config {
       pub end_date: String,
       pub tool_path: String,
       pub ioc_file: String,
-      pub silent: bool
+      pub silent: bool,
+      pub out_log: String
   }
 
   // Set struct for whipped args
-  #[derive(Debug, Clone)]
+  #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct WhippedArgs {
     pub config: String,
+    pub artefacts_config: String,
     pub data_source_list: String,
     pub local_storage: String,
     pub start_date: String,
