@@ -64,13 +64,11 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs
 
 fn out_table(contents: Vec<Summary>, out_log: &String, msg: String) {
     let mut table = Table::new(&contents);
-    let mut table_file = Table::new(&contents);
     table.with(Style::psql());
-    table_file.with(Style::psql());
     table.with(Width::wrap(200));
     table.with(Width::increase(75));
     println!("{}", table.to_string());
     println!("{}", msg);
-    file_ops::log_msg(&out_log, table_file.to_string());
+    file_ops::log_msg(&out_log, table.to_string());
     file_ops::log_msg(&out_log, msg);
 }

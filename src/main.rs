@@ -12,7 +12,7 @@ use serde_yaml::{self};
 use std::fs::OpenOptions;
 use std::env;
 use clap::{Parser, ArgAction, Subcommand};
-use chrono::{Utc, Duration};
+use chrono::Utc;
 use ctrlc;
 
 /// Structure of the command line args
@@ -35,9 +35,12 @@ enum Commands {
     Setup { },
     /// whipped pipeline process commands
     Whipped {
-        /// config file of the artefact file paths and binaries to run as processors
-        #[arg(short, long)]
+        /// config file of the binaries to run as processors
+        #[arg(short, long, default_value = "config/main_win.yaml")]
         config: String,
+        /// config file of the artefact file paths
+        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        artefacts_config: String,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long)]
         data_source_list: String,
@@ -73,9 +76,12 @@ enum Commands {
     },
     /// process the data with wiskess
     Wiskess {
-        /// config file of the artefact file paths and binaries to run as processors
-        #[arg(short, long)]
+        /// config file of the binaries to run as processors
+        #[arg(short, long, default_value = "config/main_win.yaml")]
         config: String,
+        /// config file of the artefact file paths
+        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        artefacts_config: String,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long)]
         data_source: String,
@@ -117,6 +123,7 @@ fn main() {
         },
         Commands::Whipped { 
             config,
+            artefacts_config,
             data_source_list,
             local_storage,
             start_date,
@@ -135,6 +142,7 @@ fn main() {
             // put the args into a whipped structure
             let args = config::WhippedArgs {
                 config,
+                artefacts_config,
                 data_source_list,
                 local_storage,
                 start_date,
@@ -150,6 +158,7 @@ fn main() {
         },
         Commands::Wiskess { 
             config, 
+            artefacts_config,
             data_source, 
             out_path, 
             start_date, 
@@ -170,8 +179,7 @@ fn main() {
             
             // Write start time to log
             file_ops::log_msg(&out_log, format!("Starting wiskess at: {}", wiskess_start_str));
-
-            
+ 
             // Confirm date is valid
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
@@ -182,7 +190,8 @@ fn main() {
                 end_date,
                 tool_path,
                 ioc_file,
-                silent: args.silent
+                silent: args.silent,
+                out_log
             };
         
             // Read the config
@@ -191,15 +200,22 @@ fn main() {
                 .open(config)
                 .expect("Unable to open config file.");
             let config: config::Config = serde_yaml::from_reader(f).expect("Could not read values.");
+
+            // Read the artefacts config
+            let f: std::fs::File = OpenOptions::new()
+                .read(true)
+                .open(artefacts_config)
+                .expect("Unable to open artefacts config file.");
+            let config_artefacts: config::ConfigArt = serde_yaml::from_reader(f).expect("Could not read values of artefacts config.");
         
             // TODO: check or gracefully error when the yaml config misses keys
         
             // check the file paths in the config exist and return a hash of the art paths
             let data_paths = paths::check_art(
-                config.artefacts, 
+                config_artefacts.artefacts, 
                 &data_source,
                 args.silent,
-                &out_log
+                &main_args.out_log
             );
             
             // Run in parallel then in series (if applicable) each binary of   
@@ -209,12 +225,12 @@ fn main() {
                 &config.enrichers,
                 &config.reporters] {
                     for num_threads in [0, 1] {
-                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads, &out_log);
+                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads);
                     }
             }
 
             // Validate wiskess has processed all input files into output files
-            valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &out_log);
+            valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
 
             // Set end time
             let wiskess_stop = Utc::now();
@@ -224,7 +240,7 @@ fn main() {
             let hours = (wiskess_duration.num_seconds() / 60) / 60;
             let duration = format!("{:0>2}:{:0>2}:{:0>2}", hours, minutes, seconds);
             file_ops::log_msg(
-                &out_log, 
+                &main_args.out_log, 
                 format!(
                     "Wiskess finished at: {}, which took: {} [H:M:S]", 
                     wiskess_stop.format(date_time_fmt).to_string(), 

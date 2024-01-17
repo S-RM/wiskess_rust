@@ -2,7 +2,7 @@ pub mod paths {
     use std::{path::Path, collections::HashMap};
     use glob::glob;
     use inquire::Text;
-    use crate::{configs::config::Artefacts, ops::file_ops};
+    use crate::{configs::config::Artefacts, ops::file_ops::{self, log_msg}};
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool, out_log: &String) -> HashMap<String, String> {
         let mut art_paths = HashMap::new();
@@ -13,6 +13,7 @@ pub mod paths {
                 data_source
             );
             let art_name = format!("{}", art.name);
+            // resolve the path_str into a path, and add it to art_path hash
             get_path(path_str, &mut art_paths, &art_name);
             if art_paths.get(&art.name).is_none() {
                 // TODO: check urlencoded filename
@@ -29,9 +30,6 @@ pub mod paths {
                 }
                 if art_paths.get(&art.name).is_none() && art.name != "none" {
                     file_ops::log_msg(&out_log, format!("[-] Path for {} not found at {}", art.name, path_str));
-                    // if not found, check others: mounted or ask user
-                    // TODO: if collected path from live mount, check mounted
-                    // if not found, ask the user to enter path
                     if silent {
                         // path not found, set as empty to skip processing
                         art_paths.insert(
@@ -39,9 +37,11 @@ pub mod paths {
                             "wiskess_none".to_string()
                         );
                     } else {
+                        // as the user for the path
                         get_users_path(&art_name, &mut art_paths);
                     }
                 } else if art.name == "none" {
+                    // if art name has been given none in the config, ignore and add
                     art_paths.insert(
                         art.name,
                         art.path.to_string()
@@ -52,6 +52,20 @@ pub mod paths {
         // Return a hashmap of artefact paths
         art_paths
     }
+
+    pub fn check_art_access(filepath: &String, out_log: &String) -> bool {
+        match file_ops::check_access(&filepath) {
+            Ok(message) => {
+                println!("{message}");
+                true
+            }
+            Err(e) => {
+                log_msg(out_log, format!("[!] Unable to read file: {filepath}, please copy it. Error: {}\n", e));
+                false
+            }
+        }
+    }
+
 
     fn get_users_path(art_name: &String, art_paths: &mut HashMap<String, String>) {
         let msg = format!("What is the file path of {}?", &art_name);

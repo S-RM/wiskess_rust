@@ -2,8 +2,8 @@ use std::{collections::HashMap, process::{Stdio, Command}, io::Write};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::OpenOptions;
-use crate::configs::config::{self, Wiskers};
-use super::file_ops;
+use crate::{configs::config::{self, Wiskers}, art::paths};
+use super::{file_ops, get_files};
 
 fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
@@ -37,8 +37,10 @@ fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, fo
 }
 
 fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap<String, String>, folder_path: &String, main_args: &config::MainArgs) -> String {
+    let input_path = get_wisker_art(data_paths, wisker, main_args);
+    
     let wisker_arg = wisker_field
-        .replace("{input}", data_paths[&wisker.input].as_str())
+        .replace("{input}", &input_path)
         .replace("{outfile}", &wisker.outfile.as_str())
         .replace("{outfolder}", folder_path)
         .replace("{start_date}", &main_args.start_date)
@@ -47,6 +49,28 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
         .replace("{out_path}", &main_args.out_path)
         .replace("{tool_path}", &main_args.tool_path);
     wisker_arg
+}
+
+fn get_wisker_art(data_paths: &HashMap<String, String>, wisker: &Wiskers, main_args: &config::MainArgs) -> String {
+    let mut input_path = data_paths[&wisker.input].clone();
+    if wisker.input != "none" && wisker.input != "base" {
+        // don't check none or base, as these are generic placeholders
+        if !paths::check_art_access(&input_path, &main_args.out_log) {
+            let filesystem = format!("\\\\.\\{}", &data_paths["base"]);
+            let base_path = format!("{}\\", &data_paths["base"]);
+            let filename = &input_path.replace(&base_path, "");
+            let dest_path = format!("{}\\Artefacts", &main_args.out_path);
+            file_ops::make_folders(&dest_path);
+            match get_files::get_file(&filesystem, &filename, &dest_path) {
+                Ok(_) => {
+                    println!("[+] Copy done for file: {input_path}");
+                    input_path = format!("{}\\{}", dest_path, filename);
+                }
+                Err(e) => println!("[!] Unable to copy file: {filesystem} {input_path}. Error: {}\n", e)
+            }
+        }
+    }
+    input_path
 }
 
 pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
@@ -86,7 +110,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     (wisker_arg, wisker_binary, wisker_script, overwrite_file)
 }
 
-pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, out_log: &String) {
+pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
@@ -110,7 +134,6 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         let tx = tx.clone();
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
-        let out_log_c = out_log.clone();
         
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
@@ -122,12 +145,12 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                 
                 if overwrite_file {
                     if wisker.script {
-                        run_posh("-c", &wisker_script, &out_log_c);
+                        run_posh("-c", &wisker_script, &main_args_c.out_log);
                     }
                     
-                    let output = run_wisker(&wisker_binary, &wisker_arg, &out_log_c);
+                    let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
                 
-                    file_ops::log_msg(&out_log_c, format!("[+] Done {} with command: {} {}", 
+                    file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
                         &wisker.name, 
                         &wisker_binary,
                         &wisker_arg));
@@ -144,7 +167,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                         &wisker.name,
                         "please delete the output file or run wiskess without --silent mode"
                     );
-                    file_ops::log_msg(&out_log_c, msg);
+                    file_ops::log_msg(&main_args_c.out_log, msg);
                 }
             }
         });
@@ -155,7 +178,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .write(true)
         .create(true)
         .append(true)
-        .open(&out_log)
+        .open(&main_args.out_log)
         .expect("Failed to open log file");
         
     for msg in rx {
