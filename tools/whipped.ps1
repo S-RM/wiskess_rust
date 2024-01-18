@@ -159,7 +159,7 @@ function Start-VeloProcess ($velo_collection, $wiskess_folder, $start_date, $end
     Write-Host "[+] Processing velociraptor collection: $velo_collection"
     if ($(Test-Path -PathType Container -Path "$velo_collection\files") -eq $False) {
         New-Item -ItemType Directory "$velo_collection\files" -ErrorAction SilentlyContinue
-        Get-ChildItem "$velo_collection\*\*" -Exclude "$velo_collection\files*" | ForEach-Object {
+        Get-ChildItem "$velo_collection\*\*" -Exclude "%5C%5C.%5CD%3A","$velo_collection\files*" | ForEach-Object {
             Copy-Item $_ -Destination "$velo_collection\files" -Recurse -ErrorAction SilentlyContinue
             Remove-Item -Force -Recurse $_ 
         }

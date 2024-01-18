@@ -87,7 +87,8 @@ function Start-MainSetup {
   # install chocolatey, git, 7zip, ripgrep, python2/3, EZ-Tools, chainsaw, hayabusa, osfmount, fd
   Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
-  choco install -y git 7zip ripgrep python2 fd osfmount awscli
+  choco install -y git 7zip python2 fd osfmount awscli
+  choco install -y --force ripgrep
   $chkPython = checkPython
   if ($chkPython.ToLower().Contains("python 3")) {
     write-host "Python already installed" -ForegroundColor White -BackgroundColor DarkGreen
