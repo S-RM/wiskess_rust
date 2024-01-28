@@ -17,16 +17,14 @@ pub mod paths {
             get_path(path_str, &mut art_paths, &art_name);
             if art_paths.get(&art.name).is_none() {
                 // TODO: check urlencoded filename
-                let path = Path::new(path_str);
-                let filename = path.file_name();
-                if filename != None {
-                    let parent = path.parent().unwrap();
-                    let filename_str = filename.unwrap().to_str().unwrap().replace(":","%3A");
-                    let enc_path = format!(
-                        "{}/{}", 
-                        parent.to_str().unwrap(), 
-                        filename_str);
-                    get_path(&enc_path, &mut art_paths, &art_name);
+                get_enc_path(path_str, &mut art_paths, &art_name);
+                if art.legacy != "" {
+                    // check legacy path
+                    let path_str_leg = &art.legacy.replace(
+                        "{root}", 
+                        data_source
+                    );
+                    get_path(&path_str_leg, &mut art_paths, &art_name);
                 }
                 if art_paths.get(&art.name).is_none() && art.name != "none" {
                     file_ops::log_msg(&out_log, format!("[-] Path for {} not found at {}", art.name, path_str));
@@ -51,6 +49,21 @@ pub mod paths {
         }
         // Return a hashmap of artefact paths
         art_paths
+    }
+
+    fn get_enc_path(path_str: &String, art_paths: &mut HashMap<String, String>, art_name: &String) {
+        let path = Path::new(path_str);
+        let filename = path.file_name();
+        if filename != None {
+            let parent = path.parent().unwrap();
+            let filename_str = filename.unwrap().to_str().unwrap().replace(":","%3A");
+            let enc_path = format!(
+                "{}/{}", 
+                parent.to_str().unwrap(), 
+                filename_str);
+            // get the path that has url encoding
+            get_path(&enc_path, art_paths, art_name);
+        }
     }
 
     pub fn check_art_access(filepath: &String, out_log: &String) -> bool {

@@ -58,6 +58,8 @@ pub mod config {
   pub struct Artefacts {
     pub name: String,
     pub path: String,
+    #[serde(default)]
+    pub legacy: String,
   }
 
   // Set struct for interal args
@@ -82,7 +84,6 @@ pub mod config {
     pub start_date: String,
     pub end_date: String,
     pub ioc_file: String,
-    pub storage_type: String,
     pub in_link: String,
     pub out_link: String,
     pub update: bool,

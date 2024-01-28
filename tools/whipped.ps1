@@ -23,8 +23,6 @@
     Required. The paths to the file, folder of images, collections, etc. Must be separated by comma ','
 .PARAMETER local_storage
     Required. The path to where the data is temporarily downloaded to and Wiskess output is stored locally
-.PARAMETER storage_type
-    Requried. Either 'azure' or 'aws' - based on where the data source is stored.
 .PARAMETER in_link
     Required. The link that the data is stored on, i.e. https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
 .PARAMETER out_link
@@ -44,7 +42,6 @@
     Run with a list of data sources (needs to be the path from the azure storage), where each is separated by a comma or new line:
     .\whipped.ps1 -data_source_list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
         -local_storage x:
-        -storage_type azure
         -in_link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
         -out_link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
         -start_date 2023-01-01 `
@@ -61,7 +58,6 @@ param (
     [Parameter(Mandatory)] [string] $config,
     [Parameter(Mandatory)] [string] $data_source_list,
     [Parameter(Mandatory)] [string] $local_storage,
-    [Parameter(Mandatory)] [string] $storage_type,
     [Parameter(Mandatory)] [string] $in_link,
     [Parameter(Mandatory)] [string] $out_link,
     [Parameter()] [string] $ioc_file = "$PSScriptRoot\iocs.txt",
@@ -160,8 +156,8 @@ function Start-VeloProcess ($velo_collection, $wiskess_folder, $start_date, $end
     if ($(Test-Path -PathType Container -Path "$velo_collection\files") -eq $False) {
         New-Item -ItemType Directory "$velo_collection\files" -ErrorAction SilentlyContinue
         Get-ChildItem "$velo_collection\*\*" -Exclude "%5C%5C.%5CD%3A","$velo_collection\files*" | ForEach-Object {
-            Copy-Item $_ -Destination "$velo_collection\files" -Recurse -ErrorAction SilentlyContinue
-            Remove-Item -Force -Recurse $_ 
+            Move-Item $_ -Destination "$velo_collection\files" -ErrorAction SilentlyContinue
+            Remove-Item -Force -Recurse $_ -ErrorAction SilentlyContinue     
         }
     }
     Start-Wiskess "$velo_collection\files" $wiskess_folder $start_date $end_date $ioc_file
@@ -183,24 +179,15 @@ function Start-Wiskess ($dataSource, $wiskess_folder, $start_date, $end_date, $i
 
 # TODO: List the data_source_list to get size of largest file 
 
-# Storage type must be aws or azure, storage_type is used to select the method of data transfer
-if ($storage_type -match "aws") {
-    $storage_type = "aws"
-} elseif ($storage_type -match "azure") {
-    $storage_type = "azure"
-} else {
-    Write-Error "Storage type must be either aws or azure"
-    Start-Sleep -Seconds 2
-    exit
-}
-
 function Find-Uploaded($out_URL) {
     Write-Host "[ ] Checking if already done $out_URL"
     $uploaded = $False
-    if ($storage_type -match "aws") {
+    if ($out_URL -match "^s3") {
+        # if the cloud storage is AWS
         $size = $(aws s3 ls $out_URL --summarize --recursive) -match "Total Size" -replace ".*Total Size:\s*"
         $uploaded = [int]$size[0] -gt 50
-    } elseif ($storage_type -match "azure") {
+    } elseif ($out_URL -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
         $out_dest = & "$tool_path\tools\azcopy\azcopy.exe" list "$out_URL"
         $uploaded = $out_dest.Length -gt 50
     }
@@ -208,7 +195,8 @@ function Find-Uploaded($out_URL) {
 }
 
 function Get-VMDKDescriptor ($dataS, $in_link) {
-    if ($storage_type -match "azure") {
+    if ($in_link -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
         # Not needed as using osfmount
         $vmdk_stub = $("$dataS" -Replace "(?:-flat\.vmdk|\.vmdk)$","")
         $vmdk_files = $(& "$tool_path\tools\azcopy\azcopy.exe" list "$in_link" | `
@@ -223,9 +211,12 @@ function Get-VMDKDescriptor ($dataS, $in_link) {
     }
 }
 
-function Copy-CloudTransfer ($src, $dst) {
+# Download-Cloud - src is Cloud url, dst is local folder
+function Download-Cloud ($src, $dst) {
     Write-Host "[ ] Copying data from $src to $dst"
-    if ($storage_type -match "aws") {
+
+    if ($src -match "^s3") {
+        # if the cloud storage is AWS
         if ($src -match "[^\\]*\.\w{2,3}$") {
             Write-Host "[ ] Data is a file"
             aws s3 cp "$src" "$dst"
@@ -233,28 +224,40 @@ function Copy-CloudTransfer ($src, $dst) {
             Write-Host "[ ] Data is a folder"
             aws s3 cp "$src" "$dst" --recursive
         }
-    } elseif ($storage_type -match "azure") {
+    } elseif ($src -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
         & "$tool_path\tools\azcopy\azcopy.exe" copy "$src" "$dst" --recursive
     }
 }
 
-function Sync-CloudTransfer ($src, $dst, $folder) {
+# Upload-Cloud - src is local folder, dst is cloud url, folder is local folder and needed for aws
+function Upload-Cloud ($src, $dst, $folder) {
     Write-Host "[ ] Syncing data from $src to $dst"
-    if ($storage_type -match "aws") {
+    if ($dst -match "^s3") {
+        # if the cloud storage is AWS
         aws s3 sync "$src" "$dst/$folder"
-    } elseif ($storage_type -match "azure") {
+    } elseif ($dst -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
         & "$tool_path\tools\azcopy\azcopy.exe" copy "$src" "$dst" --recursive --overwrite=ifSourceNewer
     }
 }
 
 function Set-UrlLinks ($dataS, $wiskess_folder) {
-    if ($storage_type -match "aws") {
-        $out_URL = '{0}/{1}' -f $($out_link -replace "/*$",""),$wiskess_folder
+    if ($in_link -match "^s3") {
+        # if the cloud storage is AWS
         $in_URL = '{0}/{1}' -f $($in_link -replace "/*$",""),$dataS
-    } elseif ($storage_type -match "azure") {
-        $out_URL = '{0}{1}{2}' -f $out_link.Split("?")[0],"/$($wiskess_folder)?",$out_link.Split("?")[1]
+    } elseif ($in_link -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
         $in_URL = '{0}{1}{2}' -f $in_link.Split("?")[0],"/$($dataS)?",$in_link.Split("?")[1]
     }
+    if ($out_link -match "^s3") {
+        # if the cloud storage is AWS
+        $out_URL = '{0}/{1}' -f $($out_link -replace "/*$",""),$wiskess_folder
+    } elseif ($out_link -match "^https://[^/]+.core.windows.net") {
+        # if the cloud storage is Azure
+        $out_URL = '{0}{1}{2}' -f $out_link.Split("?")[0],"/$($wiskess_folder)?",$out_link.Split("?")[1]
+    }
+
     return $out_URL, $in_URL
 }
 
@@ -288,7 +291,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
             } else {
                 # Download the image
                 Write-Host "[+] Downloading $_"
-                Copy-CloudTransfer $in_URL "$local_storage\"
+                Download-Cloud $in_URL "$local_storage\"
             }
             Write-Host "Downloaded files: $(Get-ChildItem -recurse -Depth 3 $local_storage\$_)"
         }
@@ -304,7 +307,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
             # Download is a zip, check for embedded zips
             $image_archive = $(Get-ChildItem "$local_storage\$_").FullName
         } 
-        if ($(Test-Path -Type Container "$local_storage\$($image_folder)-extracted") -eq $true -and $(Get-ChildItem "$local_storage\$($image_folder)-extracted" | Measure-Object -Property Length -sum).sum -gt 1000000000) {
+        if ($(Test-Path -Type Container "$local_storage\$($image_folder)-extracted") -eq $true -and $(Get-ChildItem -Recurse -Depth 2 "$local_storage\$($image_folder)-extracted" | Measure-Object -Property Length -sum).sum -gt 1000000000) {
             Write-Warning "Folder $local_storage\$($image_folder)-extracted exists delete it if wanting to extract again."
         } elseif ($image_archive) {
             # Extracting the zip to folder
@@ -336,7 +339,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
             Write-Host "---------------- Update Data ----------------"
             if ($uploaded -eq $False) {
                 # Download the wiskess folder
-                Copy-CloudTransfer $out_URL "$local_storage\"
+                Download-Cloud $out_URL "$local_storage\"
             }
             if ($(Test-Path -Path "$local_storage\$($wiskess_folder)")) {
                 # Remove the Artefacts folder
@@ -370,7 +373,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
 
         Write-Host "---------------- Upload Data ----------------"
         if ($(Test-Path -PathType Container "$local_storage\$($wiskess_folder)")) {
-            Sync-CloudTransfer "$local_storage\$($wiskess_folder)" "$out_link" "$wiskess_folder"
+            Upload-Cloud "$local_storage\$($wiskess_folder)" "$out_link" "$wiskess_folder"
         }
         if ($keep_evidence -eq $False) {
             Write-Host "[ ] Cleaning up data source files..."
@@ -379,7 +382,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
             Remove-Item -Force -Recurse "$local_storage\$($image_folder)-extracted"
         }
     } else {
-        Write-Warning "The wiskess output exists on $storage_type $out_URL. Remove this if wanting to rerun the pipeline. Or add the flag -update"
+        Write-Warning "The wiskess output exists on $out_URL. Remove this if wanting to rerun the pipeline. Or add the flag -update"
     }
     Write-Host "[+] Done $_"
     Write-Host "------------------------========================================================------------------------"

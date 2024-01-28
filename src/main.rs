@@ -56,9 +56,6 @@ enum Commands {
         /// IOC list file
         #[arg(short, long)]
         ioc_file: String,
-        /// Either 'azure' or 'aws' - based on where the data source is stored.
-        #[arg(short, long)]
-        storage_type: String,
         /// The link that the data is stored on, i.e https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
         #[arg(long)]
         in_link: String,
@@ -129,7 +126,6 @@ fn main() {
             start_date,
             end_date,
             ioc_file,
-            storage_type,
             in_link,
             out_link,
             update,
@@ -147,8 +143,7 @@ fn main() {
                 local_storage,
                 start_date,
                 end_date,
-                ioc_file,                
-                storage_type,
+                ioc_file,      
                 in_link,
                 out_link,
                 update,

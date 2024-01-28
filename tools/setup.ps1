@@ -115,6 +115,7 @@ function Start-MainSetup {
   $gitRepos = @{
     # Format: "URL gitRepo" = "Output Director outDir"
     "https://github.com/EricZimmerman/Get-ZimmermanTools.git" = "Get-ZimmermanTools"
+    "https://github.com/williballenthin/python-registry.git" = "python-registry"
     # "https://github.com/Neo23x0/Loki2.git" = "loki2"
   }
   $gitReleases = @{    

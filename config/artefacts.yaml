@@ -1,8 +1,6 @@
 artefacts:
   - name: none
     path: ''
-  - name: winevt
-    path: '{root}\Windows\System32\winevt\Logs'
   - name: base
     path: '{root}'
   - name: j_file
@@ -11,10 +9,12 @@ artefacts:
     path: '{root}\$MFT'
   - name: recycle_bin
     path: '{root}\$Recycle.Bin'
+    legacy: '{root}\RECYCLER'
   - name: pagefile
     path: '{root}\pagefile.sys'
   - name: user_dir
     path: '{root}\Users'
+    legacy: '{root}\Documents and Settings'
   - name: consolehost_history
     path: '{root}\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt'
   - name: amcache
@@ -35,11 +35,13 @@ artefacts:
     path: '{root}\Windows\System32\wbem\Repository\OBJECTS.DATA'
   - name: winevt
     path: '{root}\Windows\System32\winevt\Logs'
+    legacy: '{root}\Windows\System32\config'
   - name: temp
     path: '{root}\Windows\Temp'
   - name: evtx_dump
     path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
   - name: chrome
     path: '{root}\Users'
+    legacy: '{root}\Documents and Settings'
   - name: actCache
     path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'

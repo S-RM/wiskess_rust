@@ -1,7 +1,7 @@
 use std::{collections::HashMap, process::{Stdio, Command}, io::Write};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
-use std::fs::OpenOptions;
+use std::fs::{canonicalize, OpenOptions};
 use crate::{configs::config::{self, Wiskers}, art::paths};
 use super::{file_ops, get_files};
 
@@ -70,7 +70,13 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, wisker: &Wiskers, main_a
             }
         }
     }
-    input_path
+    match canonicalize(&input_path) {
+        Ok(p) => p.into_os_string().into_string().unwrap(),
+        Err(e) => {
+            println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
+            "".to_string()
+        }
+    }
 }
 
 pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
@@ -200,7 +206,6 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     command.args(["-start_date", &args.start_date]);
     command.args(["-end_date", &args.end_date]);
     command.args(["-ioc_file", &args.ioc_file]);
-    command.args(["-storage_type", &args.storage_type]);
     command.args(["-in_link", &args.in_link]);
     command.args(["-out_link", &args.out_link]);
     if args.update {

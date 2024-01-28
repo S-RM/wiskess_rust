@@ -1,49 +1,3 @@
-artefacts:
-  - name: none
-    path: ''
-  - name: winevt
-    path: '{root}\Windows\System32\winevt\Logs'
-  - name: base
-    path: '{root}'
-  - name: j_file
-    path: '{root}\$Extend\$UsnJrnl:$J'
-  - name: mft
-    path: '{root}\$MFT'
-  - name: recycle_bin
-    path: '{root}\$Recycle.Bin'
-  - name: pagefile
-    path: '{root}\pagefile.sys'
-  - name: user_dir
-    path: '{root}\Users'
-  - name: consolehost_history
-    path: '{root}\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt'
-  - name: amcache
-    path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
-  - name: recentFileCache
-    path: '{root}\Windows\AppCompat\Programs\RecentFileCache.bcf'
-  - name: prefetch
-    path: '{root}\Windows\Prefetch'
-  - name: system32
-    path: '{root}\Windows\System32'
-  - name: system
-    path: '{root}\Windows\System32\config\SYSTEM'
-  - name: system_config
-    path: '{root}\Windows\System32\config'
-  - name: sum
-    path: '{root}\Windows\System32\LogFiles\Sum'
-  - name: objects
-    path: '{root}\Windows\System32\wbem\Repository\OBJECTS.DATA'
-  - name: winevt
-    path: '{root}\Windows\System32\winevt\Logs'
-  - name: temp
-    path: '{root}\Windows\Temp'
-  - name: evtx_dump
-    path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
-  - name: chrome
-    path: '{root}\Users'
-  - name: actCache
-    path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'
-
 wiskers:
   - name: MFTECmd
     binary: '{tool_path}\Get-ZimmermanTools\MFTECmd.exe'
@@ -75,7 +29,7 @@ wiskers:
     github: https://github.com/EricZimmerman/RBCmd.git
   - name: lnk
     binary: '{tool_path}\Get-ZimmermanTools\LECmd.exe'
-    args: '-d {input} --csv {outfolder} --csvf {outfile} -q'
+    args: -d {input} --csv {outfolder} --csvf {outfile} -q
     outfolder: FileSystem
     outfile: lnk-files.csv
     input: user_dir
@@ -112,7 +66,7 @@ wiskers:
     para: false
   - name: chainsaw_shim
     binary: '{tool_path}\chainsaw\chainsaw.exe'
-    args: analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}
+    args: 'analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}'
     input: base
     valid_path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
     outfolder: FileExecution
@@ -133,13 +87,6 @@ wiskers:
     outfile: appcompatcache.csv
     input: system
     github: https://github.com/EricZimmerman/AppCompatCacheParser.git
-  - name: AmcacheParser
-    binary: '{tool_path}\Get-ZimmermanTools\AmcacheParser.exe'
-    args: '-f {input} --csv {outfolder} -i'
-    outfolder: FileExecution
-    outfile: '*_Amcache_*'
-    input: amcache
-    github: https://github.com/EricZimmerman/AmcacheParser.git
   - name: RecentFileCacheParser
     binary: '{tool_path}\Get-ZimmermanTools\RecentFileCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
@@ -202,9 +149,11 @@ wiskers:
     script: true
     script_posh: '$hist = "{input}";
       $outDir = "{outfolder}";
-      Get-ChildItem $hist | ForEach-Object { 
-          $fn = $($_ -Replace ".*Users\\([^\\]+).+","`$1_ConsoleHost_history.txt"); 
-          Get-Content $_ | Out-File -FilePath "$outDir\$fn";
+      if ($hist -ne "") {
+        Get-ChildItem $hist | ForEach-Object { 
+            $fn = $($_ -Replace ".*Users\\([^\\]+).+","`$1_ConsoleHost_history.txt"); 
+            Get-Content $_ | Out-File -FilePath "$outDir\$fn";
+        }
       }'
   - name: SumECmd
     binary: '{tool_path}\Get-ZimmermanTools\SumECmd.exe'
@@ -307,3 +256,16 @@ enrichers:
     outfile: iocs_datasource.txt
     input: base
     github: https://github.com/BurntSushi/ripgrep.git
+  - name: thor_analysis
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --intense --norescontrol --nosoft --cross-platform --alldrives -p {out_path} -e {outfolder}'
+    outfolder: IOC_Findings\thor_analysis
+    outfile: '*.txt'
+    input: none
+  - name: thor_datasource
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --intense --norescontrol --nosoft --cross-platform --alldrives -p {input} -e {outfolder}'
+    outfolder: IOC_Findings\thor_datasource
+    outfile: '*.txt'
+    input: base
+    para: false
