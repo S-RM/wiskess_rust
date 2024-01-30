@@ -81,7 +81,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     } elseif ($image -Match "-flat\.vmdk$") {
         $osf_mount = $True
     }
-    if ($image -Match "\.(?:vhdx|ova|vdi)$") {
+    if ($image -Match "\.(?:vhd|vhdx|ova|vdi)$") {
         # OSFMount doesn't support these image types, so either convert or use AIM
         $osf_mount = $False
     }
@@ -100,7 +100,8 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
             Start-Sleep -Seconds 5
         }
     } else {
-        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o ro -f "$image" -v all
+        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o wc -f "$image" -v all
+        # $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -o wc,physical -f "$image" -v all
         if ($osf_mount -match 'Created device\s') {
             $drive_mount_start = $(($osf_mount -match 'Created device\s') -replace 'Created device\s*\d+:\s*(\w):.*','$1')
         }
@@ -133,8 +134,14 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
             Dismount-VHD -Path $image
         }
     } else {
-        $drive_mount_start.Split() | ForEach-Object {
-            & 'C:\Program Files\OSFMount\OSFMount.com' -D -m "$($_):"
+        if ($drive_mount_start -ne "") {
+            $drive_mount_start.Split() | ForEach-Object {
+                & 'C:\Program Files\OSFMount\OSFMount.com' -D -m "$($_):"
+            }
+        } else {        
+            $free_drives | ForEach-Object { 
+                $drive_mount = "$($_):"
+            }
         }
     }
 }
@@ -285,6 +292,8 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
         Write-Host "---------------- Get Data ----------------"
         if ($(Test-Path "$local_storage\$_") -eq $true) {
             Write-Warning "File $local_storage\$_ exists, remove it if wanting to download again."
+        } elseif ($(Test-Path -Type Container "$local_storage\$($image_folder)-extracted") -eq $true -and $(Get-ChildItem -Recurse -Depth 2 "$local_storage\$($image_folder)-extracted" | Measure-Object -Property Length -sum).sum -gt 1000000000) {
+            Write-Warning "Folder $local_storage\$($image_folder)-extracted exists delete it if wanting to extract again."
         } else {
             if ($_ -match "\.vmdk$") {
                 Get-VMDKDescriptor $_ $in_link
