@@ -270,7 +270,7 @@ enrichers:
     outfile: '*.txt'
     input: none
   - name: loki_datasource
-    binary: '{tool_path}/loki-lite/loki64-lite.exe'
+    binary: '{tool_path}/loki/loki/loki.exe'
     args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
     outfolder: IOC_Findings\loki_datasource
     outfile: '*.txt'
