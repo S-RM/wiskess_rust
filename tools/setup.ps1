@@ -135,12 +135,10 @@ function Start-MainSetup {
     gitRelease -gitRepo $_ -gitKey $gitKey
   }
   
-  # Hayabusa post process, move exe to sibling of rules
-  # if ($(Test-Path -PathType Leaf "$toolPath\hayabusa\target\release\hayabusa.exe") -eq $True) {
-  #   Copy-Item "$toolPath\hayabusa\target\release\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
-  # } else {
-  #   Copy-Item "$toolPath\hayabusa.exe" "$toolPath\hayabusa\hayabusa.exe"
-  # }
+  # Loki upgrader
+  cd "$toolPath\loki\loki\"
+  .\loki-upgrader.exe
+  cd $toolPath
 
   # EZ Tools
   & "$toolPath\Get-ZimmermanTools\Get-ZimmermanTools.ps1" -NetVersion 4 -Dest "$toolPath\Get-ZimmermanTools\"

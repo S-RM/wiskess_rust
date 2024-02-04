@@ -35,11 +35,11 @@ wiskers:
     input: user_dir
     github: https://github.com/EricZimmerman/LECmd.git
   - name: evtx_dump
-    binary: '{tool_path}\evtx\evtx.exe'
-    args: -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite {input}
+    binary: 'fd'
+    args: '.* -e evtx -p {input} -x {tool_path}\evtx\evtx.exe -f {outfolder}\{outfile} -o jsonl --no-confirm-overwrite'
     outfolder: EventLogs
     outfile: evtx_dump.json
-    input: evtx_dump
+    input: winevt
     github: https://github.com/omerbenamram/evtx.git
   - name: EvtxECmd
     binary: '{tool_path}\Get-ZimmermanTools\EvtxECmd\EvtxECmd.exe'

@@ -100,8 +100,8 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
             Start-Sleep -Seconds 5
         }
     } else {
-        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o wc -f "$image" -v all
-        # $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -o wc,physical -f "$image" -v all
+        # $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o wc -f "$image" -v all
+        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -o wc,physical -f "$image" -v all
         if ($osf_mount -match 'Created device\s') {
             $drive_mount_start = $(($osf_mount -match 'Created device\s') -replace 'Created device\s*\d+:\s*(\w):.*','$1')
         }

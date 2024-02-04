@@ -38,8 +38,6 @@ artefacts:
     legacy: '{root}\Windows\System32\config'
   - name: temp
     path: '{root}\Windows\Temp'
-  - name: evtx_dump
-    path: '{root}\Windows\System32\winevt\Logs\Microsoft-Windows-TaskScheduler%4Operational.evtx'
   - name: chrome
     path: '{root}\Users'
     legacy: '{root}\Documents and Settings'
