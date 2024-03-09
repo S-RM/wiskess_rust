@@ -15,7 +15,7 @@ use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
 use ctrlc;
 
-/// Structure of the command line args
+/// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
