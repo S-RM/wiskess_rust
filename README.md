@@ -50,7 +50,7 @@ wiskess_rust.exe whipped --config ./config/win_all.yml
     <summary>Click to show the parameters for `wiskess_rust.exe whipped`</summary>
     
     --config <String>
-        Required. The paths to the configuration file, i.e. ./config/win_all.yml
+        Optional. The paths to the configuration file, i.e. ./config/win_all.yml
             
     --data-source-list <String>
         Required. The paths to the file, folder of images, collections, etc. Must be separated by comma ',' or new line
@@ -105,10 +105,10 @@ run `wiskess_rust.exe setup` using PowerShell as Administrator
     <summary>Click to show the parameters for `wiskess_rust.exe wiskess`</summary>
         
     --config <String>
-        Required. The paths to the configuration file, i.e. ./config/win_all.yml
+        Optional. The paths to the configuration file, i.e. ./config/win_all.yml
             
     --data-source <String>
-        Required. The drive letter the image is mounted on.
+        Required. The drive letter the image is mounted on, or the file path to the extracted collection.
 
     --out-path <String>
         Required. Where you want to store the analysis and artefact results.
@@ -124,8 +124,6 @@ run `wiskess_rust.exe setup` using PowerShell as Administrator
         Optional. The end time to when we want to look for interesting information. Normally aligned with the incident timeframe.        
         Caution: specifying a high number of days will cause performance issues.
 
-    --claws-out
-        Optional. Run an intense system-wide scan for IOCs using ripgrep and loki
 </details>
 
 ## Examples for wiskess

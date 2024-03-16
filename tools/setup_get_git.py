@@ -4,9 +4,11 @@ from urllib.parse import urlparse
 import zipfile
 import argparse
 import os
+import stat
 import filetype
 import re
 import shutil
+import magic
 
 def get_files(response: str, target_dir: str):
   # download each url, and extract, then delete the zip
@@ -24,7 +26,7 @@ def get_files(response: str, target_dir: str):
         # extract it
         with zipfile.ZipFile(filename, 'r') as zip_ref:
           zip_ref.extractall(target_dir)
-      elif file_type.mime in ('application/x-msdownload', 'application/x-executable'):
+      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable'):
         shutil.copy(filename, target_dir)
       else:
         print(f'[!] Unable to extract release {filename} archive with mime type: {file_type.mime}')
@@ -34,22 +36,39 @@ def get_files(response: str, target_dir: str):
       print(f'[!] File {filename} didn\'t download to the filepath.')
 
 
-def make_symlink(target_dir: str, program: str):
+def make_symlink(target_dir: str, program: str, script_os: str):
   source_file = ''
   target_file = os.path.join(target_dir, f'{program}.exe')
-  if os.path.exists(target_file):
+  if os.path.exists(target_file) and not(os.path.islink(target_file)):
     return
+
+  if script_os == 'windows':
+    file_type_regex = re.compile('x-dos-executable')
+  elif script_os == 'linux':
+    file_type_regex = re.compile('x(?:-pie|)-executable')
+  else:
+    file_type_regex = re.compile('x.*-executable')
+
   for root, dirs, files in os.walk(target_dir):
     if root.count(os.sep) - target_dir.count(os.sep) < 2:
       for f in files:
-        if re.match(r'.*\.exe$', f):
-          source_file = os.path.join(root, f)
+        f_path = os.path.join(root, f)
+        file_type = magic.from_file(f_path, mime=True)
+        print(f'Filename: {f_path}, Type: {file_type}')
+        if file_type_regex.search(file_type):
+          source_file = f_path
           break
   if source_file != '' and source_file != target_file:
     os.symlink(source_file, target_file)
-        
+    # make the source executable
+    sf_stats = os.stat(source_file)
+    os.chmod(source_file, sf_stats.st_mode | stat.S_IEXEC)
+    # make the symlink executable
+    tf_stats = os.stat(target_file)
+    os.chmod(target_file, tf_stats.st_mode | stat.S_IEXEC)
 
-def get_release(token: str, url: str):
+
+def get_release(token: str, url: str, script_os: str):
     repo = urlparse(url).path
     repo = re.sub('\.git$', '', repo)
     program = repo.split('/')[-1]
@@ -70,7 +89,7 @@ def get_release(token: str, url: str):
       # download the files to target dir
       get_files(response, target_dir)
       # symlink the main .exe to program.exe
-      make_symlink(target_dir, program)
+      make_symlink(target_dir, program, script_os)
     else:
       print(f'[!] Unable to get the repo from link: {url}')
       print('[ ] Please check the link exists')
@@ -80,10 +99,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('token', help='your API token')
     parser.add_argument('url', help='the url of the git repo')
+    parser.add_argument('script_os', help='the os of the env')
     args = parser.parse_args()
 
-    get_release(args.token, args.url)
-    
+    get_release(args.token, args.url, args.script_os)
+
 
 if __name__ == '__main__':
-  main()  
+  main()

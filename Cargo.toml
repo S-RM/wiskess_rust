@@ -1,6 +1,6 @@
 [package]
 name = "wiskess_rust"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 author = "Gavin Hull"
 about = "Automated Windows Disk Processing"
@@ -30,3 +30,4 @@ tabled = "0.15.0"
 anyhow = "1.0.79"
 ntfs = "0.4.0"
 walkdir = "2.4.0"
+run_script = "0.10.1"

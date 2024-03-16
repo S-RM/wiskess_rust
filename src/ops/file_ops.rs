@@ -8,7 +8,6 @@ use inquire::InquireError;
 use std::path::Path;
 use chrono::NaiveDate;
 use glob::glob;
-use walkdir::WalkDir;
 
 pub fn make_folders(out_path: &String) {
     fs::create_dir_all(out_path).expect("Failed to create folder");

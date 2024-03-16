@@ -107,7 +107,7 @@ pub mod paths {
                 path_arg.display().to_string()
             );
         } else {
-            if get_glob_path(path_str) {
+            if is_glob_path(path_str) {
                 // add path to hash
                 art_paths.insert(
                     art_name.to_string(),
@@ -117,7 +117,7 @@ pub mod paths {
         }
     }
 
-    fn get_glob_path(path_str: &String) -> bool {
+    fn is_glob_path(path_str: &String) -> bool {
         // Get path from glob based path  
         for entry in glob(path_str).expect("Unable to read glob pattern") {
             match entry {
@@ -131,5 +131,21 @@ pub mod paths {
             }
         }
         return false
+    }
+
+    pub fn get_glob_path(path_str: &String) -> String {
+        // Get path from glob based path  
+        for entry in glob(path_str).expect("Unable to read glob pattern") {
+            match entry {
+                Ok(_) => {
+                    return entry.unwrap().into_os_string().into_string().unwrap();
+                },
+                Err(e) => {
+                    println!("{:?}", e);
+                    return "".to_string();
+                }
+            }
+        }
+        return "".to_string()
     }
 }

@@ -1,0 +1,133 @@
+wiskers:
+  - name: mft
+    binary: '{tool_path}/mft/mft.exe'
+    args: "-o csv -f {outfolder}/{outfile} '{input}'"
+    outfolder: FileSystem
+    outfile: mft.csv
+    input: mft
+    github: https://github.com/omerbenamram/mft
+  - name: evtx_dump
+    binary: fdfind
+    args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite'
+    outfolder: EventLogs
+    outfile: evtx_dump.json
+    input: winevt
+    github: https://github.com/omerbenamram/evtx.git
+  - name: hayabusa
+    binary: '{tool_path}/hayabusa/hayabusa.exe'
+    args: 'csv-timeline -d {input} -o {outfolder}/{outfile} -p timesketch-verbose --ISO-8601 -w'
+    outfolder: EventLogs
+    outfile: hayabusa.csv
+    input: winevt
+    github:
+    para: false
+  - name: chainsaw_evtx
+    binary: '{tool_path}/chainsaw/chainsaw.exe'
+    args: 'hunt {input} -s {tool_path}/chainsaw/chainsaw/sigma -r {tool_path}/chainsaw/chainsaw/rules --mapping {tool_path}/chainsaw/chainsaw/mappings/sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
+    outfolder: EventLogs/chainsaw
+    outfile: sigma.csv
+    input: winevt
+    github: https://github.com/WithSecureLabs/chainsaw.git
+    para: false
+  - name: chainsaw_shim
+    binary: '{tool_path}/chainsaw/chainsaw.exe'
+    args: 'analyse shimcache {input}/Windows/System32/config/SYSTEM --regexfile {tool_path}/shimcache_patterns.txt --amcache {input}/Windows/AppCompat/Programs/Amcache.hve --tspair --output {outfolder}/{outfile}'
+    input: base
+    valid_path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    outfolder: FileExecution
+    outfile: chainsaw_shim.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: chainsaw_srum
+    binary: '{tool_path}/chainsaw/chainsaw.exe'
+    args: analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}
+    input: system32
+    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+    outfolder: Network
+    outfile: chainsaw_srum.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: SCCM_RecentlyUsedApplication
+    binary: python2.7
+    args: '{tool_path}/CCM_RUA_Finder.py -i {input} -o {outfolder}/{outfile}'
+    outfolder: FileExecution
+    outfile: SCCM_RecentlyUsedApplication.psv
+    input: objects
+    github: https://github.com/davidpany/WMI_Forensics.git
+  - name: WMIPersistenceFinder
+    binary: python3
+    args: '{tool_path}/PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
+    outfolder: FileExecution
+    outfile: PyWMIPersistenceFinder.txt
+    input: objects
+    github: https://github.com/davidpany/WMI_Forensics.git
+
+reporters:
+  - name: polars timeline
+    binary: python3
+    args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
+    outfolder: Timeline
+    outfile: mft.json
+    input: none
+  - name: iocs_summary
+    binary: rg
+    args: '-aiwFf {ioc_file} {outfolder} --json > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: IOCs_summary.json
+    input: none
+    github: https://github.com/BurntSushi/ripgrep.git
+
+enrichers:
+  - name: polars enrich
+    binary: python3
+    args: '{tool_path}/polars_enrich.py {out_path} {outfile} {tool_path}'
+    outfolder: IOC_Findings
+    outfile: enriched_indicators.xlsx
+    input: none
+  - name: iocs_analysis
+    binary: rg
+    args: '--hidden --trim -zUiFf {ioc_file} {out_path} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_analysis.txt
+    input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_pagefile
+    binary: rg
+    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_pagefile.txt
+    input: pagefile
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_datasource
+    binary: rg
+    args: --hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_datasource.txt
+    input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: loki_analysis
+    binary: 'python3'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
+    outfolder: IOC_Findings/loki_analysis
+    outfile: '*.txt'
+    input: none
+  - name: loki_datasource
+    binary: 'python3'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
+    outfolder: IOC_Findings/loki_datasource
+    outfile: '*.txt'
+    input: base
+    para: false
+
+intense:
+  - name: thor_analysis
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {out_path} -e {outfolder}'
+    outfolder: IOC_Findings/thor_analysis
+    outfile: '*.txt'
+    input: none
+  - name: thor_datasource
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {input} -e {outfolder}'
+    outfolder: IOC_Findings/thor_datasource
+    outfile: '*.txt'
+    input: base
+    para: false

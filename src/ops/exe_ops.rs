@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::{Stdio, Command}, io::Write};
+use std::{env, collections::HashMap, process::{Stdio, Command}, io::Write};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
@@ -53,7 +53,7 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
 
 fn get_wisker_art(data_paths: &HashMap<String, String>, wisker: &Wiskers, main_args: &config::MainArgs) -> String {
     let mut input_path = data_paths[&wisker.input].clone();
-    if wisker.input != "none" && wisker.input != "base" {
+    if wisker.input != "none" && wisker.input != "base" && env::consts::OS == "windows" {
         // don't check none or base, as these are generic placeholders
         if !paths::check_art_access(&input_path, &main_args.out_log) {
             let filesystem = format!("\\\\.\\{}", &data_paths["base"]);
@@ -70,6 +70,10 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, wisker: &Wiskers, main_a
             }
         }
     }
+    //if paths::get_glob_path(&input_path) != "" {
+    //    input_path = paths::get_glob_path(&input_path);
+    //    println!("{}", input_path);
+    //}
     match canonicalize(&input_path) {
         Ok(p) => p.into_os_string().into_string().unwrap(),
         Err(e) => {

@@ -1,16 +1,16 @@
 mod configs;
 mod ops;
 mod art;
-mod scripts;
+mod init;
 
 use crate::configs::config;
 use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
-use crate::scripts::init;
+use crate::init::{scripts};
 use ops::valid_ops;
 use serde_yaml::{self};
 use std::fs::OpenOptions;
-use std::env;
+use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
 use ctrlc;
@@ -108,15 +108,19 @@ fn main() {
     let args = Args::parse();
 
     // Set tool path
-    let mut tool_path = args.tool_path;
-    if tool_path == "" {
-        tool_path = format!("{}\\tools", env::current_dir().unwrap().display());
-    }
+    let tool_path = Path::new(&args.tool_path);
+    let tool_path = match tool_path.to_str() {
+        Some("") | None => {
+            let pwd = env::current_dir().unwrap();
+            tool_path.join(&pwd).join("tools")
+        }
+        Some(&_) => tool_path.to_path_buf(),
+    };
 
     match args.command {
         Commands::Setup { } => {
             // TODO: check if setup has been run, or if any binaries are missing
-            init::run_setup(&tool_path);
+            scripts::run_setup(&tool_path);
         },
         Commands::Whipped { 
             config,
@@ -149,7 +153,7 @@ fn main() {
                 update,
                 keep_evidence,
             };
-            init::run_whipped(&tool_path, args)
+            scripts::run_whipped(&tool_path, args)
         },
         Commands::Wiskess { 
             config, 
@@ -183,7 +187,7 @@ fn main() {
                 out_path,
                 start_date,
                 end_date,
-                tool_path,
+                tool_path: tool_path.to_str().unwrap().to_string(),
                 ioc_file,
                 silent: args.silent,
                 out_log

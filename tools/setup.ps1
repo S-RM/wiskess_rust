@@ -63,7 +63,7 @@ function  gitInstall($gitRepo, $outDir) {
 
 function gitRelease($gitRepo, $gitKeyToken) {
   Write-Host "Getting release of $gitRepo"
-  & py $toolPath\setup_get_git.py $gitKeyToken $gitRepo
+  & py $toolPath\setup_get_git.py $gitKeyToken $gitRepo "windows"
 }
 
 function Install-Rust {
