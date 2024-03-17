@@ -6,6 +6,14 @@ wiskers:
     outfile: mft.csv
     input: mft
     github: https://github.com/omerbenamram/mft
+  - name: j_file
+    binary: '{tool_path}/RustyUsn/RustyUsn.exe'
+    args: "-s '{input}' --mft '{input_other}' > {outfolder}/{outfile}"
+    outfolder: FileSystem
+    outfile: usnjrnl_j.json
+    input: j_file
+    input_other: mft
+    github: https://github.com/forensicmatt/RustyUsn
   - name: evtx_dump
     binary: fdfind
     args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite'

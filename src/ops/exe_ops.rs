@@ -37,10 +37,15 @@ fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, fo
 }
 
 fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap<String, String>, folder_path: &String, main_args: &config::MainArgs) -> String {
-    let input_path = get_wisker_art(data_paths, wisker, main_args);
+    let input_path = get_wisker_art(data_paths, &wisker.input, main_args);
+    let mut input_other_path = String::new();
+    if wisker.input_other != "" {
+        input_other_path = get_wisker_art(data_paths, &wisker.input_other, main_args);
+    }
     
     let wisker_arg = wisker_field
         .replace("{input}", &input_path)
+        .replace("{input_other}", &input_other_path)
         .replace("{outfile}", &wisker.outfile.as_str())
         .replace("{outfolder}", folder_path)
         .replace("{start_date}", &main_args.start_date)
@@ -51,9 +56,9 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
     wisker_arg
 }
 
-fn get_wisker_art(data_paths: &HashMap<String, String>, wisker: &Wiskers, main_args: &config::MainArgs) -> String {
-    let mut input_path = data_paths[&wisker.input].clone();
-    if wisker.input != "none" && wisker.input != "base" && env::consts::OS == "windows" {
+fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_args: &config::MainArgs) -> String {
+    let mut input_path = data_paths[input].clone();
+    if input != "none" && input != "base" && env::consts::OS == "windows" {
         // don't check none or base, as these are generic placeholders
         if !paths::check_art_access(&input_path, &main_args.out_log) {
             let filesystem = format!("\\\\.\\{}", &data_paths["base"]);

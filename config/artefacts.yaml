@@ -5,6 +5,7 @@ artefacts:
     path: '{root}'
   - name: j_file
     path: '{root}\$Extend\$UsnJrnl:$J'
+    legacy: '{root}\$Extend\$UsnJrnl$J'
   - name: mft
     path: '{root}\$MFT'
   - name: recycle_bin

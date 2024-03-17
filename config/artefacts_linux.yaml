@@ -5,6 +5,7 @@ artefacts:
     path: '{root}'
   - name: j_file
     path: '{root}/$Extend/$UsnJrnl:$J'
+    legacy: '{root}/$Extend/$UsnJrnl$J'
   - name: mft
     path: '{root}/$MFT'
   - name: recycle_bin
@@ -14,7 +15,7 @@ artefacts:
     path: '{root}/pagefile.sys'
   - name: user_dir
     path: '{root}/Users'
-    legacy: '{root}/Documents and Settings'
+    legacy: "'{root}/Documents and Settings'"
   - name: consolehost_history
     path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
   - name: amcache

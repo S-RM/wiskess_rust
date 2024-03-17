@@ -26,7 +26,10 @@ def get_files(response: str, target_dir: str):
         # extract it
         with zipfile.ZipFile(filename, 'r') as zip_ref:
           zip_ref.extractall(target_dir)
-      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable'):
+      elif file_type.mime == 'application/gzip':
+        # extract it
+        shutil.unpack_archive(filename, target_dir)
+      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec'):
         shutil.copy(filename, target_dir)
       else:
         print(f'[!] Unable to extract release {filename} archive with mime type: {file_type.mime}')
@@ -39,23 +42,26 @@ def get_files(response: str, target_dir: str):
 def make_symlink(target_dir: str, program: str, script_os: str):
   source_file = ''
   target_file = os.path.join(target_dir, f'{program}.exe')
-  if os.path.exists(target_file) and not(os.path.islink(target_file)):
-    return
+  if os.path.exists(target_file):
+    if os.path.islink(target_file):
+      os.unlink(target_file)
+    else:
+      return
 
   if script_os == 'windows':
-    file_type_regex = re.compile('x-dos-executable')
+    file_type_regex = re.compile('x-dos(?:-executable|exec)')
   elif script_os == 'linux':
     file_type_regex = re.compile('x(?:-pie|)-executable')
   else:
-    file_type_regex = re.compile('x.*-executable')
+    file_type_regex = re.compile('x-.*-exec')
 
   for root, dirs, files in os.walk(target_dir):
     if root.count(os.sep) - target_dir.count(os.sep) < 2:
       for f in files:
         f_path = os.path.join(root, f)
         file_type = magic.from_file(f_path, mime=True)
-        print(f'Filename: {f_path}, Type: {file_type}')
         if file_type_regex.search(file_type):
+          print(f'[+] Creating link for: {f_path}, with type: {file_type}')
           source_file = f_path
           break
   if source_file != '' and source_file != target_file:

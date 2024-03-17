@@ -32,7 +32,11 @@ struct Args {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// setup the wiskess dependencies
-    Setup { },
+    Setup {
+        /// Personal github token to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
+        #[arg(short, long)]
+        github_token: String
+    },
     /// whipped pipeline process commands
     Whipped {
         /// config file of the binaries to run as processors
@@ -118,9 +122,11 @@ fn main() {
     };
 
     match args.command {
-        Commands::Setup { } => {
+        Commands::Setup {
+            github_token
+        } => {
             // TODO: check if setup has been run, or if any binaries are missing
-            scripts::run_setup(&tool_path);
+            scripts::run_setup(&tool_path, github_token);
         },
         Commands::Whipped { 
             config,

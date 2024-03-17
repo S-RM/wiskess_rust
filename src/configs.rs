@@ -30,6 +30,8 @@ pub mod config {
     pub args: String,
     pub outfolder: String,
     pub input: String,
+    #[serde(default)]
+    pub input_other: String,
     pub outfile: String,
     #[serde(default)]
     pub choco: String,
@@ -72,6 +74,12 @@ pub mod config {
       pub ioc_file: String,
       pub silent: bool,
       pub out_log: String
+  }
+
+  // Set struct for setup args
+  #[derive(Debug, Serialize, Deserialize, Clone)]
+  pub struct SetupArgs {
+    pub github_token: String,
   }
 
   // Set struct for whipped args
