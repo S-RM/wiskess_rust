@@ -35,7 +35,10 @@ enum Commands {
     Setup {
         /// Personal github token to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
         #[arg(short, long)]
-        github_token: String
+        github_token: String,
+        /// Print additional info to the stdout
+        #[arg(short, long)]
+        verbose: bool
     },
     /// whipped pipeline process commands
     Whipped {
@@ -123,10 +126,11 @@ fn main() {
 
     match args.command {
         Commands::Setup {
-            github_token
+            github_token,
+            verbose
         } => {
             // TODO: check if setup has been run, or if any binaries are missing
-            scripts::run_setup(&tool_path, github_token);
+            scripts::run_setup(&tool_path, github_token, verbose);
         },
         Commands::Whipped { 
             config,

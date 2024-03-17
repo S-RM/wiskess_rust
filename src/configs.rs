@@ -79,6 +79,8 @@ pub mod config {
   // Set struct for setup args
   #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct SetupArgs {
+    #[serde(default = "serde_false")]
+    pub verbose: bool,
     pub github_token: String,
   }
 

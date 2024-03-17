@@ -2,7 +2,7 @@ use std::{env,path::Path};
 use crate::{ops::exe_ops, configs::config};
 use super::setup;
 
-pub fn run_setup(tool_path: &Path, github_token: String) {
+pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
     println!("[+] Running setup...");
     match env::consts::OS {
         "windows" => {
@@ -11,7 +11,7 @@ pub fn run_setup(tool_path: &Path, github_token: String) {
             exe_ops::run_posh("-f", &script, &"".to_string());
 	},
         "linux" => {
-            setup::setup_linux(github_token);
+            setup::setup_linux(verbose, github_token);
         },
         &_ => todo!()
     }
