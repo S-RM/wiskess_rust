@@ -36,7 +36,7 @@ wiskers:
     github: https://github.com/EricZimmerman/LECmd.git
   - name: evtx_dump
     binary: 'fd'
-    args: '.* -e evtx -p {input} -x {tool_path}\evtx\evtx.exe -f {outfolder}\{outfile} -o jsonl --no-confirm-overwrite'
+    args: '.* -e evtx -p {input} -x {tool_path}\evtx\evtx.exe -o jsonl > {outfolder}\{outfile}'
     outfolder: EventLogs
     outfile: evtx_dump.json
     input: winevt
