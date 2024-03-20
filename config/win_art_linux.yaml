@@ -16,7 +16,7 @@ wiskers:
     github: https://github.com/forensicmatt/RustyUsn
   - name: evtx_dump
     binary: fdfind
-    args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -f {outfolder}/{outfile} -o jsonl --no-confirm-overwrite'
+    args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -o jsonl > {outfolder}/{outfile}'
     outfolder: EventLogs
     outfile: evtx_dump.json
     input: winevt
@@ -37,22 +37,38 @@ wiskers:
     input: winevt
     github: https://github.com/WithSecureLabs/chainsaw.git
     para: false
+  - name: regripper_amcache
+    binary: regripper
+    args: '-aT -r {input} 1> {outfolder}/{outfile}'
+    input: amcache
+    outfolder: FileExecution
+    outfile: regripper_amcache.psv
+    github: https://www.kali.org/tools/regripper/
   - name: chainsaw_shim
     binary: '{tool_path}/chainsaw/chainsaw.exe'
-    args: 'analyse shimcache {input}/Windows/System32/config/SYSTEM --regexfile {tool_path}/shimcache_patterns.txt --amcache {input}/Windows/AppCompat/Programs/Amcache.hve --tspair --output {outfolder}/{outfile}'
-    input: base
+    args: 'analyse shimcache {input} --regexfile {tool_path}/shimcache_patterns.txt --amcache {input_other} --tspair --output {outfolder}/{outfile}'
+    input: system
+    input_other: amcache
     valid_path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: chainsaw_srum
     binary: '{tool_path}/chainsaw/chainsaw.exe'
-    args: analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}
+    args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
     input: system32
     valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
     outfolder: Network
     outfile: chainsaw_srum.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: KStrike
+    binary: python3
+    args: '{tool_path}/KStrike/KStrike.py {input}/Current.mdb > {outfolder}/{outfile}'
+    input: sum
+    valid_path: '{root}/Windows/System32/LogFiles/Sum/Current.mdb'
+    outfolder: Network
+    outfile: UAL_Kstrike.psv
+    github: https://github.com/brimorlabs/KStrike
   - name: SCCM_RecentlyUsedApplication
     binary: python2.7
     args: '{tool_path}/CCM_RUA_Finder.py -i {input} -o {outfolder}/{outfile}'
@@ -67,6 +83,27 @@ wiskers:
     outfile: PyWMIPersistenceFinder.txt
     input: objects
     github: https://github.com/davidpany/WMI_Forensics.git
+  - name: shellbags
+    binary: fdfind
+    args: '-i "USRCLASS|NTUSER" {input} -x python2 {tool_path}/shellbags/shellbags.py -o csv > {outfolder}/{outfile}'
+    outfolder: UserActivity
+    outfile: shellbags.csv
+    input: user_dir
+    github: https://github.com/williballenthin/shellbags
+  - name: regripper_user
+    binary: fdfind
+    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -aT -r 1> {outfolder}/{outfile}'
+    outfolder: Registry
+    outfile: regripper_user.psv
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system
+    binary: fdfind
+    args: '-i "SAM|Security|Software|System" {input} -x regripper -aT -r 1> {outfolder}/{outfile}'
+    outfolder: Registry
+    outfile: regripper_system.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
 
 reporters:
   - name: polars timeline
