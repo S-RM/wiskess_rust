@@ -17,6 +17,7 @@
 !/tools/BrowsingHistoryView.exe
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
+!/tools/uac-vector.yaml
 /output_test
 /testing_wr
 /logs
