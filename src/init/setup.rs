@@ -54,7 +54,7 @@ pub fn setup_linux(v: bool, github_token: String) {
          tool_dir="$PWD/tools/"
          cd $tool_dir
          sudo apt-get -y install p7zip-full awscli fd-find git ripgrep python2.7 python-pip regripper
-         python3 -m pip install polars chardet datetime filetype requests libesedb-python --no-warn-script-location
+         python3 -m pip install polars chardet datetime filetype requests libesedb-python python-magic --no-warn-script-location
          python3 -m pip install colorama yara-python psutil rfc5424-logging-handler netaddr --no-warn-script-location
          pip2 install python-registry
          "#
