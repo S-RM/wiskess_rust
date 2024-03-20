@@ -20,6 +20,7 @@ artefacts:
     path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
   - name: amcache
     path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    legacy: '{root}/Windows/appcompat/Programs/Amcache.hve'
   - name: recentFileCache
     path: '{root}/Windows/AppCompat/Programs/RecentFileCache.bcf'
   - name: prefetch

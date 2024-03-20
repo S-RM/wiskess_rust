@@ -12,6 +12,7 @@ fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> 
     file_ops::log_msg(&out_log, format!("[ ] Running: {}", wisker_cmd));
     let mut command = shell(wisker_cmd);
     command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
     let output = command.execute_output().unwrap();
     output
 }
