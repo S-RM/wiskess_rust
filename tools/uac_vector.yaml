@@ -1,0 +1,115 @@
+sources:
+  g_syslog:
+    type: file
+    include:
+      - /home/ubuntu/uac-collection/?root?/var/log/syslog*
+      - /home/ubuntu/uac-collection/?root?/var/log/messages*
+  g_auth:
+    type: file
+    include:
+      - /home/ubuntu/uac-collection/?root?/var/log/auth*log*
+      - /home/ubuntu/uac-collection/?root?/var/log/secure*
+  g_nginx:
+    type: file
+    include:
+      - /home/ubuntu/uac-collection/?root?/var/log/nginx/*log*
+  g_apache:
+    type: file
+    include:
+      - /home/ubuntu/uac-collection/?root?/var/log/apache2/
+  g_bodyfile:
+    type: file
+    include:
+      - /home/ubuntu/uac-collection/bodyfile/bodyfile.txt
+  g_journal:
+    type: file
+    include:
+    # needs the following command run (can be in parallel) $ journalctl -D /home/ubuntu/uac-collection/\[root\]/var/log/journal/ -o json --utc > /home/ubuntu/uac-collection/journal.log
+      - /home/ubuntu/uac-collection/journal.log
+
+transforms:
+  remap_syslog:
+    inputs:
+      - g_syslog
+    type: remap
+    source: |
+            structured = parse_syslog!(.message)
+            . = merge(., structured)
+  remap_auth:
+    inputs:
+      - g_auth
+    type: remap
+    source: |
+            structured = parse_linux_authorization!(.message)
+            . = merge(., structured)
+  remap_nginx:
+    inputs:
+      - g_nginx
+    type: remap
+    source: |
+            structured = parse_nginx_log!(.message, "combined")
+            . = merge(., structured)
+  remap_apache:
+    inputs:
+      - g_apache
+    type: remap
+    source: |
+            structured = parse_apache_log!(.message, "combined")
+            . = merge(., structured)
+  remap_bodyfile:
+    # bodyfile of a UAC collection, replaces original timestamp with changed time of filepath
+    inputs:
+      - g_bodyfile
+    type: remap
+    source: |
+            structured = parse_regex!(.message, r'^.+?\|(?P<filename>.+?)\|.+?\|(?P<permissions>.+?)\|(?:.+?\|){2}(?P<size>.+?)\|(?P<accessed>.+?)\|(?P<modified>.+?)\|(?P<changed>.+?)\|(?P<born>.+?)$')
+            structured.accessed = parse_timestamp!(structured.accessed, format: "%s")
+            structured.modified = parse_timestamp!(structured.modified, format: "%s")
+            structured.changed = parse_timestamp!(structured.changed, format: "%s")
+            structured.born = parse_timestamp!(structured.born, format: "%s")
+            structured.timestamp = structured.changed
+            . = merge(., structured)
+
+sinks:
+  sink_journal:
+    type: file
+    inputs:
+      - g_journal
+    path: /tmp/vector-journal.log
+    encoding:
+      codec: json
+  sink_syslog:
+    type: file
+    inputs:
+      - remap_syslog
+    path: /tmp/vector-syslog.log
+    encoding:
+      codec: json
+  sink_auth:
+    type: file
+    inputs:
+      - remap_auth
+    path: /tmp/vector-auth.log
+    encoding:
+      codec: json
+  sink_nginx:
+    type: file
+    inputs:
+      - remap_nginx
+    path: /tmp/vector-nginx.log
+    encoding:
+      codec: json
+  sink_bodyfile:
+    type: file
+    inputs:
+      - remap_bodyfile
+    path: /tmp/vector-bodyfile.log
+    encoding:
+      codec: json
+  sink_apache:
+    type: file
+    inputs:
+      - remap_apache
+    path: /tmp/vector-apache.log
+    encoding:
+      codec: json
