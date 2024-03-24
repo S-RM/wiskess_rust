@@ -2,7 +2,9 @@ use std::{env, collections::HashMap, process::{Stdio, Command}, io::Write};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
+use indicatif::MultiProgress;
 use crate::{configs::config::{self, Wiskers}, art::paths};
+use crate::init::setup;
 use super::{file_ops, get_files};
 
 fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
@@ -80,12 +82,16 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_arg
     //    input_path = paths::get_glob_path(&input_path);
     //    println!("{}", input_path);
     //}
-    match canonicalize(&input_path) {
-        Ok(p) => p.into_os_string().into_string().unwrap(),
-        Err(e) => {
-            println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
-            "".to_string()
+    if input_path != "" {
+        match canonicalize(&input_path) {
+            Ok(p) => p.into_os_string().into_string().unwrap(),
+            Err(e) => {
+                println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
+                "".to_string()
+            }
         }
+    } else {
+        input_path
     }
 }
 
@@ -126,7 +132,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     (wisker_arg, wisker_binary, wisker_script, overwrite_file)
 }
 
-pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
+pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, m: MultiProgress) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
@@ -144,12 +150,19 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .collect();
 
     let (tx, rx) = std::sync::mpsc::channel();
+    
+    // Setup progress bar second level
+    let pb = setup::prog_spin_init(960, &m, "green");
+    let num_wiskers = wiskers.len();
+    setup::prog_spin_msg(&pb, format!("Running {} processes", num_wiskers));
 
     for wisker in wiskers {
-    
+        
         let tx = tx.clone();
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
+        let pb_clone = pb.clone();
+        let m_clone = m.clone();
         
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
@@ -158,7 +171,11 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     &main_args_c, 
                     &wisker, 
                     data_paths_c);
-                
+        
+                let pb2_clone = setup::prog_spin_after(&pb_clone, 960, &m_clone, "red");
+                setup::prog_spin_msg(&pb2_clone, format!("Running: {}", &wisker.name));
+                pb2_clone.inc(1);
+
                 if overwrite_file {
                     if wisker.script {
                         run_posh("-c", &wisker_script, &main_args_c.out_log);
@@ -185,10 +202,12 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     );
                     file_ops::log_msg(&main_args_c.out_log, msg);
                 }
+                setup::prog_spin_stop(&pb2_clone, format!("Done: {}", &wisker.name));
             }
         });
     }
     drop(tx);
+    //setup::prog_spin_stop(&pb, format!("Ran {} wiskers",  num_wiskers));
 
     let mut file = OpenOptions::new()
         .write(true)

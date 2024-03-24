@@ -6,7 +6,7 @@ mod init;
 use crate::configs::config;
 use crate::ops::{file_ops, exe_ops};
 use crate::art::paths;
-use crate::init::{scripts};
+use crate::init::{scripts, setup};
 use ops::valid_ops;
 use serde_yaml::{self};
 use std::fs::OpenOptions;
@@ -14,6 +14,7 @@ use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
 use ctrlc;
+use indicatif::MultiProgress;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -185,10 +186,10 @@ fn main() {
             // Set main log
             let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start_str);
             file_ops::file_exists(&out_log, args.silent);
-            
+    	    
             // Write start time to log
             file_ops::log_msg(&out_log, format!("Starting wiskess at: {}", wiskess_start_str));
- 
+
             // Confirm date is valid
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
@@ -226,15 +227,20 @@ fn main() {
                 args.silent,
                 &main_args.out_log
             );
-            
+
+            // Setup progress bars
+            let m = MultiProgress::new();
+            let pb = setup::prog_spin_init(960, &m, "blue");
+           
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
             for func in [
                 &config.wiskers,
                 &config.enrichers,
                 &config.reporters] {
+	            setup::prog_spin_msg(&pb, "Wiskess - Running Wiskers / Enrichers / Reporters".to_string());            
                     for num_threads in [0, 1] {
-                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads);
+                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads, m.clone());
                     }
             }
 
@@ -242,6 +248,7 @@ fn main() {
             valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
 
             // Set end time
+            setup::prog_spin_stop(&pb, "Wiskess complete".to_string());
             let wiskess_stop = Utc::now();
             let wiskess_duration = wiskess_stop - wiskess_start;
             let seconds = wiskess_duration.num_seconds() % 60;

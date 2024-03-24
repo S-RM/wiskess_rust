@@ -104,6 +104,13 @@ wiskers:
     outfile: regripper_system.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
+  - name: rdp_bitmap
+    binary: fdfind
+    args: '"(?:bcache.*\.bmc|cache.*\.bin)$" -x python3 {tool_path}/bmc_run.py "{}" {outfolder} {tool_path}/bmc-tools/bmc-tools.py'
+    outfolder: Network
+    outfile: '*.bmp'
+    input: rdp_bitmap
+    github: https://github.com/ANSSI-FR/bmc-tools
 
 reporters:
   - name: polars timeline
@@ -150,15 +157,15 @@ enrichers:
     github: https://github.com/BurntSushi/ripgrep.git
   - name: loki_analysis
     binary: 'python3'
-    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {out_path} --logfolder {outfolder}'
     outfolder: IOC_Findings/loki_analysis
-    outfile: '*.txt'
+    outfile: '*.log'
     input: none
   - name: loki_datasource
     binary: 'python3'
-    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {input} --logfolder {outfolder}'
     outfolder: IOC_Findings/loki_datasource
-    outfile: '*.txt'
+    outfile: '*.log'
     input: base
     para: false
 
