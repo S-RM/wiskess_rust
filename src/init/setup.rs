@@ -30,6 +30,12 @@ fn prog_set_stlye(pb: &ProgressBar, tick: u64, colour: &str) {
 		"▰▰▰▰▰▱▱",
 		"▰▰▰▰▰▰▱",
 		"▰▰▰▰▰▰▰",
+		"▱▰▰▰▰▰▰",
+		"▱▱▰▰▰▰▰",
+		"▱▱▱▰▰▰▰",
+		"▱▱▱▱▰▰▰",
+		"▱▱▱▱▱▰▰",
+		"▱▱▱▱▱▱▰",
 		"▰▰▰▰▰▰▰",
             ]),
     );
@@ -60,8 +66,8 @@ fn output_script(verbose: bool, code: i32, output: String, error: String) -> Str
 pub fn setup_linux(v: bool, github_token: String) {
     // Setup progress bars    
     let m = MultiProgress::new();
-    let pb = prog_spin_init(960, &m, "blue");
-    let pb2 = prog_spin_init(480, &m, "green");
+    let pb = prog_spin_init(960, &m, "magenta");
+    let pb2 = prog_spin_init(480, &m, "yellow");
     prog_spin_msg(&pb, "Wiskess - Setup Linux".to_string());
     prog_spin_msg(&pb2, "Installing packages...".to_string());
 
@@ -81,7 +87,7 @@ pub fn setup_linux(v: bool, github_token: String) {
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
-    let pb3 = prog_spin_init(240, &m, "red");
+    let pb3 = prog_spin_init(240, &m, "white");
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
     let urls = vec![

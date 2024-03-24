@@ -15,6 +15,9 @@ use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
 use ctrlc;
 use indicatif::MultiProgress;
+use figrs::{Figlet, FigletOptions};
+use console::style;
+use rand::seq::SliceRandom;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -105,6 +108,19 @@ enum Commands {
     }
 }
 
+fn show_banner() {
+    let font = vec!["3-D", "3D Diagonal", "3D-ASCII", "ANSI Shadow", "Alligator", "Alpha", "Banner3-D", "Big Money-ne", "Caligraphy2", "Doh", "Henry 3D", "Larry 3D", "Train"];
+    let font_str = font.choose(&mut rand::thread_rng()).unwrap();
+    let opt = FigletOptions {
+        font: font_str.to_string(), // Default font is "Standard"
+        ..FigletOptions::default()
+    };
+    let figlet = Figlet::text("WISKESS".to_string(), opt).unwrap();
+    println!("{}", style(figlet.text).magenta());
+    println!("{}", style("Gavin Hull").yellow());
+    println!("{}", style("version: 0.2.1").yellow());
+}
+
 fn main() {
     // Set exit handler
     ctrlc::set_handler(move || {
@@ -114,6 +130,9 @@ fn main() {
     
     // Get the args
     let args = Args::parse();
+
+    // Display banner
+    show_banner();
 
     // Set tool path
     let tool_path = Path::new(&args.tool_path);
@@ -230,7 +249,7 @@ fn main() {
 
             // Setup progress bars
             let m = MultiProgress::new();
-            let pb = setup::prog_spin_init(960, &m, "blue");
+            let pb = setup::prog_spin_init(960, &m, "magenta");
            
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters

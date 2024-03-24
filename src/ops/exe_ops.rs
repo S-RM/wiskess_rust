@@ -152,7 +152,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
     let (tx, rx) = std::sync::mpsc::channel();
     
     // Setup progress bar second level
-    let pb = setup::prog_spin_init(960, &m, "green");
+    let pb = setup::prog_spin_init(960, &m, "yellow");
     let num_wiskers = wiskers.len();
     setup::prog_spin_msg(&pb, format!("Running {} processes", num_wiskers));
 
@@ -172,7 +172,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     &wisker, 
                     data_paths_c);
         
-                let pb2_clone = setup::prog_spin_after(&pb_clone, 960, &m_clone, "red");
+                let pb2_clone = setup::prog_spin_after(&pb_clone, 480, &m_clone, "white");
                 setup::prog_spin_msg(&pb2_clone, format!("Running: {}", &wisker.name));
                 pb2_clone.inc(1);
 
