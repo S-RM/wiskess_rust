@@ -15,30 +15,46 @@ pub fn prog_spin_after(pb_before: &ProgressBar, tick: u64, m: &MultiProgress, co
 }
 
 fn prog_set_stlye(pb: &ProgressBar, tick: u64, colour: &str) {
-    pb.enable_steady_tick(Duration::from_millis(tick));
+    pb.enable_steady_tick(Duration::from_millis(tick / 4));
     let sty = format!("{{spinner:.{colour}}} {{msg}}");
-    pb.set_style(
-        ProgressStyle::with_template(sty.as_str())
+    let sty2 = format!("[{{elapsed}}] {{spinner:40.{colour}}} {{msg}}");
+    let sty_bar = ProgressStyle::with_template(sty2.as_str())
             .unwrap()
             // For more spinners check out the cli-spinners project:
             // https://github.com/sindresorhus/cli-spinners/blob/master/spinners.json
             .tick_strings(&[
-                "▰▱▱▱▱▱▱",
-		"▰▰▱▱▱▱▱",
-		"▰▰▰▱▱▱▱",
-		"▰▰▰▰▱▱▱",
-		"▰▰▰▰▰▱▱",
-		"▰▰▰▰▰▰▱",
-		"▰▰▰▰▰▰▰",
-		"▱▰▰▰▰▰▰",
-		"▱▱▰▰▰▰▰",
-		"▱▱▱▰▰▰▰",
-		"▱▱▱▱▰▰▰",
-		"▱▱▱▱▱▰▰",
-		"▱▱▱▱▱▱▰",
-		"▰▰▰▰▰▰▰",
-            ]),
-    );
+                "▐⠂       ▌",
+		"▐⠈       ▌",
+		"▐ ⠂      ▌",
+		"▐ ⠠      ▌",
+		"▐  ⡀     ▌",
+		"▐  ⠠     ▌",
+		"▐   ⠂    ▌",
+		"▐   ⠈    ▌",
+		"▐    ⠂   ▌",
+		"▐    ⠠   ▌",
+		"▐     ⡀  ▌",
+		"▐     ⠠  ▌",
+		"▐      ⠂ ▌",
+		"▐      ⠈ ▌",
+		"▐       ⠂▌",
+		"▐       ⠠▌",
+		"▐       ⡀▌",
+		"▐      ⠠ ▌",
+		"▐      ⠂ ▌",
+		"▐     ⠈  ▌",
+		"▐     ⠂  ▌",
+		"▐    ⠠   ▌",
+		"▐    ⡀   ▌",
+		"▐   ⠠    ▌",
+		"▐   ⠂    ▌",
+		"▐  ⠈     ▌",
+		"▐  ⠂     ▌",
+		"▐ ⠠      ▌",
+		"▐ ⡀      ▌",
+		"▐⠠       ▌"
+            ]);
+    pb.set_style(sty_bar);
 }
 
 pub fn prog_spin_msg(pb: &ProgressBar, msg: String) {
