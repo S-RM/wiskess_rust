@@ -9,6 +9,7 @@ use crate::art::paths;
 use crate::init::{scripts, setup};
 use ops::valid_ops;
 use serde_yaml::{self};
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};
@@ -195,7 +196,7 @@ fn main() {
             ioc_file 
         } => {
             // Set output directories
-            file_ops::make_folders(&out_path);
+            file_ops::make_folders(Path::new(&out_path));
             
             // Set the start time
             let date_time_fmt = "%Y-%m-%dT%H%M%S";
@@ -220,7 +221,8 @@ fn main() {
                 tool_path: tool_path.to_str().unwrap().to_string(),
                 ioc_file,
                 silent: args.silent,
-                out_log
+                out_log,
+                multi_pb: MultiProgress::new()
             };
         
             // Read the config
@@ -236,6 +238,11 @@ fn main() {
                 .open(artefacts_config)
                 .expect("Unable to open artefacts config file.");
             let config_artefacts: config::ConfigArt = serde_yaml::from_reader(f).expect("Could not read values of artefacts config.");
+            
+            // get a velo collection
+            // let velo_source = HashMap::new();
+            // velo_source.insert("root", "{root}");
+            // exe_ops::run_commands(&config.collectors, &main_args, &data_paths, num_threads, m.clone());
         
             // TODO: check or gracefully error when the yaml config misses keys
         
@@ -244,12 +251,15 @@ fn main() {
                 config_artefacts.artefacts, 
                 &data_source,
                 args.silent,
-                &main_args.out_log
+                &main_args
             );
 
+            // check access and copy unreadable artefacts
+            let data_paths = paths::check_copy_art(data_paths, &main_args);
+
+
             // Setup progress bars
-            let m = MultiProgress::new();
-            let pb = setup::prog_spin_init(960, &m, "magenta");
+            let pb = setup::prog_spin_init(960, &main_args.multi_pb, "magenta");
            
             // Run in parallel then in series (if applicable) each binary of   
             // wiskers, enrichers and reporters
@@ -259,7 +269,7 @@ fn main() {
                 &config.reporters] {
 	            setup::prog_spin_msg(&pb, "Wiskess - Running Wiskers / Enrichers / Reporters".to_string());            
                     for num_threads in [0, 1] {
-                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads, m.clone());
+                        exe_ops::run_commands(func, &main_args, &data_paths, num_threads);
                     }
             }
 

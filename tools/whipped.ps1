@@ -101,7 +101,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
         }
     } else {
         # $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -m '#:' -o wc -f "$image" -v all
-        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -o wc,physical -f "$image" -v all
+        $osf_mount = & 'C:\Program Files\OSFMount\OSFMount.com' -a -t file -f "$image" -v all
         if ($osf_mount -match 'Created device\s') {
             $drive_mount_start = $(($osf_mount -match 'Created device\s') -replace 'Created device\s*\d+:\s*(\w):.*','$1')
         }
@@ -117,12 +117,14 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
                 $done = $true
             } else {
                 Write-Warning "Data source $drive_mount had no Windows folder!"
-                $get_win_dir = Get-ChildItem -Depth 1 $drive_mount -Directory | Where-Object { $_.Name -match "Windows" }
+                if ($(Get-PSDrive -Name $($drive_mount -replace ":$","") -ErrorAction SilentlyContinue)) {
+                    $get_win_dir = Get-ChildItem -Depth 1 -Directory $drive_mount | Where-Object { $_.Name -match "Windows" }
+                }
                 if ($get_win_dir) {
+                    Write-Host "[ ] Found Windows folder at dept 1"
                     Start-Wiskess $get_win_dir.Parent $wiskess_folder $start_date $end_date $ioc_file
                     $done = $true
                 }
-                Write-Host "[ ] Found Windows folder at dept 1"
             }
         }
     }
@@ -369,7 +371,11 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
         $surge_collection = (Get-ChildItem -Recurse -Depth 3 "$local_storage\$($image_folder)-extracted" | Where-Object {$_.Name -match "^files$"}).FullName
         $velo_collection = (Get-ChildItem -Recurse -Depth 3 "$local_storage\$($image_folder)-extracted" | Where-Object {$_.Name -match "^uploads$"}).FullName
         if ($image) {
-            Start-ImageProcess -image $image -wiskess_folder $wiskess_folder -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
+            $add_image = ""
+            ForEach ($i in $image) {
+                Start-ImageProcess -image $i -wiskess_folder "$wiskess_folder$add_image" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
+                $add_image += "_1"
+            }
         } elseif ("$velo_collection") {
             Start-VeloProcess -velo_collection $velo_collection -wiskess_folder $wiskess_folder -start_date $start_date -end_date $end_date -ioc_file $ioc_file
         } elseif ("$surge_collection") {

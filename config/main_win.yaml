@@ -276,6 +276,13 @@ enrichers:
     outfile: '*.txt'
     input: base
     para: false
+  - name: Executablelist 
+    binary: 'pwsh.exe'
+    args: '{tool_path}\Executablelist.ps1 {out_path} {tool_path}'
+    outfolder: FileExecution
+    outfile: MISPoutput.csv
+    input: pagefile
+    para: false
 
 intense:
   - name: thor_analysis
@@ -291,3 +298,4 @@ intense:
     outfile: '*.txt'
     input: base
     para: false
+

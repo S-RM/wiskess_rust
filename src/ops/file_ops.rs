@@ -9,7 +9,7 @@ use std::path::Path;
 use chrono::NaiveDate;
 use glob::glob;
 
-pub fn make_folders(out_path: &String) {
+pub fn make_folders(out_path: &Path) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
 }
 

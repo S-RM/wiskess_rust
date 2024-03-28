@@ -16,6 +16,7 @@ import subprocess
 
 
 def get_indicator(select_col, type, dict_tln):
+    indicator = pl.LazyFrame({})
     if os.path.exists(dict_tln[type]['file']):
         for file in os.listdir(dict_tln[type]['file']):
             if re.search(dict_tln[type]['regex_file'], file):
@@ -25,11 +26,10 @@ def get_indicator(select_col, type, dict_tln):
                         pl.col(select_col).alias('indicators').drop_nulls()
                         )
                     indicator = indicator.unique()
-                    return indicator
                 except Exception as e:
                     print(f'Ran into an error when trying to get the indicator {select_col} from the {type}.')
                     print('Error was:', e) 
-    return 'Unknown'
+    return indicator
 
 
 

@@ -1,5 +1,6 @@
 pub mod config {
-  use serde::{Deserialize, Serialize};
+  use indicatif::MultiProgress;
+use serde::{Deserialize, Serialize};
 
   /// Top level structure of config file
   #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -73,7 +74,8 @@ pub mod config {
       pub tool_path: String,
       pub ioc_file: String,
       pub silent: bool,
-      pub out_log: String
+      pub out_log: String,
+      pub multi_pb: MultiProgress
   }
 
   // Set struct for setup args

@@ -111,6 +111,8 @@ function Start-MainSetup {
   py -m pip install datetime
   py -m pip install filetype
   py -m pip install requests
+  py -m pip install python-magic
+  py -m pip install python-magic-bin
 
   $gitRepos = @{
     # Format: "URL gitRepo" = "Output Director outDir"
@@ -132,7 +134,7 @@ function Start-MainSetup {
   }
   # Install all listed git releases
   $gitReleases.Keys.Clone() | ForEach-Object {
-    gitRelease -gitRepo $_ -gitKey $gitKey
+    gitRelease -gitRepo $_ -gitKey $gitKey -script_os
   }
   
   # Loki upgrader
