@@ -8,14 +8,14 @@ get-files.exe \\.\e: ./get-files.yaml
 
 use super::sector_reader;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read, Seek, Write};
+use std::io::{self, BufReader, Read, Seek, Write};
 use std::path::{Ancestors, Path};
-use anyhow::{bail, Context, Error, Result};
+use anyhow::{bail, Context, Result};
 use ntfs::indexes::NtfsFileNameIndex;
 use ntfs::structured_values::{NtfsFileName, NtfsFileNamespace};
 use ntfs::{Ntfs, NtfsFile, NtfsReadSeek};
+use regex::Regex;
 use sector_reader::SectorReader;
-use tabled::grid::records::IntoRecords;
 
 struct CommandInfo<'n, T>
 where
@@ -28,7 +28,12 @@ where
 }
 
 /// get_file - opens a handle to the filesystem in read-only mode, then passes the filepath to copy to get()
-pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str) -> Result<()> {
+/// 
+/// Args:
+/// * filesystem - the drive t copy from; in the format \\\\.\\d:
+/// * filepath - the file path to copy from, i.e. Windows\System32\config\SYSTEM
+/// * dest_path - the folder path to where to copy to, i.e. c:\wiskess\artefacts
+pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file: bool) -> Result<()> {
     let f = File::open(&filesystem)?;
     let sr = SectorReader::new(f, 4096)?;
     let mut fs = BufReader::new(sr);
@@ -45,27 +50,18 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str) -> Resu
 
     println!("Opened \"{}\" read-only.", filesystem);
 
-    println!("[DEBUG] Attempting to get. Filepath: {filepath}; to Dest path: {dest_path}");
-
     // get the parent paths of filepath into directories
     let file_ancestors = Path::new(filepath).ancestors();
     // in a loop, use cd to move to the directory
-    let num_dirs = file_ancestors.count() - 1;
-    let mut b = vec![];
-    for a in file_ancestors {
-        b.push(a);
+    let mut dirs = vec![];
+    for dir in file_ancestors {
+        dirs.push(dir);
     }
-    for c in b.iter().rev() {
-        println!("{c:#?}");
-        // let parent_path = match &file_ancestors.next() {
-        //     Some(p) => p.as_os_str().to_os_string().into_string().unwrap(),
-        //     None => "Unable to get ancestor path".to_string()
-        // };
-        if c.parent() == None {
+    for dir in dirs.iter().rev() {
+        if dir.parent() == None {
             continue;
         }
-        let parent_path = c.file_name().unwrap().to_str().unwrap().to_string();
-        println!("[DEBUG] CD to {}", parent_path);
+        let parent_path = dir.file_name().unwrap().to_str().unwrap().to_string();
         let result = cd(&parent_path, &mut info);
         
         if let Err(e) = result {
@@ -76,13 +72,58 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str) -> Resu
     // get the file
     let filepath_path = Path::new(filepath); 
     let filename = filepath_path.file_name();
-    let result = get(filename.unwrap().to_os_string().to_str().unwrap(), &mut info, dest_path);
-    
-    if let Err(e) = result {
-        eprintln!("Error: {e:?}");
-    }
+    let dest_parent = Path::new(dest_path).join(filepath);
+    // if path to copy is a file, dest_p is the parent of the path, otherwise is the same
+    // if copying a file, use get() once, else if a dir, get vector of file and loop using get()
+    if is_file {
+        let dest_p = dest_parent.parent().unwrap().as_os_str().to_str().unwrap();
+        get(
+            filename.unwrap().to_os_string().to_str().unwrap(), 
+            &mut info, 
+            dest_p
+        )?
+    } else {
+        let dest_p = dest_parent.as_os_str().to_str().unwrap();
+        let file_list = get_file_list(&mut info, dest_p);
+        let re = Regex::new(r"\.evtx$").unwrap();
+        let mut num_matches: u32 = 0;
+        for file in file_list {
+            if re.is_match(&file) {
+                num_matches += 1;
+                get(
+                    &file, 
+                    &mut info, 
+                    dest_p
+                )?
+            }
+        };
+        if num_matches <= 0 {
+            bail!("[!] no match")
+        }
+    };
 
     Ok(())
+}
+
+fn get_file_list<T>(info: &mut CommandInfo<T>, dest_p: &str) -> Vec<String>
+where
+    T: Read + Seek,
+{
+    let index = info
+        .current_directory
+        .last()
+        .unwrap()
+        .directory_index(&mut info.fs).unwrap();
+    let mut iter = index.entries();
+    let mut file_list = vec![];
+    while let Some(entry) = iter.next(&mut info.fs) {
+        let entry = entry.unwrap();
+        let file_name = entry
+            .key()
+            .expect("key must exist for a found Index Entry").unwrap();
+        file_list.push(file_name.name().to_string().unwrap().to_string());
+    };
+    file_list
 }
 
 /// get - get the file from the filesystem specified in info

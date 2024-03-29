@@ -101,20 +101,22 @@ pub mod paths {
                     let filename = &path.replace(&base_path, "");
                     // make dirs of the filename
                     let dest_dir = Path::new(&dest_path_str).join(filename);
-                    file_ops::make_folders(
-                        dest_dir.parent().unwrap()
-                    );
-                    let new_path = match get_files::get_file(&filesystem, &filename, &dest_path_str) {
+                    let path_path = Path::new(path);
+                    if path_path.is_file() {
+                        file_ops::make_folders(dest_dir.parent().unwrap());
+                    } else {
+                        file_ops::make_folders(Path::new(&dest_dir.into_os_string()));
+                    }
+                    let new_path = match get_files::get_file(&filesystem, &filename, &dest_path_str, path_path.is_file()) {
                         Ok(_) => {
-                            println!("[+] Copy done for file: {path}");
+                            let msg = format!("[+] Copy done for file: {path}");
+                            log_msg(&main_args.out_log, msg);
                             let new_path = Path::new(&dest_path).join(filename).to_str().unwrap().to_string();
-                            println!("[DEBUG] New path: {new_path}");
-                            println!("[DEBUG] Art name: {name}; Filesystem: {filesystem}; Filename: {filename}; Dest path: {dest_path_str}");
                             new_path
                         }   
                         Err(e) => {
-                            println!("[!] Unable to copy file: {path}. Error: {}\n", e);
-                            println!("[DEBUG] Art name: {name}; Base path: {}; Filesystem: {filesystem}; Filename: {filename}; Dest path: {dest_path_str}", &data_paths["base"]);
+                            let msg = format!("[!] Unable to copy file: {path}. Error: {}\n", e);
+                            log_msg(&main_args.out_log, msg);
                             path.to_owned()
                         }
                     };
@@ -127,12 +129,12 @@ pub mod paths {
 
     fn check_art_access(filepath: &String, out_log: &String) -> bool {
         match file_ops::check_access(&filepath) {
-            Ok(_) => {
-                // println!("{message}");
+            Ok(message) => {
+                println!("{message}");
                 true
             }
             Err(e) => {
-                log_msg(out_log, format!("[!] Unable to read file: {filepath}, please copy it. Error: {}\n", e));
+                log_msg(out_log, format!("[!] Unable to read file: {filepath}, please copy it. Error: {}", e));
                 false
             }
         }

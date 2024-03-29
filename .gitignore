@@ -18,6 +18,9 @@
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
 !/tools/uac_vector.yaml
+!/tools/MISPAPI.py
+!/tools/MISP.yaml
+!/tools/Executablelist.ps1
 /output_test
 /testing_wr
 /logs
