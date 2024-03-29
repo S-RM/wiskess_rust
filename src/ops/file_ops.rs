@@ -6,7 +6,7 @@ use core::result::Result::Ok;
 use inquire::Confirm;
 use inquire::CustomType;
 use inquire::InquireError;
-use rand::seq::IteratorRandom;
+
 use walkdir::WalkDir;
 use std::path::Path;
 use chrono::NaiveDate;

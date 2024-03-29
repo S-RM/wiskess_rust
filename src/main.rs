@@ -9,7 +9,7 @@ use crate::art::paths;
 use crate::init::{scripts, setup};
 use ops::valid_ops;
 use serde_yaml::{self};
-use std::collections::HashMap;
+
 use std::fs::OpenOptions;
 use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};

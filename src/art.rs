@@ -129,8 +129,8 @@ pub mod paths {
 
     fn check_art_access(filepath: &String, out_log: &String) -> bool {
         match file_ops::check_access(&filepath) {
-            Ok(message) => {
-                println!("{message}");
+            Ok(_message) => {
+                // println!("{message}");
                 true
             }
             Err(e) => {
@@ -198,21 +198,5 @@ pub mod paths {
             }
         }
         return false
-    }
-
-    pub fn get_glob_path(path_str: &String) -> String {
-        // Get path from glob based path  
-        for entry in glob(path_str).expect("Unable to read glob pattern") {
-            match entry {
-                Ok(_) => {
-                    return entry.unwrap().into_os_string().into_string().unwrap();
-                },
-                Err(e) => {
-                    println!("{:?}", e);
-                    return "".to_string();
-                }
-            }
-        }
-        return "".to_string()
     }
 }

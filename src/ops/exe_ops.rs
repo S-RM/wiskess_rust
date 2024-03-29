@@ -1,11 +1,11 @@
-use std::{collections::HashMap, env, io::Write, path::Path, process::{Command, Stdio}};
+use std::{collections::HashMap, io::Write, path::Path, process::{Command, Stdio}};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
-use indicatif::MultiProgress;
-use crate::{art::paths, configs::config::{self, Wiskers}, main};
+
+use crate::{configs::config::{self, Wiskers}};
 use crate::init::setup;
-use super::{file_ops, get_files};
+use super::{file_ops};
 
 fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
@@ -59,7 +59,7 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
     wisker_arg
 }
 
-fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_args: &config::MainArgs) -> String {
+fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, _main_args: &config::MainArgs) -> String {
     let input_path = data_paths[input].clone();
     // if input != "none" && input != "base" && env::consts::OS == "windows" {
     //     // don't check none or base, as these are generic placeholders
@@ -85,7 +85,7 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_arg
     if input_path != "" {
         match canonicalize(&input_path) {
             Ok(p) => p.into_os_string().into_string().unwrap(),
-            Err(e) => {
+            Err(_e) => {
                 // println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
                 input_path
             }

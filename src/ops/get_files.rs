@@ -8,8 +8,8 @@ get-files.exe \\.\e: ./get-files.yaml
 
 use super::sector_reader;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, Read, Seek, Write};
-use std::path::{Ancestors, Path};
+use std::io::{BufReader, Read, Seek, Write};
+use std::path::{Path};
 use anyhow::{bail, Context, Result};
 use ntfs::indexes::NtfsFileNameIndex;
 use ntfs::structured_values::{NtfsFileName, NtfsFileNamespace};
@@ -48,7 +48,7 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file
         ntfs: &ntfs,
     };
 
-    println!("Opened \"{}\" read-only.", filesystem);
+    // println!("Opened \"{}\" read-only.", filesystem);
 
     // get the parent paths of filepath into directories
     let file_ancestors = Path::new(filepath).ancestors();
@@ -105,7 +105,7 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file
     Ok(())
 }
 
-fn get_file_list<T>(info: &mut CommandInfo<T>, dest_p: &str) -> Vec<String>
+fn get_file_list<T>(info: &mut CommandInfo<T>, _dest_p: &str) -> Vec<String>
 where
     T: Read + Seek,
 {
@@ -142,7 +142,8 @@ where
     let output_file_name = if data_stream_name.is_empty() {
         Path::new(dest_path).join(file_name).into_os_string().into_string().unwrap()
     } else {
-        format!("{file_name}_{data_stream_name}")
+        let new_name = format!("{file_name}_{data_stream_name}");
+        Path::new(dest_path).join(new_name).into_os_string().into_string().unwrap()
     };
     let mut output_file = OpenOptions::new()
         .write(true)
