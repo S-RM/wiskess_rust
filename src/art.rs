@@ -111,7 +111,8 @@ pub mod paths {
                         Ok(_) => {
                             let msg = format!("[+] Copy done for file: {path}");
                             log_msg(&main_args.out_log, msg);
-                            let new_path = Path::new(&dest_path).join(filename).to_str().unwrap().to_string();
+                            // set the new path replace and colon `:` with underscore `_` as get_file() does that to data streams
+                            let new_path = Path::new(&dest_path).join(filename.replace(":", "_")).to_str().unwrap().to_string();
                             new_path
                         }   
                         Err(e) => {
