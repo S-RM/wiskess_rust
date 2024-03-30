@@ -1,11 +1,11 @@
-use std::{env, collections::HashMap, process::{Stdio, Command}, io::Write};
+use std::{collections::HashMap, io::Write, path::Path, process::{Command, Stdio}};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
-use indicatif::MultiProgress;
-use crate::{configs::config::{self, Wiskers}, art::paths};
+
+use crate::{configs::config::{self, Wiskers}};
 use crate::init::setup;
-use super::{file_ops, get_files};
+use super::{file_ops};
 
 fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
@@ -59,25 +59,25 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
     wisker_arg
 }
 
-fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_args: &config::MainArgs) -> String {
-    let mut input_path = data_paths[input].clone();
-    if input != "none" && input != "base" && env::consts::OS == "windows" {
-        // don't check none or base, as these are generic placeholders
-        if !paths::check_art_access(&input_path, &main_args.out_log) {
-            let filesystem = format!("\\\\.\\{}", &data_paths["base"]);
-            let base_path = format!("{}\\", &data_paths["base"]);
-            let filename = &input_path.replace(&base_path, "");
-            let dest_path = format!("{}\\Artefacts", &main_args.out_path);
-            file_ops::make_folders(&dest_path);
-            match get_files::get_file(&filesystem, &filename, &dest_path) {
-                Ok(_) => {
-                    println!("[+] Copy done for file: {input_path}");
-                    input_path = format!("{}\\{}", dest_path, filename);
-                }
-                Err(e) => println!("[!] Unable to copy file: {filesystem} {input_path}. Error: {}\n", e)
-            }
-        }
-    }
+fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, _main_args: &config::MainArgs) -> String {
+    let input_path = data_paths[input].clone();
+    // if input != "none" && input != "base" && env::consts::OS == "windows" {
+    //     // don't check none or base, as these are generic placeholders
+    //     if !paths::check_art_access(&input_path, &main_args.out_log) {
+    //         let filesystem = format!("\\\\.\\{}", &data_paths["base"]);
+    //         let base_path = format!("{}\\", &data_paths["base"]);
+    //         let filename = &input_path.replace(&base_path, "");
+    //         let dest_path = format!("{}\\Artefacts", &main_args.out_path);
+    //         file_ops::make_folders(&dest_path);
+    //         match get_files::get_file(&filesystem, &filename, &dest_path) {
+    //             Ok(_) => {
+    //                 println!("[+] Copy done for file: {input_path}");
+    //                 input_path = format!("{}\\{}", dest_path, filename);
+    //             }
+    //             Err(e) => println!("[!] Unable to copy file: {filesystem} {input_path}. Error: {}\n", e)
+    //         }
+    //     }
+    // }
     //if paths::get_glob_path(&input_path) != "" {
     //    input_path = paths::get_glob_path(&input_path);
     //    println!("{}", input_path);
@@ -85,25 +85,26 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, main_arg
     if input_path != "" {
         match canonicalize(&input_path) {
             Ok(p) => p.into_os_string().into_string().unwrap(),
-            Err(e) => {
-                println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
-                "".to_string()
+            Err(_e) => {
+                // println!("[!] Unable to get path: {input_path}. Error: {}\n", e);
+                input_path
             }
         }
-    } else {
+    } else {    
         input_path
     }
 }
 
 pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
     // Make the output folders from the yaml config
-    let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
+    let folder_path = Path::new(&main_args_c.out_path).join(&wisker.outfolder);
     file_ops::make_folders(&folder_path);
+    let folder_path_str = &folder_path.into_os_string().into_string().unwrap();
     
     let (wisker_arg, wisker_binary, wisker_script) = set_wisker(
         wisker, 
         &data_paths_c, 
-        &folder_path, 
+        folder_path_str, 
         &main_args_c
     );
 
@@ -124,7 +125,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     }
             
     // Check if the outfile already exists, ask user to overwrite
-    let check_outfile = format!("{}/{}", &folder_path, &wisker.outfile);
+    let check_outfile = format!("{}/{}", &folder_path_str, &wisker.outfile);
     let overwrite_file = file_ops::file_exists(
         &check_outfile,
         main_args_c.silent
@@ -132,7 +133,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     (wisker_arg, wisker_binary, wisker_script, overwrite_file)
 }
 
-pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize, m: MultiProgress) {
+pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
@@ -152,7 +153,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
     let (tx, rx) = std::sync::mpsc::channel();
     
     // Setup progress bar second level
-    let pb = setup::prog_spin_init(960, &m, "yellow");
+    let pb = setup::prog_spin_init(960, &main_args.multi_pb, "yellow");
     let num_wiskers = wiskers.len();
     setup::prog_spin_msg(&pb, format!("Running {} processes", num_wiskers));
 
@@ -162,7 +163,6 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
         let pb_clone = pb.clone();
-        let m_clone = m.clone();
         
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
@@ -172,13 +172,13 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     &wisker, 
                     data_paths_c);
         
-                let pb2_clone = setup::prog_spin_after(&pb_clone, 480, &m_clone, "white");
+                let pb2_clone = setup::prog_spin_after(&pb_clone, 480, &main_args_c.multi_pb, "white");
                 setup::prog_spin_msg(&pb2_clone, format!("Running: {}", &wisker.name));
                 pb2_clone.inc(1);
 
                 if overwrite_file {
                     if wisker.script {
-                        run_posh("-c", &wisker_script, &main_args_c.out_log);
+                        run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string());
                     }
                     
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
@@ -261,7 +261,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// run powershell, checking filepaths for powershell or pwsh
 /// arg payload is either script or command
 /// arg func sets whether the payload is executed as file or command
-pub fn run_posh(func: &str, payload: &String, out_log: &String) {
+pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &String) {
     if out_log != "" {
         file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
     }
@@ -273,6 +273,7 @@ pub fn run_posh(func: &str, payload: &String, out_log: &String) {
 
     command.arg(func);
     command.arg(payload);
+    command.arg(git_token);
 
     let output = command.execute_output().unwrap();
 

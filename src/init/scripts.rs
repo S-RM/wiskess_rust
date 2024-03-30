@@ -8,7 +8,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
         "windows" => {
             let script = tool_path.join("setup.ps1").to_str().unwrap().to_string();
             // Run the script without any arguments
-            exe_ops::run_posh("-f", &script, &"".to_string());
+            exe_ops::run_posh("-f", &script, &"".to_string(), &github_token);
 	},
         "linux" => {
             setup::setup_linux(verbose, github_token);

@@ -18,7 +18,13 @@
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
 !/tools/uac_vector.yaml
+<<<<<<< HEAD
 !/tools/bmc_run.py
+=======
+!/tools/MISPAPI.py
+!/tools/MISP.yaml
+!/tools/Executablelist.ps1
+>>>>>>> refs/remotes/origin/main
 /output_test
 /testing_wr
 /logs

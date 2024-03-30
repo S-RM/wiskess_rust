@@ -2,14 +2,17 @@ use std::{fs, io};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufRead};
 use std::io::Write;
+use core::result::Result::Ok;
 use inquire::Confirm;
 use inquire::CustomType;
 use inquire::InquireError;
+
+use walkdir::WalkDir;
 use std::path::Path;
 use chrono::NaiveDate;
 use glob::glob;
 
-pub fn make_folders(out_path: &String) {
+pub fn make_folders(out_path: &Path) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
 }
 
@@ -127,28 +130,33 @@ pub fn log_msg(out_log: &String, msg: String) {
 /// checks the access to the file by getting the attributes, attempting a read
 /// and seeing if the path matches a regex of it being mounted. As mounted drives
 /// in Windows are locked.
-pub fn check_access(filepath: &String) -> io::Result<String> {
+pub fn check_access(filepath: &String) -> Result<String, io::Error> {
     // Check access to file
     if Path::new(filepath).is_file() {
-        match readable_file(filepath) {
+        let readable = match readable_file(filepath) {
             Ok(message) => Ok(message),
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
-        }
+        };
+        return readable;
     } else {
-        // let mut entries = WalkDir::new(filepath)
-        //     .min_depth(1)
-        //     .max_depth(2)
-        //     .into_iter();
+        let mut entries = WalkDir::new(filepath)
+            .min_depth(1)
+            .max_depth(1)
+            .into_iter();
     
-        // while let Some(Ok(entry)) = entries.next() {
-        //     let path = entry.path();
-        //     println!("{}", path.display());
-        //     let _readable = match readable_file(&path.display().to_string()) {
-        //         Ok(message) => Ok(message),
-        //         Err(e) => Err(io::Error::new(io::ErrorKind::Other, e))
-        //     };
-        // }
-        Ok("This is a folder".to_string())
+        while let Some(Ok(entry)) = entries.next() {
+            let path = entry.path();
+            if let true = path.is_file() {
+                println!("{}", path.display());
+                let readable = match readable_file(&path.display().to_string()) {
+                    Ok(message) => Ok(message),
+                    Err(e) => Err(io::Error::new(io::ErrorKind::Other, e))
+                };
+                return readable;
+            }
+        }
+        let msg = format!("Checked access for folder: {filepath}");
+        Ok(msg)
     }
 }
 
@@ -160,7 +168,11 @@ fn readable_file(filepath: &String) -> Result<String, io::Error> {
     } else {
         match has_any_lines(filepath) {
             Ok(message) => Ok(message),
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, e)),
+            Err(e) => match e.kind() {
+                io::ErrorKind::InvalidData => Ok("File has invalid data, but is readable. So might be binary.".to_string()),
+                io::ErrorKind::PermissionDenied => Err(io::Error::new(io::ErrorKind::PermissionDenied, format!("[!] Permission denied to file: {filepath}. Error: {e}"))),
+                _ => Err(io::Error::new(io::ErrorKind::Other, format!("[!] Empty file: {filepath}. Error: {e}")))
+            }
         }
     }
 }
@@ -171,9 +183,8 @@ fn has_any_lines(filepath: &String) -> Result<String, io::Error> {
         .open(&filepath)?;
     let mut reader = BufReader::new(file);
     let mut first_line = String::new();
-    if reader.read_line(&mut first_line)? > 0 {
-        Ok("this is a file".to_string())
-    } else {
-        Err(io::Error::new(io::ErrorKind::Other, format!("[!] Empty file: {filepath}")))
+    match reader.read_line(&mut first_line) {
+        Err(e) => Err(io::Error::new(io::ErrorKind::Other, format!("[!] Empty file: {filepath}. Error: {e}"))),
+        Ok(_) => Ok("this is a file".to_string()),
     }
 }

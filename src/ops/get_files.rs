@@ -9,9 +9,12 @@ get-files.exe \\.\e: ./get-files.yaml
 use super::sector_reader;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, Write};
+use std::path::{Path};
 use anyhow::{bail, Context, Result};
 use ntfs::indexes::NtfsFileNameIndex;
+use ntfs::structured_values::{NtfsFileName, NtfsFileNamespace};
 use ntfs::{Ntfs, NtfsFile, NtfsReadSeek};
+use regex::Regex;
 use sector_reader::SectorReader;
 
 struct CommandInfo<'n, T>
@@ -19,12 +22,18 @@ where
     T: Read + Seek,
 {
     current_directory: Vec<NtfsFile<'n>>,
+    current_directory_string: String,
     fs: T,
     ntfs: &'n Ntfs,
 }
 
 /// get_file - opens a handle to the filesystem in read-only mode, then passes the filepath to copy to get()
-pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str) -> Result<()> {
+/// 
+/// Args:
+/// * filesystem - the drive t copy from; in the format \\\\.\\d:
+/// * filepath - the file path to copy from, i.e. Windows\System32\config\SYSTEM
+/// * dest_path - the folder path to where to copy to, i.e. c:\wiskess\artefacts
+pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file: bool) -> Result<()> {
     let f = File::open(&filesystem)?;
     let sr = SectorReader::new(f, 4096)?;
     let mut fs = BufReader::new(sr);
@@ -34,19 +43,87 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str) -> Resu
 
     let mut info = CommandInfo {
         current_directory,
+        current_directory_string: String::new(),
         fs,
         ntfs: &ntfs,
     };
 
-    println!("Opened \"{}\" read-only.", filesystem);
+    // println!("Opened \"{}\" read-only.", filesystem);
 
-    let result = get(filepath, &mut info, dest_path);
-    
-    if let Err(e) = result {
-        eprintln!("Error: {e:?}");
+    // get the parent paths of filepath into directories
+    let file_ancestors = Path::new(filepath).ancestors();
+    // in a loop, use cd to move to the directory
+    let mut dirs = vec![];
+    for dir in file_ancestors {
+        dirs.push(dir);
+    }
+    for dir in dirs.iter().rev() {
+        if dir.parent() == None {
+            continue;
+        }
+        let parent_path = dir.file_name().unwrap().to_str().unwrap().to_string();
+        let result = cd(&parent_path, &mut info);
+        
+        if let Err(e) = result {
+            eprintln!("Error: {e:?}");
+        }
     }
 
+    // get the file
+    let filepath_path = Path::new(filepath); 
+    let filename = filepath_path.file_name();
+    let dest_parent = Path::new(dest_path).join(filepath);
+    // if path to copy is a file, dest_p is the parent of the path, otherwise is the same
+    // if copying a file, use get() once, else if a dir, get vector of file and loop using get()
+    if is_file {
+        let dest_p = dest_parent.parent().unwrap().as_os_str().to_str().unwrap();
+        get(
+            filename.unwrap().to_os_string().to_str().unwrap(), 
+            &mut info, 
+            dest_p
+        )?
+    } else {
+        let dest_p = dest_parent.as_os_str().to_str().unwrap();
+        let file_list = get_file_list(&mut info, dest_p);
+        let re = Regex::new(r"\.evtx$").unwrap();
+        let mut num_matches: u32 = 0;
+        for file in file_list {
+            if re.is_match(&file) {
+                num_matches += 1;
+                get(
+                    &file, 
+                    &mut info, 
+                    dest_p
+                )?
+            }
+        };
+        if num_matches <= 0 {
+            bail!("[!] no match")
+        }
+    };
+
     Ok(())
+}
+
+fn get_file_list<T>(info: &mut CommandInfo<T>, _dest_p: &str) -> Vec<String>
+where
+    T: Read + Seek,
+{
+    let index = info
+        .current_directory
+        .last()
+        .unwrap()
+        .directory_index(&mut info.fs).unwrap();
+    let mut iter = index.entries();
+    let mut file_list = vec![];
+    while let Some(entry) = iter.next(&mut info.fs) {
+        let entry = entry.unwrap();
+        let file_name = entry
+            .key()
+            .expect("key must exist for a found Index Entry").unwrap();
+        file_list.push(file_name.name().to_string().unwrap().to_string());
+    };
+    file_list
 }
 
 /// get - get the file from the filesystem specified in info
@@ -63,9 +140,10 @@ where
     // Compose the output file name and try to create it.
     // It must not yet exist, as we don't want to accidentally overwrite things.
     let output_file_name = if data_stream_name.is_empty() {
-        format!("{}/{}", dest_path, file_name.to_string())
+        Path::new(dest_path).join(file_name).into_os_string().into_string().unwrap()
     } else {
-        format!("{file_name}_{data_stream_name}")
+        let new_name = format!("{file_name}_{data_stream_name}");
+        Path::new(dest_path).join(new_name).into_os_string().into_string().unwrap()
     };
     let mut output_file = OpenOptions::new()
         .write(true)
@@ -146,4 +224,94 @@ where
             bail!("No such file or directory \"{}\".", arg)
         }
     }
+}
+
+fn best_file_name<T>(
+    info: &mut CommandInfo<T>,
+    file: &NtfsFile,
+    parent_record_number: u64,
+) -> Result<NtfsFileName>
+where
+    T: Read + Seek,
+{
+    // Try to find a long filename (Win32) first.
+    // If we don't find one, the file may only have a single short name (Win32AndDos).
+    // If we don't find one either, go with any namespace. It may still be a Dos or Posix name then.
+    let priority = [
+        Some(NtfsFileNamespace::Win32),
+        Some(NtfsFileNamespace::Win32AndDos),
+        None,
+    ];
+
+    for match_namespace in priority {
+        if let Some(file_name) =
+            file.name(&mut info.fs, match_namespace, Some(parent_record_number))
+        {
+            let file_name = file_name?;
+            return Ok(file_name);
+        }
+    }
+
+    bail!(
+        "Found no FileName attribute for File Record {:#x}",
+        file.file_record_number()
+    )
+}
+
+fn cd<T>(arg: &String, info: &mut CommandInfo<T>) -> Result<()>
+where
+    T: Read + Seek,
+{
+    if arg.is_empty() {
+        return Ok(());
+    }
+
+    if arg == ".." {
+        if info.current_directory_string.is_empty() {
+            return Ok(());
+        }
+
+        info.current_directory.pop();
+
+        let new_len = info.current_directory_string.rfind('\\').unwrap_or(0);
+        info.current_directory_string.truncate(new_len);
+    } else {
+        let index = info
+            .current_directory
+            .last()
+            .unwrap()
+            .directory_index(&mut info.fs)?;
+        let mut finder = index.finder();
+        let maybe_entry = NtfsFileNameIndex::find(&mut finder, info.ntfs, &mut info.fs, arg);
+
+        if maybe_entry.is_none() {
+            println!("Cannot find subdirectory \"{arg}\".");
+            return Ok(());
+        }
+
+        let entry = maybe_entry.unwrap()?;
+        let file_name = entry
+            .key()
+            .expect("key must exist for a found Index Entry")?;
+
+        if !file_name.is_directory() {
+            println!("\"{arg}\" is not a directory.");
+            return Ok(());
+        }
+
+        let file = entry.to_file(info.ntfs, &mut info.fs)?;
+        let file_name = best_file_name(
+            info,
+            &file,
+            info.current_directory.last().unwrap().file_record_number(),
+        )?;
+        if !info.current_directory_string.is_empty() {
+            info.current_directory_string += "\\";
+        }
+        info.current_directory_string += &file_name.name().to_string_lossy();
+
+        info.current_directory.push(file);
+    }
+
+    Ok(())
 }
