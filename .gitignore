@@ -18,6 +18,7 @@
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
 !/tools/uac_vector.yaml
+!/tools/bmc_run.py
 /output_test
 /testing_wr
 /logs
