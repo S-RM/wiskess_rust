@@ -106,13 +106,13 @@ function Start-MainSetup {
   RefreshEnv.cmd
   
   # polars install
-  py -m pip install polars
-  py -m pip install chardet
-  py -m pip install datetime
-  py -m pip install filetype
-  py -m pip install requests
-  py -m pip install python-magic
-  py -m pip install python-magic-bin
+  py -m pip install -U polars
+  py -m pip install -U chardet
+  py -m pip install -U datetime
+  py -m pip install -U filetype
+  py -m pip install -U requests
+  py -m pip install -U python-magic
+  py -m pip install -U python-magic-bin
 
   $gitRepos = @{
     # Format: "URL gitRepo" = "Output Director outDir"
@@ -143,7 +143,7 @@ function Start-MainSetup {
   cd $toolPath
 
   # EZ Tools
-  & "$toolPath\Get-ZimmermanTools\Get-ZimmermanTools.ps1" -NetVersion 4 -Dest "$toolPath\Get-ZimmermanTools\"
+  & "$toolPath\Get-ZimmermanTools\Get-ZimmermanTools.ps1" -NetVersion 6 -Dest "$toolPath\Get-ZimmermanTools\"
 
   # Chainsaw download shimcache patterns
   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt" -OutFile "$toolPath\shimcache_patterns.txt"
