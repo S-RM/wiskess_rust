@@ -49,18 +49,23 @@ def make_symlink(target_dir: str, program: str, script_os: str):
       return
 
   if script_os == 'windows':
-    file_type_regex = re.compile('x-dos(?:-executable|exec)')
+    file_type_regex = re.compile('x-(?:dos-executable|dosexec|msdownload)')
+    file_mime_regex = re.compile('PE32\+ executable \(console\) x86-64, for MS Windows')
   elif script_os == 'linux':
     file_type_regex = re.compile('x(?:-pie|)-executable')
+    file_mime_regex = re.compile('ELF 64-bit LSB shared object, x86-64')
   else:
-    file_type_regex = re.compile('x-.*-exec')
+    file_type_regex = re.compile('(?:application|x-.*-exec)')
+    file_mime_regex = re.compile('x86-64')
 
   for root, dirs, files in os.walk(target_dir):
     if root.count(os.sep) - target_dir.count(os.sep) < 2:
       for f in files:
         f_path = os.path.join(root, f)
+        # check both versions of the mimetype
         file_type = magic.from_file(f_path, mime=True)
-        if file_type_regex.search(file_type):
+        file_mime = magic.from_file(f_path)
+        if file_type_regex.search(file_type) and file_mime_regex.search(file_mime):
           print(f'[+] Creating link for: {f_path}, with type: {file_type}')
           source_file = f_path
           break
@@ -99,6 +104,7 @@ def get_release(token: str, url: str, script_os: str):
     else:
       print(f'[!] Unable to get the repo from link: {url}')
       print('[ ] Please check the link exists')
+      print(response)
 
 
 def main():
