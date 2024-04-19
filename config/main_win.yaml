@@ -170,7 +170,7 @@ wiskers:
     input: sum
     github: https://github.com/EricZimmerman/SumECmd.git
     script: true
-    script_posh: '$sum = "{input}";
+    script_posh: '$sum = ("{input}" -replace "^\\\\\?\\");
     $outDir = "{outfolder}";
     $outFile = "{outfile}";
     if ($(Test-Path -PathType Container -Path "$sum") -eq $True -and $(Test-Path -Path "$outDir\$outFile") -eq $False) {
