@@ -30,9 +30,9 @@ where
 /// get_file - opens a handle to the filesystem in read-only mode, then passes the filepath to copy to get()
 /// 
 /// Args:
-/// * filesystem - the drive t copy from; in the format \\\\.\\d:
-/// * filepath - the file path to copy from, i.e. Windows\System32\config\SYSTEM
-/// * dest_path - the folder path to where to copy to, i.e. c:\wiskess\artefacts
+/// * `filesystem` - the drive t copy from; in the format \\\\.\\d:
+/// * `filepath` - the file path to copy from, i.e. Windows\System32\config\SYSTEM
+/// * `dest_path` - the folder path to where to copy to, i.e. c:\wiskess\artefacts
 pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file: bool) -> Result<()> {
     let f = File::open(&filesystem)?;
     let sr = SectorReader::new(f, 4096)?;

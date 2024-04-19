@@ -147,7 +147,6 @@ pub fn check_access(filepath: &String) -> Result<String, io::Error> {
         while let Some(Ok(entry)) = entries.next() {
             let path = entry.path();
             if let true = path.is_file() {
-                println!("{}", path.display());
                 let readable = match readable_file(&path.display().to_string()) {
                     Ok(message) => Ok(message),
                     Err(e) => Err(io::Error::new(io::ErrorKind::Other, e))

@@ -223,7 +223,7 @@ wiskers:
     github: https://github.com/brimorlabs/KStrike
   - name: shellbags
     binary: fd
-    args: '-i "USRCLASS|NTUSER" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2>$null > {outfolder}\{outfile}'
+    args: '-i "USRCLASS|NTUSER" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1> {outfolder}\{outfile}'
     outfolder: UserActivity
     outfile: shellbags.csv
     input: user_dir
