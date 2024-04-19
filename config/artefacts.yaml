@@ -44,3 +44,6 @@ artefacts:
     legacy: '{root}\Documents and Settings'
   - name: actCache
     path: '{root}\Users\*\AppData\Local\ConnectedDevicesPlatform\*\ActivitiesCache.db'
+  - name: rdp_bitmap
+    path: '{root}\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\'
+    legacy: '{root}\Documents and Settings\*\Local Settings\Application Data\Microsoft\Terminal Server Client\Cache\'

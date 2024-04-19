@@ -1,6 +1,6 @@
 wiskers:
   - name: MFTECmd
-    binary: '{tool_path}\Get-ZimmermanTools\MFTECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
     outfolder: FileSystem
     outfile: MFTECmd.csv
@@ -14,21 +14,21 @@ wiskers:
     input: mft
     github: https://github.com/omerbenamram/mft
   - name: usnjrnl-j
-    binary: '{tool_path}\Get-ZimmermanTools\MFTECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
     outfolder: FileSystem
     outfile: usnjrnl-j-file.csv
     input: j_file
     github: https://github.com/EricZimmerman/MFTECmd.git
   - name: rbcmd
-    binary: '{tool_path}\Get-ZimmermanTools\RBCmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\RBCmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: FileSystem
     outfile: 'RBCmd_Output.csv'
     input: recycle_bin
     github: https://github.com/EricZimmerman/RBCmd.git
   - name: lnk
-    binary: '{tool_path}\Get-ZimmermanTools\LECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\LECmd.exe'
     args: -d {input} --csv {outfolder} --csvf {outfile} -q
     outfolder: FileSystem
     outfile: lnk-files.csv
@@ -42,7 +42,7 @@ wiskers:
     input: winevt
     github: https://github.com/omerbenamram/evtx.git
   - name: EvtxECmd
-    binary: '{tool_path}\Get-ZimmermanTools\EvtxECmd\EvtxECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\EvtxECmd\EvtxECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: EventLogs
     outfile: EvtxECmd-All.csv
@@ -73,7 +73,7 @@ wiskers:
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AmcacheParser
-    binary: '{tool_path}\Get-ZimmermanTools\AmcacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\AmcacheParser.exe'
     args: '-f {input} --csv {outfolder} -i'
     outfolder: FileExecution
     outfile: '*_Amcache_*'
@@ -88,14 +88,14 @@ wiskers:
     outfile: chainsaw_srum.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AppCompatCache
-    binary: '{tool_path}\Get-ZimmermanTools\AppCompatCacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\AppCompatCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileExecution
     outfile: appcompatcache.csv
     input: system
     github: https://github.com/EricZimmerman/AppCompatCacheParser.git
   - name: RecentFileCacheParser
-    binary: '{tool_path}\Get-ZimmermanTools\RecentFileCacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\RecentFileCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileExecution
     outfile: RecentFileCache.csv
@@ -116,14 +116,14 @@ wiskers:
     input: objects
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: Prefetch
-    binary: '{tool_path}\Get-ZimmermanTools\PECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\PECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
     outfolder: FileExecution
     outfile: prefetch.csv
     input: prefetch
     github: https://github.com/EricZimmerman/Prefetch.git
   - name: SrumECmd
-    binary: '{tool_path}\Get-ZimmermanTools\SrumECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\SrumECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: Network
     outfile: '*_SrumECmd_*.csv'
@@ -163,7 +163,7 @@ wiskers:
         }
       }'
   - name: SumECmd
-    binary: '{tool_path}\Get-ZimmermanTools\SumECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\SumECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: Network
     outfile: '*SumECmd*.csv'
@@ -186,33 +186,55 @@ wiskers:
         }
     }'
   - name: RegSystem
-    binary: '{tool_path}\Get-ZimmermanTools\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\Get-ZimmermanTools\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\RECmd\RECmd.exe'
+    args: '--bn {tool_path}\Get-ZimmermanTools\net6\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
     outfile: reg-System.csv
     input: system_config
     github:
   - name: RegUser
-    binary: '{tool_path}\Get-ZimmermanTools\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\Get-ZimmermanTools\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\RECmd\RECmd.exe'
+    args: '--bn {tool_path}\Get-ZimmermanTools\net6\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
     outfile: reg-User.csv
     input: user_dir
     github:
   - name: SBE
-    binary: '{tool_path}\Get-ZimmermanTools\SBECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\SBECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: UserActivity
     outfile: '*SBECmd_Messages.txt'
     input: user_dir
     github:
   - name: JLECmd
-    binary: '{tool_path}\Get-ZimmermanTools\JLECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net6\JLECmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: UserActivity
     outfile: '*Destinations.csv'
     input: user_dir
     github:
+  - name: KStrike
+    binary: py
+    args: '{tool_path}/KStrike/KStrike.py {input}\Current.mdb > {outfolder}\{outfile}'
+    input: sum
+    valid_path: '{root}\Windows\System32\LogFiles\Sum\Current.mdb'
+    outfolder: Network
+    outfile: UAL_Kstrike.psv
+    github: https://github.com/brimorlabs/KStrike
+  - name: shellbags
+    binary: fd
+    args: '-i "USRCLASS|NTUSER" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2>$null > {outfolder}\{outfile}'
+    outfolder: UserActivity
+    outfile: shellbags.csv
+    input: user_dir
+    github: https://github.com/williballenthin/shellbags
+  - name: rdp_bitmap
+    binary: fd
+    args: '"(?:bcache.*\.bmc|cache.*\.bin)$" {input} -x py {tool_path}\bmc_run.py "{}" {outfolder} {tool_path}\bmc-tools\bmc-tools.py'
+    outfolder: Network
+    outfile: '*.bmp'
+    input: user_dir
+    github: https://github.com/ANSSI-FR/bmc-tools
 
 reporters:
   - name: polars timeline
@@ -278,7 +300,7 @@ enrichers:
     para: false
   - name: Executablelist 
     binary: 'pwsh.exe'
-    args: '{tool_path}\Executablelist.ps1 {out_path} {tool_path}'
+    args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'
     outfolder: FileExecution
     outfile: MISPoutput.csv
     input: pagefile
