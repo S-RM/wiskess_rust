@@ -24,7 +24,7 @@ wiskers:
     binary: '{tool_path}\Get-ZimmermanTools\net6\RBCmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: FileSystem
-    outfile: 'RBCmd_Output.csv'
+    outfile: '*RBCmd_Output.csv'
     input: recycle_bin
     github: https://github.com/EricZimmerman/RBCmd.git
   - name: lnk
@@ -66,8 +66,9 @@ wiskers:
     para: false
   - name: chainsaw_shim
     binary: '{tool_path}\chainsaw\chainsaw.exe'
-    args: 'analyse shimcache {input}\Windows\System32\config\SYSTEM --regexfile {tool_path}\shimcache_patterns.txt --amcache {input}\Windows\AppCompat\Programs\Amcache.hve --tspair --output {outfolder}\{outfile}'
-    input: base
+    args: 'analyse shimcache {input} --regexfile {tool_path}\shimcache_patterns.txt --amcache {input_other} --tspair --output {outfolder}\{outfile}'
+    input: system
+    input_other: amcache
     valid_path: '{root}\Windows\AppCompat\Programs\Amcache.hve'
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
@@ -134,7 +135,7 @@ wiskers:
     binary: '{tool_path}\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
     outfolder: Network
-    outfile: hindsight
+    outfile: hindsight*
     input: chrome
     valid_path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     github: https://github.com/obsidianforensics/hindsight.git
@@ -229,11 +230,11 @@ wiskers:
     input: user_dir
     github: https://github.com/williballenthin/shellbags
   - name: rdp_bitmap
-    binary: fd
-    args: '"(?:bcache.*\.bmc|cache.*\.bin)$" {input} -x py {tool_path}\bmc_run.py "{}" {outfolder} {tool_path}\bmc-tools\bmc-tools.py'
+    binary: py
+    args: '{tool_path}\bmc_run.py {outfolder} {input}'
     outfolder: Network
     outfile: '*.bmp'
-    input: user_dir
+    input: rdp_bitmap
     github: https://github.com/ANSSI-FR/bmc-tools
 
 reporters:
@@ -241,7 +242,7 @@ reporters:
     binary: py
     args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
     outfolder: Timeline
-    outfile: mft.json
+    outfile: MFTECmd.json
     input: none
   - name: polars hostinfo
     binary: py
@@ -289,13 +290,13 @@ enrichers:
     binary: '{tool_path}/loki/loki/loki.exe'
     args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
     outfolder: IOC_Findings\loki_analysis
-    outfile: '*.txt'
+    outfile: '*.log'
     input: none
   - name: loki_datasource
     binary: '{tool_path}/loki/loki/loki.exe'
     args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
     outfolder: IOC_Findings\loki_datasource
-    outfile: '*.txt'
+    outfile: '*.log'
     input: base
     para: false
   - name: Executablelist 

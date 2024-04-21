@@ -256,6 +256,7 @@ fn main() {
 
             // check access and copy unreadable artefacts
             let data_paths = paths::check_copy_art(data_paths, &main_args);
+            println!("{:#?}", data_paths);
 
 
             // Setup progress bars

@@ -119,9 +119,11 @@ function Start-MainSetup {
     "https://github.com/EricZimmerman/Get-ZimmermanTools.git" = "Get-ZimmermanTools"
     "https://github.com/williballenthin/python-registry.git" = "python-registry"
     # "https://github.com/Neo23x0/Loki2.git" = "loki2"
+    "https://github.com/ANSSI-FR/bmc-tools.git" = "bmc-tools"
   }
   $gitReleases = @{    
     # "https://github.com/SigmaHQ/sigma" = "sigma"
+    "https://github.com/obsidianforensics/hindsight.git" = "hindsight"
     "https://github.com/countercept/chainsaw" = "chainsaw"
     "https://github.com/Yamato-Security/hayabusa" = "hayabusa"
     "https://github.com/omerbenamram/evtx.git" = "evtx"
@@ -134,7 +136,7 @@ function Start-MainSetup {
   }
   # Install all listed git releases
   $gitReleases.Keys.Clone() | ForEach-Object {
-    gitRelease -gitRepo $_ -gitKey $gitKey -script_os
+    gitRelease -gitRepo $_ -gitKey $gitKey
   }
   
   # Loki upgrader
