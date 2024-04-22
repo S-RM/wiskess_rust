@@ -2,6 +2,7 @@ pub mod paths {
     use std::{env, path::Path, collections::HashMap};
     use glob::glob;
     use inquire::Text;
+    use regex::Regex;
     use crate::{configs::config::{self, Artefacts}, ops::{get_files, file_ops::{self, log_msg}}};
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool, main_args: &config::MainArgs) -> HashMap<String, String> {
@@ -111,14 +112,25 @@ pub mod paths {
                         Ok(_) => {
                             let msg = format!("[+] Copy done for file: {path}");
                             log_msg(&main_args.out_log, msg);
-                            // set the new path replace and colon `:` with underscore `_` as get_file() does that to data streams
+                            // set the new path replace any colon `:` with underscore `_` as get_file() does that to data streams
                             let new_path = Path::new(&dest_path).join(filename.replace(":", "_")).to_str().unwrap().to_string();
                             new_path
                         }   
                         Err(e) => {
-                            let msg = format!("[!] Unable to copy file: {path}. Error: {}\n", e);
+                            // check if the file has already been copied from the datasource
+                            let (msg, new_path) = if Regex::new(r"^Tried to open .+ for writing$")
+                                .unwrap()
+                                .is_match(e.to_string().as_str()) {
+                                let msg = format!("[ ] Alerady copied file: {path}. Error: {}\n", e);
+                                let new_path = Path::new(&dest_path).join(filename.replace(":", "_")).to_str().unwrap().to_string();
+                                (msg, new_path)
+                            } else {
+                                let msg = format!("[!] Unable to copy file: {path}. Error: {}\n", e);
+                                let new_path = path.to_owned();
+                                (msg, new_path)
+                            };
                             log_msg(&main_args.out_log, msg);
-                            path.to_owned()
+                            new_path
                         }
                     };
                     data_paths_clone.insert(name.to_owned(), new_path);

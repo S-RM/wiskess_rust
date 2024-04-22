@@ -105,8 +105,8 @@ wiskers:
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: rdp_bitmap
-    binary: fdfind
-    args: '"(?:bcache.*\.bmc|cache.*\.bin)$" -x python3 {tool_path}/bmc_run.py "{}" {outfolder} {tool_path}/bmc-tools/bmc-tools.py'
+    binary: python3
+    args: '{tool_path}/bmc_run.py "{input}" {outfolder}'
     outfolder: Network
     outfile: '*.bmp'
     input: rdp_bitmap

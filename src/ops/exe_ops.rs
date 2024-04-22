@@ -3,10 +3,116 @@ use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
 
-use crate::{configs::config::{self, Wiskers}};
+use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
-use super::{file_ops};
+use super::file_ops;
 
+pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
+    let mut pwsh = "pwsh".to_string();
+    if !check_binary(&pwsh, "-h") {
+        pwsh = "powershell".to_string();
+    }
+    let mut command = Command::new(pwsh);
+
+    command.args(["-f", script]);
+    command.args(["-config", &args.config]);
+    command.args(["-data_source_list", &args.data_source_list]);
+    command.args(["-local_storage", &args.local_storage]);
+    command.args(["-start_date", &args.start_date]);
+    command.args(["-end_date", &args.end_date]);
+    command.args(["-ioc_file", &args.ioc_file]);
+    command.args(["-in_link", &args.in_link]);
+    command.args(["-out_link", &args.out_link]);
+    if args.update {
+        command.arg("-update");
+    }
+    if args.keep_evidence {
+        command.arg("-keep_evidence");
+    }
+    // command.args(["-tool_path",tool_path]);
+
+    let output = command.execute_output().unwrap();
+
+    if let Some(exit_code) = output.status.code() {
+        if exit_code == 0 {
+            println!("Ok.");
+        } else {
+            eprintln!("Failed.");
+        }
+    } else {
+        eprintln!("Interrupted!");
+    }
+}
+
+/// run powershell, checking filepaths for powershell or pwsh
+/// 
+/// Args:
+/// * func: set whether the payload is executed as file or command
+/// * payload: either script or command
+/// * out_log: the file path to the wiskess log
+/// * git_token: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
+pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &String) {
+    if out_log != "" {
+        file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
+    }
+    let mut pwsh = "pwsh".to_string();
+    if !check_binary(&pwsh, "-h") {
+        pwsh = "powershell".to_string();
+    }
+    let mut command = Command::new(pwsh);
+
+    command.arg(func);
+    command.arg(payload);
+    command.arg(git_token);
+
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+
+    let output = command.execute_output().unwrap();
+
+    if let Some(exit_code) = output.status.code() {
+        if exit_code == 0 {
+            println!("Ok.");
+        } else {
+            eprintln!("Failed.");
+        }
+    } else {
+        eprintln!("Interrupted!");
+    }
+
+    log_exe_output(out_log, output);
+}
+
+fn log_exe_output(out_log: &String, output: std::process::Output) {
+    if out_log != "" {
+        for o in output.stdout {
+            file_ops::log_msg(&out_log, o.to_string());
+        }
+        for e in output.stderr {
+            file_ops::log_msg(&out_log, e.to_string());
+        }
+    }
+}
+
+
+/// check if the binary works
+/// 
+/// Args:
+/// * binary: the file path to the tool to run
+/// * arg: the argument to test the execution, i.e. -h or --help
+fn check_binary(binary: &String, arg: &str) -> bool {
+    let mut binary_cmd = Command::new(binary);
+
+    binary_cmd.arg(arg);
+
+    if binary_cmd.execute_check_exit_status_code(0).is_err() {
+        return false;
+    }
+    return true;
+}
+
+/// run the binary with the given argument, which is a string
+/// returns the output of what was ran, including the stdout and stderr
 fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
         &wisker_binary, 
@@ -19,6 +125,14 @@ fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> 
     output
 }
 
+/// set the command to be run with the replacement of placeholders, as specified in the config yaml
+/// 
+/// Args:
+/// * wisker: the command to be run as specified in the config, i.e. main_win.yaml
+/// * data_paths: a hash map of the file paths that the data is sourced, i.e. mft:'C:\$MFT'
+/// * folder_path: the path to the output folder
+/// * main_args: the arguments specified from the main.rs, i.e. tool_path
+/// returns the string of the constructed command for the binary, argument and/or script
 fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, folder_path: &String, main_args: &config::MainArgs) -> (String, String, String) {
     // TODO: remove quotes from wisker.args, as it causes issues and isn't needed
     
@@ -61,27 +175,7 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
 
 fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, _main_args: &config::MainArgs) -> String {
     let input_path = data_paths[input].clone();
-    // if input != "none" && input != "base" && env::consts::OS == "windows" {
-    //     // don't check none or base, as these are generic placeholders
-    //     if !paths::check_art_access(&input_path, &main_args.out_log) {
-    //         let filesystem = format!("\\\\.\\{}", &data_paths["base"]);
-    //         let base_path = format!("{}\\", &data_paths["base"]);
-    //         let filename = &input_path.replace(&base_path, "");
-    //         let dest_path = format!("{}\\Artefacts", &main_args.out_path);
-    //         file_ops::make_folders(&dest_path);
-    //         match get_files::get_file(&filesystem, &filename, &dest_path) {
-    //             Ok(_) => {
-    //                 println!("[+] Copy done for file: {input_path}");
-    //                 input_path = format!("{}\\{}", dest_path, filename);
-    //             }
-    //             Err(e) => println!("[!] Unable to copy file: {filesystem} {input_path}. Error: {}\n", e)
-    //         }
-    //     }
-    // }
-    //if paths::get_glob_path(&input_path) != "" {
-    //    input_path = paths::get_glob_path(&input_path);
-    //    println!("{}", input_path);
-    //}
+    
     if input_path != "" {
         match canonicalize(&input_path) {
             Ok(p) => p.into_os_string().into_string().unwrap(),
@@ -128,7 +222,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     let check_outfile = format!("{}/{}", &folder_path_str, &wisker.outfile);
     let overwrite_file = file_ops::file_exists(
         &check_outfile,
-        main_args_c.silent
+        true
     );
     (wisker_arg, wisker_binary, wisker_script, overwrite_file)
 }
@@ -219,82 +313,4 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
     for msg in rx {
         file.write_all(&msg).expect("Failed to write to log file");
     }
-}
-
-pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
-    let mut pwsh = "pwsh".to_string();
-    if !check_binary(&pwsh, "-h") {
-        pwsh = "powershell".to_string();
-    }
-    let mut command = Command::new(pwsh);
-
-    command.args(["-f", script]);
-    command.args(["-config", &args.config]);
-    command.args(["-data_source_list", &args.data_source_list]);
-    command.args(["-local_storage", &args.local_storage]);
-    command.args(["-start_date", &args.start_date]);
-    command.args(["-end_date", &args.end_date]);
-    command.args(["-ioc_file", &args.ioc_file]);
-    command.args(["-in_link", &args.in_link]);
-    command.args(["-out_link", &args.out_link]);
-    if args.update {
-        command.arg("-update");
-    }
-    if args.keep_evidence {
-        command.arg("-keep_evidence");
-    }
-    // command.args(["-tool_path",tool_path]);
-
-    let output = command.execute_output().unwrap();
-
-    if let Some(exit_code) = output.status.code() {
-        if exit_code == 0 {
-            println!("Ok.");
-        } else {
-            eprintln!("Failed.");
-        }
-    } else {
-        eprintln!("Interrupted!");
-    }
-}
-
-/// run powershell, checking filepaths for powershell or pwsh
-/// arg payload is either script or command
-/// arg func sets whether the payload is executed as file or command
-pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &String) {
-    if out_log != "" {
-        file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
-    }
-    let mut pwsh = "pwsh".to_string();
-    if !check_binary(&pwsh, "-h") {
-        pwsh = "powershell".to_string();
-    }
-    let mut command = Command::new(pwsh);
-
-    command.arg(func);
-    command.arg(payload);
-    command.arg(git_token);
-
-    let output = command.execute_output().unwrap();
-
-    if let Some(exit_code) = output.status.code() {
-        if exit_code == 0 {
-            println!("Ok.");
-        } else {
-            eprintln!("Failed.");
-        }
-    } else {
-        eprintln!("Interrupted!");
-    }
-}
-
-fn check_binary(binary: &String, arg: &str) -> bool {
-    let mut binary_cmd = Command::new(binary);
-
-    binary_cmd.arg(arg);
-
-    if binary_cmd.execute_check_exit_status_code(0).is_err() {
-        return false;
-    }
-    return true;
 }
