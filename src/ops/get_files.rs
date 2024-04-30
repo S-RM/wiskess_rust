@@ -85,7 +85,7 @@ pub fn get_file(filesystem: &String, filepath: &String, dest_path: &str, is_file
     } else {
         let dest_p = dest_parent.as_os_str().to_str().unwrap();
         let file_list = get_file_list(&mut info, dest_p);
-        let re = Regex::new(r"\.evtx$").unwrap();
+        let re = Regex::new(r"\.(?:evtx|LOG1|LOG2|regtrans-ms|blf|LOG)$").unwrap();
         let mut num_matches: u32 = 0;
         for file in file_list {
             if re.is_match(&file) {
@@ -295,7 +295,7 @@ where
             .expect("key must exist for a found Index Entry")?;
 
         if !file_name.is_directory() {
-            println!("\"{arg}\" is not a directory.");
+            // println!("\"{arg}\" is not a directory.");
             return Ok(());
         }
 

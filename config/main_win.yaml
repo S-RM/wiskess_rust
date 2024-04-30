@@ -125,17 +125,18 @@ wiskers:
     github: https://github.com/EricZimmerman/Prefetch.git
   - name: SrumECmd
     binary: '{tool_path}\Get-ZimmermanTools\net6\SrumECmd.exe'
-    args: '-d {input} --csv {outfolder}'
+    args: '-f {input} -r {input_other} --csv {outfolder}'
     outfolder: Network
     outfile: '*_SrumECmd_*.csv'
-    input: system32
+    input: srum
+    input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: hindsight
-    binary: '{tool_path}\hindsight.exe'
+    binary: '{tool_path}\hindsight\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
     outfolder: Network
-    outfile: hindsight*
+    outfile: hindsight
     input: chrome
     valid_path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     github: https://github.com/obsidianforensics/hindsight.git
@@ -224,7 +225,7 @@ wiskers:
     github: https://github.com/brimorlabs/KStrike
   - name: shellbags
     binary: fd
-    args: '-i "USRCLASS|NTUSER" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1> {outfolder}\{outfile}'
+    args: '-i "USRCLASS\.DAT|NTUSER\.DAT" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1> {outfolder}\{outfile}'
     outfolder: UserActivity
     outfile: shellbags.csv
     input: user_dir
@@ -233,7 +234,7 @@ wiskers:
     binary: py
     args: '{tool_path}\bmc_run.py {outfolder} {input}'
     outfolder: Network
-    outfile: '*.bmp'
+    outfile: '*-bitmap/*.bmp'
     input: rdp_bitmap
     github: https://github.com/ANSSI-FR/bmc-tools
 
@@ -242,7 +243,7 @@ reporters:
     binary: py
     args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
     outfolder: Timeline
-    outfile: MFTECmd.json
+    outfile: '*.json'
     input: none
   - name: polars hostinfo
     binary: py
@@ -303,9 +304,8 @@ enrichers:
     binary: 'pwsh.exe'
     args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'
     outfolder: FileExecution
-    outfile: MISPoutput.csv
+    outfile: MISP
     input: pagefile
-    para: false
 
 intense:
   - name: thor_analysis

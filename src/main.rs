@@ -238,12 +238,7 @@ fn main() {
                 .open(artefacts_config)
                 .expect("Unable to open artefacts config file.");
             let config_artefacts: config::ConfigArt = serde_yaml::from_reader(f).expect("Could not read values of artefacts config.");
-            
-            // get a velo collection
-            // let velo_source = HashMap::new();
-            // velo_source.insert("root", "{root}");
-            // exe_ops::run_commands(&config.collectors, &main_args, &data_paths, num_threads, m.clone());
-        
+                    
             // TODO: check or gracefully error when the yaml config misses keys
         
             // check the file paths in the config exist and return a hash of the art paths
@@ -275,7 +270,9 @@ fn main() {
             }
 
             // Validate wiskess has processed all input files into output files
+            println!("[ ] Starting validations");
             valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
+            println!("[ ] Ending validations");
 
             // Set end time
             setup::prog_spin_stop(&pb, "Wiskess complete".to_string());

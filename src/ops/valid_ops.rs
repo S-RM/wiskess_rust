@@ -27,7 +27,7 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs
             false => wisker.valid_path.replace("{root}", data_source)
         };
         // Get input paths that exist in the data source
-        if input_file != "wiskess_none" {
+        if input_file != "wiskess_none" && input_file != "" {
             let folder_path = format!("{}/{}", &main_args.out_path, &wisker.outfolder);
             let check_outfile = format!("{}/{}", &folder_path, &wisker.outfile);
             // Check if the outfile exists, file_exists returns false if exists
@@ -37,6 +37,7 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs
             );
             let mut file_lines = 0;
             if !input_not_processed {
+                println!("[ ] Checking lines in {check_outfile}");
                 file_lines = file_ops::line_count(&check_outfile);
             }
             if input_not_processed || file_lines <= 1 {

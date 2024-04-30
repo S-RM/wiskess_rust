@@ -129,7 +129,8 @@ pub fn setup_linux(v: bool, github_token: String) {
     let repos = vec![
          "https://github.com/brimorlabs/KStrike",
          "https://github.com/ANSSI-FR/bmc-tools.git",
-         "https://github.com/Neo23x0/loki.git"
+         "https://github.com/Neo23x0/loki.git",
+         "https://github.com/williballenthin/shellbags"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
@@ -217,7 +218,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Getting Python-Cim and Azcopy...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-        py -2 -m pip install python-cim
+        py -2 -m pip install python-cim python-registry six
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
         7z e ".\AzCopy.zip" -o"azcopy\" azcopy.exe -r -aoa
         del ".\AzCopy.zip"
@@ -238,6 +239,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         "python-magic",
         "python-magic-bin",
         "PyQt6",
+        "libesedb-python",
     ];
     for pip in pips.iter() {
         let msg = format!("Python installing: {}", pip);
@@ -259,7 +261,6 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         "https://github.com/omerbenamram/evtx.git",
         "https://github.com/omerbenamram/mft",
 	    "https://github.com/forensicmatt/RustyUsn",
-        "https://github.com/williballenthin/shellbags",
         "https://github.com/obsidianforensics/hindsight.git",
         "https://github.com/Neo23x0/loki.git",
     ];
@@ -282,6 +283,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
          "https://github.com/ANSSI-FR/bmc-tools.git",
          "https://github.com/EricZimmerman/Get-ZimmermanTools.git",
          "https://github.com/williballenthin/python-registry.git",
+         "https://github.com/williballenthin/shellbags"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
