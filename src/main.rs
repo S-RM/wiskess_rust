@@ -249,9 +249,19 @@ fn main() {
                 &main_args
             );
 
+            // if not a collection, run velo, extract zip and move files
+            match paths::check_collection(&data_paths) {
+                Ok(_) => {
+                    // TODO: run velo
+                    // TODO: extract velo collection 
+                    // TODO: move extracted files to out_path/Artefacts
+                },
+                Err(_) => (),
+            };
+
             // check access and copy unreadable artefacts
             let data_paths = paths::check_copy_art(data_paths, &main_args);
-            println!("{:#?}", data_paths);
+            // println!("{:#?}", data_paths);
 
 
             // Setup progress bars
@@ -270,9 +280,7 @@ fn main() {
             }
 
             // Validate wiskess has processed all input files into output files
-            println!("[ ] Starting validations");
             valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
-            println!("[ ] Ending validations");
 
             // Set end time
             setup::prog_spin_stop(&pb, "Wiskess complete".to_string());

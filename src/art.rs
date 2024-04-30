@@ -78,14 +78,9 @@ pub mod paths {
     /// * `data_paths` - a hash of the artefact name and filepath of it {name:'pagefile',path:'c:/pagefile.sys'}
     /// * `main_args` - a vector of the main args from main.rs, including the output path
     pub fn check_copy_art(data_paths: HashMap<String, String>, main_args: &config::MainArgs) -> HashMap<String, String> {
-        let mut data_paths_clone = data_paths.to_owned();
-        let base_path = Path::new(&data_paths_clone["base"]);
-        match base_path.parent() {
-            Some(_) => {
-                println!("[DEBUG] This is likely a collection, not collecting.");
-                return data_paths_clone;
-            },
-            None => (),
+        let mut data_paths_clone = match check_collection(&data_paths) {
+            Ok(value) => value,
+            Err(value) => return value,
         };
         if env::consts::OS == "windows" {
             // set the path where artefacts are copied to
@@ -140,6 +135,26 @@ pub mod paths {
         data_paths_clone    
     }
 
+    /// check if the collection has a base path that is the root
+    /// serves as a good way to check if the data source is a collection or a mounted drive
+    /// 
+    /// Args:
+    /// * `data_paths` - hash of the paths in form: pagefile: C:\pagefile.sys
+    /// 
+    /// returns the datapaths as Ok if a mounted drive, otherwise as Err if a collection
+    pub fn check_collection(data_paths: &HashMap<String, String>) -> Result<HashMap<String, String>, HashMap<String, String>> {
+        let mut data_paths_clone = data_paths.to_owned();
+        let base_path = Path::new(&data_paths_clone["base"]);
+        match base_path.parent() {
+            Some(_) => {
+                println!("[DEBUG] This is likely a collection, not collecting.");
+                return Err(data_paths_clone);
+            },
+            None => (),
+        };
+        Ok(data_paths_clone)
+    }
+    
     fn check_art_access(filepath: &String, out_log: &String) -> bool {
         match file_ops::check_access(&filepath) {
             Ok(_message) => {

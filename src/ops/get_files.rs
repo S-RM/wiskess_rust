@@ -285,7 +285,7 @@ where
         let maybe_entry = NtfsFileNameIndex::find(&mut finder, info.ntfs, &mut info.fs, arg);
 
         if maybe_entry.is_none() {
-            println!("Cannot find subdirectory \"{arg}\".");
+            // println!("Cannot find subdirectory \"{arg}\".");
             return Ok(());
         }
 

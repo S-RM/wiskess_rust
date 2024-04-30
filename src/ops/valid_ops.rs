@@ -37,7 +37,6 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs
             );
             let mut file_lines = 0;
             if !input_not_processed {
-                println!("[ ] Checking lines in {check_outfile}");
                 file_lines = file_ops::line_count(&check_outfile);
             }
             if input_not_processed || file_lines <= 1 {
