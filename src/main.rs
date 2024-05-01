@@ -119,7 +119,7 @@ fn show_banner() {
     let figlet = Figlet::text("WISKESS".to_string(), opt).unwrap();
     println!("{}", style(figlet.text).magenta());
     println!("{}", style("Gavin Hull").yellow());
-    println!("{}", style("version: 0.2.1").yellow());
+    println!("{}", style("version: 0.0.1").yellow());
 }
 
 fn main() {

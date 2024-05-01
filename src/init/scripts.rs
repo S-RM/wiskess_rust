@@ -6,9 +6,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
     println!("[+] Running setup...");
     match env::consts::OS {
         "windows" => {
-            let script = tool_path.join("setup.ps1").to_str().unwrap().to_string();
-            // Run the script without any arguments
-            // exe_ops::run_posh("-f", &script, &"".to_string(), &github_token);
+            // Run the setup for windows
             match setup::setup_win(verbose, github_token, tool_path) {
                 Ok(_) => println!("Setup ran OK"),
                 Err(e) => println!("[!] Some error occured: {e}")

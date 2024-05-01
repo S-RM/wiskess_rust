@@ -143,7 +143,7 @@ pub mod paths {
     /// 
     /// returns the datapaths as Ok if a mounted drive, otherwise as Err if a collection
     pub fn check_collection(data_paths: &HashMap<String, String>) -> Result<HashMap<String, String>, HashMap<String, String>> {
-        let mut data_paths_clone = data_paths.to_owned();
+        let data_paths_clone = data_paths.to_owned();
         let base_path = Path::new(&data_paths_clone["base"]);
         match base_path.parent() {
             Some(_) => {
