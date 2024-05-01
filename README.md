@@ -4,13 +4,21 @@ WISKESS automates the Windows evidence processing for Incident Response investig
 This is the Rust version of WISKESS, which uses parallel processing of multiple tools and more can be added. The list of tools used after setup are:
 
 ANSSI-FR: bmc_tools
+
 Nir Soft: BrowsingHistoryView
+
 Yamato-Security: hayabusa
+
 obsidianforensics: hindsight
+
 brimorlabs: KStrike
+
 Neo23x0: loki
+
 BurntSushi: RipGrep
+
 keydet89: RegRipper
+
 williballenthin: shellbags
 
 davidpany: 
