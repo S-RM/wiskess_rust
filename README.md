@@ -69,11 +69,11 @@ The output is generated into reports of a timeline that is compatible with inges
 
 ![271793948-27e9b4b3-0a7f-4efb-a844-2eda7a8a6385](https://github.com/vividDuck/wiskess_rust/assets/122105925/46cacffc-a0d0-4ec7-b1cb-60bca314d2bb)
 
+# Requirements
+run `wiskess_rust.exe setup -g <your github token>` using a terminal with Administrator rights. The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
+
 # Whipped by WISKESS `wiskess_rust.exe whipped`
 This command will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
-
-## Requirements
-run `wiskess_rust.exe setup -g <your github token>` using a terminal with Administrator rights. The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
 
 ## Usage
 This can be used to process Windows data sources stored on either an Azure or AWS S3 cloud account. It can also be used to process data from a network share or local drive.
