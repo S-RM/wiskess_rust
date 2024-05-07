@@ -11,6 +11,7 @@ use ops::valid_ops;
 use serde_yaml::{self};
 
 use std::fs::OpenOptions;
+use std::path;
 use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
@@ -119,7 +120,7 @@ fn show_banner() {
     let figlet = Figlet::text("WISKESS".to_string(), opt).unwrap();
     println!("{}", style(figlet.text).magenta());
     println!("{}", style("Gavin Hull").yellow());
-    println!("{}", style("version: 0.0.1").yellow());
+    println!("{}", style("version: 0.0.2").yellow());
 }
 
 fn main() {
@@ -139,11 +140,13 @@ fn main() {
     let tool_path = Path::new(&args.tool_path);
     let tool_path = match tool_path.to_str() {
         Some("") | None => {
-            let pwd = env::current_dir().unwrap();
-            tool_path.join(&pwd).join("tools")
+            let path_to_exe = env::current_exe().unwrap();
+            tool_path.join(&path_to_exe.parent().unwrap()).join("tools")
         }
         Some(&_) => tool_path.to_path_buf(),
     };
+
+    // TODO: check the config file exists
 
     match args.command {
         Commands::Setup {

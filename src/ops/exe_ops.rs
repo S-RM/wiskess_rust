@@ -14,6 +14,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     }
     let mut command = Command::new(pwsh);
 
+    command.args(["-ExecutionPolicy", "Bypass"]);
     command.args(["-f", script]);
     command.args(["-config", &args.config]);
     command.args(["-data_source_list", &args.data_source_list]);

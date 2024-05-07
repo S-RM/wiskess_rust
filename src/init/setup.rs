@@ -1,6 +1,8 @@
 use std::{env, io, path::Path, time::Duration};
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
+// extern crate git2;
+// use git2::Repository;
 
 pub fn prog_spin_init(tick: u64, m: &MultiProgress, colour: &str) -> ProgressBar {
     let pb = m.add(ProgressBar::new_spinner());
@@ -50,6 +52,17 @@ pub fn prog_spin_msg(pb: &ProgressBar, msg: String) {
 pub fn prog_spin_stop(pb: &ProgressBar,msg: String) {
     pb.finish_with_message(msg);
 }
+
+// fn clone_repo(url: &str) -> String {
+//     let mut msg = format!("Cloning repo: {}", url);
+//     let git_name = url.split("/").collect::<Vec<&str>>().pop().unwrap();
+//     let repo_name = git_name.replace(".git", "");
+//     match Repository::clone(url, format!("./{}", repo_name)) {
+//         Ok(repo) => repo,
+//         Err(e) => msg.push_str(format!("failed to clone: {}", e).as_str()),
+//     };
+//     msg
+// }
 
 /// format the outputs of a script command to a string 
 /// Args:
@@ -208,8 +221,16 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         r#"
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         RefreshEnv.cmd
+        "#
+    ).unwrap();
+    outmsg.push_str(&output_script(v, code, output, error));
+    
+    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli and ripgrep...".to_string());
+    let (code, output, error) = run_script::run_script!(
+        r#"
         choco install -y git 7zip python2 fd osfmount awscli
         choco install -y --force ripgrep
+        set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
         "#
     ).unwrap();
@@ -291,6 +312,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
+            set PATH=%PATH%;C:\Program Files\Git\cmd\
             git clone "%1"
             "#,
             &vec![repo.to_string()],
