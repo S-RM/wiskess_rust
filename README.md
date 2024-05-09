@@ -70,7 +70,9 @@ The output is generated into reports of a timeline that is compatible with inges
 ![271793948-27e9b4b3-0a7f-4efb-a844-2eda7a8a6385](https://github.com/vividDuck/wiskess_rust/assets/122105925/46cacffc-a0d0-4ec7-b1cb-60bca314d2bb)
 
 # Requirements
-run `wiskess_rust.exe setup -g <your github token>` using a terminal with Administrator rights. The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
+run `wiskess_rust.exe setup -g <your github token>` using a terminal with Administrator rights. 
+
+The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
 
 # Whipped by WISKESS `wiskess_rust.exe whipped`
 This command will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
@@ -96,7 +98,6 @@ This can be used to process Windows data sources stored on either an Azure or AW
 wiskess_rust.exe whipped --config ./config/win_all.yml
         --data-source-list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
         --local-storage x:
-        --storage-type azure
         --in-link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
         --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
         --start-date 2023-01-01 `
@@ -116,9 +117,6 @@ wiskess_rust.exe whipped --config ./config/win_all.yml
 
     --local-storage <String>
         Required. The path to where the data is temporarily downloaded to and Wiskess output is stored locally
-
-    --storage-type <String>
-        Requried. Either 'azure' or 'aws' - based on where the data source is stored.
 
     --in-link <String>
         Required. The link that the data is stored on, i.e.
@@ -161,7 +159,7 @@ This is the Rust version of WISKESS, which uses parallel processing of multiple 
     <summary>Click to show the parameters for `wiskess_rust.exe wiskess`</summary>
         
     --config <String>
-        Optional. The paths to the configuration file, i.e. ./config/win_all.yml
+        Optional. The paths to the configuration file. Default: ./config/main_win.yml
             
     --data-source <String>
         Required. The drive letter the image is mounted on, or the file path to the extracted collection.
@@ -187,6 +185,6 @@ This is the Rust version of WISKESS, which uses parallel processing of multiple 
 
 Minimum arguments required to collect artefacts from E:, with a quick triage of the last 7 days and storing results to Z:\Project file path. And provide a list of indicators in a file path.
 ```
-    ./wiskess_rust.exe wiskess --config ./config/all_win.yml --data-source E: -out-path "Z:\Project" --start-date 2023-01-01 --end-date 2023-02-01 --ioc-file ./iocs.txt
+    ./wiskess_rust.exe wiskess --data-source E: -out-path "Z:\Project" --start-date 2023-01-01 --end-date 2023-02-01 --ioc-file ./iocs.txt
 
 ```
