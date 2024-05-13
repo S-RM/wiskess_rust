@@ -1,5 +1,7 @@
 pub mod config {
-  use indicatif::MultiProgress;
+  use std::path::PathBuf;
+
+use indicatif::MultiProgress;
 use serde::{Deserialize, Serialize};
 
   /// Top level structure of config file
@@ -74,7 +76,7 @@ use serde::{Deserialize, Serialize};
       pub tool_path: String,
       pub ioc_file: String,
       pub silent: bool,
-      pub out_log: String,
+      pub out_log: PathBuf,
       pub multi_pb: MultiProgress
   }
 

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use crate::configs::config::Wiskers;
+use std::path::{Path, PathBuf};
+use crate::configs::config::{Wiskers, self};
 use super::file_ops;
 use tabled::{Tabled, Table};
 use tabled::settings::{Width, Style};
@@ -16,7 +17,7 @@ struct Summary<'a> {
 // Needs the wisker: outfolder, outfile, input
 // data_paths is a hashmap of the 'artefact_name : path/to/artefact'
 // wiskers is a vector of type Wiskers, which is built from the config file, i.e. config/main_win.yaml
-pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, data_paths: &'a HashMap<String, String>, data_source: &String, out_log: &String) {
+pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &'a HashMap<String, String>, data_source: &String, out_log: &PathBuf) {
     let mut contents: Vec<Summary> = Vec::new();
     // let w = wiskers;
     // let mut success = Vec::new();
@@ -28,7 +29,10 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, data_paths: &'a HashMap<Stri
         };
         // Get input paths that exist in the data source
         if input_file != "wiskess_none" && input_file != "" {
-            let check_outfile = format!("{}/{}", &wisker.outfolder, &wisker.outfile);
+            let check_outfile = Path::new(&main_args.out_path)
+                .join(&wisker.outfolder)
+                .join(&wisker.outfile);
+            let outfile = format!("{}/{}", &wisker.outfolder, &wisker.outfile);
             // Check if the outfile exists, file_exists returns false if exists
             let input_not_processed = file_ops::file_exists(
                 &check_outfile,
@@ -42,7 +46,7 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, data_paths: &'a HashMap<Stri
                 // let outfile = check_outfile;
                 let content = Summary {
                     name: &wisker.name,
-                    analysis_file: check_outfile,
+                    analysis_file: outfile,
                     data_source: input_file.replace(data_source,""),
                     lines: file_lines
                 };
@@ -51,15 +55,16 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, data_paths: &'a HashMap<Stri
         }
     }
     let msg = format!(
-        "\n{}\n{}{out_log}, {}\n",
+        "\n{}\n{}{}, {}\n",
         "[ ] Validation checks have found an input data source has not been processed. This is normally due to the output analysis file being shorter than two lines.",
         "[ ] Please check the output of each in the wiskess log: ", 
+        out_log.display(),
         "or the output in this terminal.",
     );
     out_table(contents, &out_log, msg);
 }
 
-fn out_table(contents: Vec<Summary>, out_log: &String, msg: String) {
+fn out_table(contents: Vec<Summary>, out_log: &Path, msg: String) {
     let mut table = Table::new(&contents);
     table.with(Style::psql());
     table.with(Width::wrap(200));

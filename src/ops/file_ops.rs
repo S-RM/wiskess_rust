@@ -16,7 +16,7 @@ pub fn make_folders(out_path: &Path) {
     fs::create_dir_all(out_path).expect("Failed to create folder");
 }
 
-pub(crate) fn line_count(file_path: &String) -> usize {
+pub(crate) fn line_count(file_path: &Path) -> usize {
     let path = Path::new(&file_path);
     if path.exists() && path.is_file() {
         let file = fs::File::open(file_path).unwrap();
@@ -24,7 +24,7 @@ pub(crate) fn line_count(file_path: &String) -> usize {
         let lines_count: usize = reader.lines().count();
         return lines_count;
     } else {
-        let file_path_glob = find_file_glob(&file_path);
+        let file_path_glob = find_file_glob(&file_path.to_str().unwrap().to_string());
         if file_path_glob.len() > 0 {
             let file = fs::File::open(file_path_glob).unwrap();
             let reader = BufReader::new(file);
@@ -37,13 +37,13 @@ pub(crate) fn line_count(file_path: &String) -> usize {
 
 ///  file_exists - will check if a file exists and ask the user if they want to
 /// overwrite the file. This function returns false if it exists.
-pub(crate) fn file_exists(file_path: &String, silent: bool) -> bool {
+pub(crate) fn file_exists(file_path: &Path, silent: bool) -> bool {
     let mut ret = true;
-    let path = Path::new(&file_path);
-    if path.exists() && path.is_file() {
-        ret = user_file_overwrite(silent, file_path);
+    let path_str = file_path.to_str().unwrap().to_string();
+    if file_path.exists() && file_path.is_file() {
+        ret = user_file_overwrite(silent, &path_str);
     } else {
-        let file_path_glob = find_file_glob(&file_path);
+        let file_path_glob = find_file_glob(&path_str);
         if file_path_glob.len() > 0 {
             ret = user_file_overwrite(silent, &file_path_glob);
         }
@@ -115,7 +115,7 @@ pub fn check_date(date: String, date_type: &String) -> String {
     ret_date
 }
 
-pub fn log_msg(out_log: &String, msg: String) {
+pub fn log_msg(out_log: &Path, msg: String) {
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)

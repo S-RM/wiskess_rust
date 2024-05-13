@@ -99,10 +99,10 @@ def get_release(token: str, url: str, script_os: str):
         os.makedirs(target_dir)
         # download the files to target dir
         get_files(response, target_dir)
-        # symlink the main .exe to program.exe
-        make_symlink(target_dir, program, script_os)
       else:
         print(f'[ ] Target directory {target_dir} exists, remove the folder if wanting to redownload.')
+      # symlink the main .exe to program.exe
+      make_symlink(target_dir, program, script_os)
     else:
       print(f'[!] Unable to get the repo from link: {url}')
       print('[ ] Please check the link exists')

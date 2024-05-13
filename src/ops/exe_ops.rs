@@ -50,8 +50,8 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// * payload: either script or command
 /// * out_log: the file path to the wiskess log
 /// * git_token: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
-pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &String) {
-    if out_log != "" {
+pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String) {
+    if out_log.exists() {
         file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
     }
     let mut pwsh = "pwsh".to_string();
@@ -80,8 +80,8 @@ pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &Stri
     log_exe_output(out_log, output);
 }
 
-fn log_exe_output(out_log: &String, output: std::process::Output) {
-    if out_log != "" {
+fn log_exe_output(out_log: &Path, output: std::process::Output) {
+    if out_log.exists() {
         for o in output.stdout {
             file_ops::log_msg(&out_log, o.to_string());
         }
@@ -110,7 +110,7 @@ fn check_binary(binary: &String, arg: &str) -> bool {
 
 /// run the binary with the given argument, which is a string
 /// returns the output of what was ran, including the stdout and stderr
-fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &String) -> std::process::Output {
+fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &Path) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
         &wisker_binary, 
         &wisker_arg);
@@ -217,7 +217,8 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     }
             
     // Check if the outfile already exists, ask user to overwrite
-    let check_outfile = format!("{}/{}", &folder_path_str, &wisker.outfile);
+    let check_outfile = Path::new(&folder_path_str).join(&wisker.outfile);
+    // let check_outfile = format!("{}/{}", &folder_path_str, &wisker.outfile);
     let overwrite_file = file_ops::file_exists(
         &check_outfile,
         true

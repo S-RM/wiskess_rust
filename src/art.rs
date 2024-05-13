@@ -155,7 +155,7 @@ pub mod paths {
         Ok(data_paths_clone)
     }
     
-    fn check_art_access(filepath: &String, out_log: &String) -> bool {
+    fn check_art_access(filepath: &String, out_log: &Path) -> bool {
         match file_ops::check_access(&filepath) {
             Ok(_message) => {
                 // println!("{message}");

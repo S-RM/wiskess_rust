@@ -208,7 +208,8 @@ fn main() {
             let wiskess_start_str = wiskess_start.format(date_time_fmt).to_string();
             
             // Set main log
-            let out_log = format!("{}/wiskess_{}.log", &out_path, wiskess_start_str);
+            let wiskess_log_name = format!("wiskess_{}.log", wiskess_start_str);
+            let out_log = Path::new(&out_path).join(wiskess_log_name);
             file_ops::file_exists(&out_log, args.silent);
     	    
             // Write start time to log
@@ -286,7 +287,7 @@ fn main() {
             setup::prog_spin_stop(&pb, "Wiskess complete".to_string());
             
             // Validate wiskess has processed all input files into output files
-            valid_ops::valid_process(&config.wiskers, &data_paths, &data_source, &main_args.out_log);
+            valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
 
             // Set end time
             let wiskess_stop = Utc::now();
