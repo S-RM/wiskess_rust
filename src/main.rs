@@ -11,7 +11,6 @@ use ops::valid_ops;
 use serde_yaml::{self};
 
 use std::fs::OpenOptions;
-use std::path;
 use std::{path::Path,env};
 use clap::{Parser, ArgAction, Subcommand};
 use chrono::Utc;
@@ -120,7 +119,9 @@ fn show_banner() {
     let figlet = Figlet::text("WISKESS".to_string(), opt).unwrap();
     println!("{}", style(figlet.text).magenta());
     println!("{}", style("Gavin Hull").yellow());
-    println!("{}", style("version: 0.0.2").yellow());
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let msg_version = format!("version: {}", VERSION);
+    println!("{}", style(msg_version).yellow());
 }
 
 fn main() {
@@ -282,11 +283,12 @@ fn main() {
                     }
             }
 
+            setup::prog_spin_stop(&pb, "Wiskess complete".to_string());
+            
             // Validate wiskess has processed all input files into output files
-            valid_ops::valid_process(&config.wiskers, &main_args, &data_paths, &data_source, &main_args.out_log);
+            valid_ops::valid_process(&config.wiskers, &data_paths, &data_source, &main_args.out_log);
 
             // Set end time
-            setup::prog_spin_stop(&pb, "Wiskess complete".to_string());
             let wiskess_stop = Utc::now();
             let wiskess_duration = wiskess_stop - wiskess_start;
             let seconds = wiskess_duration.num_seconds() % 60;

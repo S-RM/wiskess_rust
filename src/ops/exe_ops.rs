@@ -35,9 +35,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     let output = command.execute_output().unwrap();
 
     if let Some(exit_code) = output.status.code() {
-        if exit_code == 0 {
-            println!("Ok.");
-        } else {
+        if exit_code != 0 {
             eprintln!("Failed.");
         }
     } else {
@@ -72,9 +70,7 @@ pub fn run_posh(func: &str, payload: &String, out_log: &String, git_token: &Stri
     let output = command.execute_output().unwrap();
 
     if let Some(exit_code) = output.status.code() {
-        if exit_code == 0 {
-            println!("Ok.");
-        } else {
+        if exit_code != 0 {
             eprintln!("Failed.");
         }
     } else {
@@ -190,7 +186,7 @@ fn get_wisker_art(data_paths: &HashMap<String, String>, input: &String, _main_ar
     }
 }
 
-pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool) {
+pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, data_paths_c: HashMap<String, String>) -> (String, String, String, bool, String) {
     // Make the output folders from the yaml config
     let folder_path = Path::new(&main_args_c.out_path).join(&wisker.outfolder);
     file_ops::make_folders(&folder_path);
@@ -215,8 +211,9 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     } else {
         installed = true;
     }
+    let mut err_msg = "".to_string();
     if !installed {
-        eprintln!("[!] The path `{}` is not a correct executable binary file.", wisker_binary); 
+        err_msg = format!("[!] The path `{}` is not a correct executable binary file.", wisker_binary); 
     }
             
     // Check if the outfile already exists, ask user to overwrite
@@ -225,7 +222,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
         &check_outfile,
         true
     );
-    (wisker_arg, wisker_binary, wisker_script, overwrite_file)
+    (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg)
 }
 
 pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
@@ -262,7 +259,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
             if input_file != "wiskess_none" {
-                let (wisker_arg, wisker_binary, wisker_script, overwrite_file) = load_wisker(
+                let (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg) = load_wisker(
                     &main_args_c, 
                     &wisker, 
                     data_paths_c);
@@ -297,7 +294,11 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     );
                     file_ops::log_msg(&main_args_c.out_log, msg);
                 }
-                setup::prog_spin_stop(&pb2_clone, format!("Done: {}", &wisker.name));
+                if err_msg != "" {
+                    setup::prog_spin_stop(&pb2_clone, format!("Done: {}. Error: {}", &wisker.name, err_msg));
+                } else {
+                    setup::prog_spin_stop(&pb2_clone, format!("Done: {}", &wisker.name));
+                }
             }
         });
     }
