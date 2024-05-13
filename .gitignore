@@ -18,13 +18,11 @@
 !/tools/BrowsingHistoryView.chm
 !/tools/BrowsingHistoryView.cfg
 !/tools/uac_vector.yaml
-<<<<<<< HEAD
 !/tools/bmc_run.py
-=======
 !/tools/MISPAPI.py
 !/tools/MISP.yaml
 !/tools/Executablelist.ps1
->>>>>>> refs/remotes/origin/main
+!tools/jq_chainsaw_srum_filter.txt
 /output_test
 /testing_wr
 /logs

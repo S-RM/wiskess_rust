@@ -86,7 +86,7 @@ wiskers:
     input: system32
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     outfolder: Network
-    outfile: chainsaw_srum.csv
+    outfile: chainsaw_srum.json
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AppCompatCache
     binary: '{tool_path}\Get-ZimmermanTools\net6\AppCompatCacheParser.exe'
@@ -327,6 +327,14 @@ enrichers:
     outfolder: FileExecution
     outfile: MISP
     input: pagefile
+  - name: jq_chainsaw_srum
+    binary: jq
+    args: -r -f {tool_path}\jq_chainsaw_srum_filter.txt {out_path}\Network\chainsaw_srum.json >> {outfolder}\{outfile}
+    outfolder: Network
+    outfile: chainsaw_srum.csv
+    input: base
+    script: true
+    script_posh: '"TimeStamp,UserName,UserSID,UserId,AppName,AddId,AutoIncId,BackgroundBytesRead,BackgroundBytesWritten,BackgroundContextSwitches,BackgroundCycleTime,BackgroundNumReadOperations,BackgroundNumWriteOperations,BackgroundNumberOfFlushes,FaceTime,ForegroundBytesRead,ForegroundBytesWritten,ForegroundContextSwitches,ForegroundCycleTime,ForegroundNumReadOperations,ForegroundNumWriteOperations,ForegroundNumberOfFlushes,Table,TableName" > {outfolder}\{outfile}'
 
 intense:
   - name: thor_analysis

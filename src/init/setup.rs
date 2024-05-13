@@ -101,7 +101,7 @@ pub fn setup_linux(v: bool, github_token: String) {
          tool_dir="$PWD/tools/"
          cd $tool_dir
          sudo apt-get update
-         sudo apt-get -y install p7zip-full awscli fd-find git ripgrep python2.7 python-pip regripper python3-pip
+         sudo apt-get -y install p7zip-full awscli fd-find git ripgrep python2.7 python-pip regripper python3-pip jq
          python3 -m ensurepip --default-pip
          python3 -m pip install polars chardet datetime filetype requests libesedb-python python-magic --no-warn-script-location
          python3 -m pip install colorama yara-python psutil rfc5424-logging-handler netaddr --no-warn-script-location
@@ -115,10 +115,10 @@ pub fn setup_linux(v: bool, github_token: String) {
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
     let urls = vec![
         "https://github.com/countercept/chainsaw",
-	"https://github.com/Yamato-Security/hayabusa",
-	"https://github.com/omerbenamram/evtx.git",
+        "https://github.com/Yamato-Security/hayabusa",
+        "https://github.com/omerbenamram/evtx.git",
         "https://github.com/omerbenamram/mft",
-	"https://github.com/forensicmatt/RustyUsn",
+	    "https://github.com/forensicmatt/RustyUsn",
         "https://github.com/williballenthin/shellbags"
     ];
     for url in urls.iter() {
@@ -225,10 +225,10 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
     
-    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli and ripgrep...".to_string());
+    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli, jq and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-        choco install -y git 7zip python2 fd osfmount awscli
+        choco install -y git 7zip python2 fd osfmount awscli jq
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
