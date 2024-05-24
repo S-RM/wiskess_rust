@@ -223,14 +223,6 @@ wiskers:
     outfolder: Network
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
-  - name: KStrike_wsl
-    binary: wsl
-    args: '-e python3 {tool_path}/KStrike/KStrike.py {input}\Current.mdb > {outfolder}\{outfile}'
-    input: sum
-    valid_path: '{root}\Windows\System32\LogFiles\Sum\Current.mdb'
-    outfolder: Network
-    outfile: UAL_Kstrike_wsl.psv
-    github: https://github.com/brimorlabs/KStrike
   - name: shellbags
     binary: fd
     args: '-i "USRCLASS\.DAT|NTUSER\.DAT" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1> {outfolder}\{outfile}'
