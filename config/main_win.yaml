@@ -1,7 +1,7 @@
 wiskers:
   - name: MFTECmd
     binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
-    args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
+    args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileSystem
     outfile: MFTECmd.csv
     input: mft
@@ -15,7 +15,7 @@ wiskers:
     github: https://github.com/omerbenamram/mft
   - name: usnjrnl-j
     binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
-    args: '-f {input} --csv {outfolder} --csvf {outfile} --vss --dedupe'
+    args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileSystem
     outfile: usnjrnl-j-file.csv
     input: j_file
@@ -239,25 +239,35 @@ wiskers:
     github: https://github.com/ANSSI-FR/bmc-tools
   - name: regripper_amcache
     binary: '{tool_path}\RegRipper3.0\rip.exe'
-    args: '-aT -r {input} 1> {outfolder}\{outfile}'
+    args: '-aT -r {input} 1>> {outfolder}\{outfile}'
     input: amcache
     outfolder: FileExecution
     outfile: regripper_amcache.psv
     github: https://www.kali.org/tools/regripper/
+  - name: regripper_user_test
+    binary: fd
+    args: -i "NTUSER\.DAT|USRCLASS\.DAT" {input} -x cmd /c "dir {}" > {outfolder}\{outfile}
+    outfolder: Registry
+    outfile: regripper_user_test.psv
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+    para: false
   - name: regripper_user
     binary: fd
-    args: '-i "NTUSER\.DAT|USRCLASS\.DAT" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}'
+    args: -i 'NTUSER\.DAT|USRCLASS\.DAT' {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry
     outfile: regripper_user.psv
     input: user_dir
     github: https://www.kali.org/tools/regripper/
+    para: false
   - name: regripper_system
     binary: fd
-    args: '-i "SAM|Security|Software|System" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}'
+    args: -i "SAM|Security|Software|System" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry
     outfile: regripper_system.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
+    para: false
 
 reporters:
   - name: polars timeline
