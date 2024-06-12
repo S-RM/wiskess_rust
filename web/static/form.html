@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Wiskess Whipped Form</title>
+    <link rel="stylesheet" href="web/static/chota.min.css">
+    <style>
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px 10px;
+      }
+
+      h1 {
+          margin: 10px 0;
+      }
+    </style>
+  </head>
+    <body>
+      <div class="container">
+        <h1>Wiskess Process App</h1>
+        <h3>Will hit handle_post_1</h3>
+        <form action=/post1 method=POST>
+            <label>
+                Case Name:
+                <input name="case_name">
+            </label>
+            <label>
+                Output Path:
+                <input name="out_path" required>
+            </label>
+            <label>
+                Start Date:
+                <input type="date" name="start_date" required>
+            </label>
+            </label>
+            <label>
+                End Date:
+                <input type="date" name="end_date" required>
+            </label>
+            <label>
+                Tool Path:
+                <input type="file" name="tool_path" required webkitdirectory directory multiple>
+            </label>
+            <label>
+                IOC File:
+                <input type="file" name="ioc_file" required accept=".txt">
+            </label>
+            <label>
+                Process Config File:
+                <input type="file" name="config" required accept=".yaml">
+            </label>
+            <label>
+                Artefacts Config File:
+                <input type="file" name="artefacts_config" required accept=".yaml">
+            </label>
+            <label>
+                Silent:
+                <input type="checkbox" name="silent">
+            </label>
+            <!-- <label>
+                Data Source List:
+                <input rows="8" cols="40" name="data_source_list" placeholder="Enter a comma separated list of the data you want to process, i.e. image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" max=250> 
+            </label> -->
+            <label>
+                Data Source:
+                <input name="data_source" placeholder="Enter the full path to the drive or folder containing the artefacts to process, i.e. X:\ or C:\data\to\process\" max=250 required> 
+            </label>
+            <button type=submit>Submit form</button>
+        </form>
+      </div>
+    </body>
+</html>
