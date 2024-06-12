@@ -8,7 +8,7 @@ use inquire::CustomType;
 use inquire::InquireError;
 
 use walkdir::WalkDir;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use chrono::NaiveDate;
 use glob::glob;
 
@@ -35,9 +35,9 @@ pub(crate) fn line_count(file_path: &Path) -> usize {
     return 0;
 }
 
-///  file_exists - will check if a file exists and ask the user if they want to
+///  file_exists_overwrite - will check if a file exists and ask the user if they want to
 /// overwrite the file. This function returns false if it exists.
-pub(crate) fn file_exists(file_path: &Path, silent: bool) -> bool {
+pub(crate) fn file_exists_overwrite(file_path: &Path, silent: bool) -> bool {
     let mut ret = true;
     let path_str = file_path.to_str().unwrap().to_string();
     if file_path.exists() && file_path.is_file() {
@@ -186,4 +186,16 @@ fn has_any_lines(filepath: &String) -> Result<String, io::Error> {
         Err(e) => Err(io::Error::new(io::ErrorKind::Other, format!("[!] Empty file: {filepath}. Error: {e}"))),
         Ok(_) => Ok("this is a file".to_string()),
     }
+}
+
+pub fn check_path(file_path: PathBuf) -> PathBuf {
+    let file_path = if !(file_path.exists() && file_path.is_file()) {
+        let path_str = inquire::Text::new(
+            format!("Unable to find file: {}. Please check the path and enter again.", file_path.display()).as_str()
+        ).prompt().unwrap();
+        Path::new(&path_str).to_path_buf()
+    } else {
+        file_path
+    };
+    file_path
 }

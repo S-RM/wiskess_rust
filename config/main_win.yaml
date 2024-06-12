@@ -246,14 +246,14 @@ wiskers:
     github: https://www.kali.org/tools/regripper/
   - name: regripper_user
     binary: fd
-    args: '-i "NTUSER\.DAT|USRCLASS\.DAT" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1> {outfolder}\{outfile}'
+    args: '-i "NTUSER\.DAT|USRCLASS\.DAT" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}'
     outfolder: Registry
     outfile: regripper_user.psv
     input: user_dir
     github: https://www.kali.org/tools/regripper/
   - name: regripper_system
     binary: fd
-    args: '-i "SAM|Security|Software|System" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1> {outfolder}\{outfile}'
+    args: '-i "SAM|Security|Software|System" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}'
     outfolder: Registry
     outfile: regripper_system.psv
     input: system_config

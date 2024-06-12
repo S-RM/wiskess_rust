@@ -34,7 +34,7 @@ pub fn valid_process<'a>(wiskers: &'a Vec<Wiskers>, main_args: &config::MainArgs
                 .join(&wisker.outfile);
             let outfile = format!("{}/{}", &wisker.outfolder, &wisker.outfile);
             // Check if the outfile exists, file_exists returns false if exists
-            let input_not_processed = file_ops::file_exists(
+            let input_not_processed = file_ops::file_exists_overwrite(
                 &check_outfile,
                 true
             );

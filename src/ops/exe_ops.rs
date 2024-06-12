@@ -16,7 +16,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 
     command.args(["-ExecutionPolicy", "Bypass"]);
     command.args(["-f", script]);
-    command.args(["-config", &args.config]);
+    command.args(["-config", &args.config.into_os_string().into_string().unwrap()]);
     command.args(["-data_source_list", &args.data_source_list]);
     command.args(["-local_storage", &args.local_storage]);
     command.args(["-start_date", &args.start_date]);
@@ -137,7 +137,7 @@ fn set_wisker(wisker: &config::Wiskers, data_paths: &HashMap<String, String>, fo
     if data_paths.contains_key(&wisker.input) {
         let wisker_arg = set_placeholder(&wisker.args, wisker, data_paths, folder_path, main_args);
         let wisker_binary = wisker.binary
-            .replace("{tool_path}", &main_args.tool_path);
+            .replace("{tool_path}", &main_args.tool_path.to_str().unwrap().to_string());
         let mut wisker_script = String::new();
         if wisker.script {
             wisker_script = set_placeholder(&wisker.script_posh, wisker, data_paths, folder_path, main_args);
@@ -166,7 +166,7 @@ fn set_placeholder(wisker_field: &String, wisker: &Wiskers, data_paths: &HashMap
         .replace("{end_date}", &main_args.end_date)
         .replace("{ioc_file}", &main_args.ioc_file)
         .replace("{out_path}", &main_args.out_path)
-        .replace("{tool_path}", &main_args.tool_path);
+        .replace("{tool_path}", &main_args.tool_path.to_str().unwrap().to_string());
     wisker_arg
 }
 
@@ -219,7 +219,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     // Check if the outfile already exists, ask user to overwrite
     let check_outfile = Path::new(&folder_path_str).join(&wisker.outfile);
     // let check_outfile = format!("{}/{}", &folder_path_str, &wisker.outfile);
-    let overwrite_file = file_ops::file_exists(
+    let overwrite_file = file_ops::file_exists_overwrite(
         &check_outfile,
         true
     );

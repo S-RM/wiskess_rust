@@ -2,6 +2,7 @@ pub mod config {
   use std::path::PathBuf;
 
 use indicatif::MultiProgress;
+use rocket::http::uri::Path;
 use serde::{Deserialize, Serialize};
 
   /// Top level structure of config file
@@ -73,7 +74,7 @@ use serde::{Deserialize, Serialize};
       pub out_path: String,
       pub start_date: String,
       pub end_date: String,
-      pub tool_path: String,
+      pub tool_path: PathBuf,
       pub ioc_file: String,
       pub silent: bool,
       pub out_log: PathBuf,
@@ -91,8 +92,8 @@ use serde::{Deserialize, Serialize};
   // Set struct for whipped args
   #[derive(Debug, Serialize, Deserialize, Clone)]
   pub struct WhippedArgs {
-    pub config: String,
-    pub artefacts_config: String,
+    pub config: PathBuf,
+    pub artefacts_config: PathBuf,
     pub data_source_list: String,
     pub local_storage: String,
     pub start_date: String,
