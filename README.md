@@ -95,9 +95,9 @@ This can be used to process Windows data sources stored on either an Azure or AW
 
 ## Example
 ```
-wiskess_rust.exe whipped --config ./config/win_all.yml
+wiskess_rust.exe whipped --config ./config/win_all.yml `
         --data-source-list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
-        --local-storage x:
+        --local-storage x: `
         --in-link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
         --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
         --start-date 2023-01-01 `
