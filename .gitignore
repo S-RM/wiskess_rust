@@ -22,7 +22,7 @@
 !/tools/MISPAPI.py
 !/tools/MISP.yaml
 !/tools/Executablelist.ps1
-!tools/jq_chainsaw_srum_filter.txt
+!tools/jq_filters/*
 /output_test
 /testing_wr
 /logs

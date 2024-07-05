@@ -90,17 +90,73 @@ wiskers:
     outfile: shellbags.csv
     input: user_dir
     github: https://github.com/williballenthin/shellbags
-  - name: regripper_user
+  - name: regripper_user_tln
     binary: fdfind
-    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -aT -r 1> {outfolder}/{outfile}'
-    outfolder: Registry
+    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
     outfile: regripper_user.psv
     input: user_dir
     github: https://www.kali.org/tools/regripper/
+  - name: regripper_sam_tln
+    binary: fdfind
+    args: '-i "SAM" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_sam.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security_tln
+    binary: fdfind
+    args: '-i "Security" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_security.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software_tln
+    binary: fdfind
+    args: '-i "Software" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_software.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system_tln
+    binary: fdfind
+    args: '-i "System" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_system.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_user
+    binary: fdfind
+    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_user.psv
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_sam
+    binary: fdfind
+    args: '-i "SAM" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_sam.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security
+    binary: fdfind
+    args: '-i "Security" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_security.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software
+    binary: fdfind
+    args: '-i "Software" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_software.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
   - name: regripper_system
     binary: fdfind
-    args: '-i "SAM|Security|Software|System" {input} -x regripper -aT -r 1> {outfolder}/{outfile}'
-    outfolder: Registry
+    args: '-i "System" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
     outfile: regripper_system.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/

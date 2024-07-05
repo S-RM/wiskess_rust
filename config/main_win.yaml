@@ -150,7 +150,7 @@ wiskers:
     web_download: https://www.nirsoft.net/utils/browsinghistoryview-x64.zip
   - name: consolehost_history
     binary: 'pwsh.exe'
-    args: '-d {input} --csv {outfolder}'
+    args: -c Write-Host "script was ran"
     outfolder: PSReadLine
     outfile: '*ConsoleHost_history.txt'
     input: consolehost_history
@@ -223,9 +223,16 @@ wiskers:
     outfolder: Network
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
-  - name: shellbags
+  - name: shellbags_usrclass
     binary: fd
-    args: '-i "USRCLASS\.DAT|NTUSER\.DAT" {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1> {outfolder}\{outfile}'
+    args: '-i USRCLASS\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
+    outfolder: UserActivity
+    outfile: shellbags.csv
+    input: user_dir
+    github: https://github.com/williballenthin/shellbags
+  - name: shellbags_ntuser
+    binary: fd
+    args: '-i NTUSER\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
     outfolder: UserActivity
     outfile: shellbags.csv
     input: user_dir
@@ -244,30 +251,76 @@ wiskers:
     outfolder: FileExecution
     outfile: regripper_amcache.psv
     github: https://www.kali.org/tools/regripper/
-  - name: regripper_user_test
+  - name: regripper_user_tln
     binary: fd
-    args: -i "NTUSER\.DAT|USRCLASS\.DAT" {input} -x cmd /c "dir {}" > {outfolder}\{outfile}
-    outfolder: Registry
-    outfile: regripper_user_test.psv
-    input: user_dir
-    github: https://www.kali.org/tools/regripper/
-    para: false
-  - name: regripper_user
-    binary: fd
-    args: -i 'NTUSER\.DAT|USRCLASS\.DAT' {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
-    outfolder: Registry
+    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r {} 2>nul >> {outfolder}\{outfile}
+    outfolder: Registry\regripper_tln
     outfile: regripper_user.psv
     input: user_dir
     github: https://www.kali.org/tools/regripper/
-    para: false
-  - name: regripper_system
+  - name: regripper_sam_tln
     binary: fd
-    args: -i "SAM|Security|Software|System" {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
-    outfolder: Registry
+    args: -i SAM {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper_tln
+    outfile: regripper_sam.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security_tln
+    binary: fd
+    args: -i Security {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper_tln
+    outfile: regripper_security.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software_tln
+    binary: fd
+    args: -i Software {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper_tln
+    outfile: regripper_software.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system_tln
+    binary: fd
+    args: -i System {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper_tln
     outfile: regripper_system.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
-    para: false
+  - name: regripper_user
+    binary: fd
+    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r {} 2>nul >> {outfolder}\{outfile}
+    outfolder: Registry\regripper
+    outfile: regripper_user.txt
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_sam
+    binary: fd
+    args: -i SAM {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper
+    outfile: regripper_sam.txt
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security
+    binary: fd
+    args: -i Security {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper
+    outfile: regripper_security.txt
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software
+    binary: fd
+    args: -i Software {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper
+    outfile: regripper_software.txt
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system
+    binary: fd
+    args: -i System {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    outfolder: Registry\regripper
+    outfile: regripper_system.txt
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
 
 reporters:
   - name: polars timeline
@@ -289,6 +342,14 @@ reporters:
     outfile: IOCs_summary.json
     input: none
     github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_summary_csv
+    binary: jq
+    args: -r -f {tool_path}\jq_filters\jq_ioc_summary_filter.txt {outfolder}\IOCs_summary.json > {outfolder}\{outfile}
+    outfolder: IOC_Findings
+    outfile: IOCs_summary.csv
+    input: none
+    github: https://github.com/jqlang/jq.git
+    para: false
 
 enrichers:
   - name: polars enrich
@@ -339,7 +400,7 @@ enrichers:
     input: pagefile
   - name: jq_chainsaw_srum
     binary: jq
-    args: -r -f {tool_path}\jq_chainsaw_srum_filter.txt {out_path}\Network\chainsaw_srum.json >> {outfolder}\{outfile}
+    args: -r -f {tool_path}\jq_filters\jq_chainsaw_srum_filter.txt {out_path}\Network\chainsaw_srum.json >> {outfolder}\{outfile}
     outfolder: Network
     outfile: chainsaw_srum.csv
     input: base
@@ -349,13 +410,13 @@ enrichers:
 intense:
   - name: thor_analysis
     binary: '{tool_path}/thor-lite/thor64-lite.exe'
-    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {out_path} -e {outfolder}'
+    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
     outfolder: IOC_Findings\thor_analysis
     outfile: '*.txt'
     input: none
   - name: thor_datasource
     binary: '{tool_path}/thor-lite/thor64-lite.exe'
-    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {input} -e {outfolder}'
+    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
     outfolder: IOC_Findings\thor_datasource
     outfile: '*.txt'
     input: base
