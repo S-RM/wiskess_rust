@@ -1,0 +1,1 @@
+{IOC_match: .data.submatches[]?.match.text, lines: .data.lines.text, data: .data.lines.bytes, path: .data.path.text} | join(",")
