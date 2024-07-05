@@ -348,7 +348,7 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
 
         if ($update -eq $True) {
             Write-Host "---------------- Update Data ----------------"
-            if ($uploaded -eq $False) {
+            if ($uploaded -eq $True) {
                 # Download the wiskess folder
                 Download-Cloud $out_URL "$local_storage\"
             }
