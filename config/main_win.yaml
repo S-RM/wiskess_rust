@@ -392,6 +392,19 @@ enrichers:
     outfile: '*.log'
     input: base
     para: false
+  # - name: thor_analysis
+  #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
+  #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
+  #   outfolder: IOC_Findings\thor_analysis
+  #   outfile: '*.txt'
+  #   input: none
+  # - name: thor_datasource
+  #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
+  #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
+  #   outfolder: IOC_Findings\thor_datasource
+  #   outfile: '*.txt'
+  #   input: base
+  #   para: false
   - name: Executablelist 
     binary: 'pwsh.exe'
     args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'
@@ -406,19 +419,3 @@ enrichers:
     input: base
     script: true
     script_posh: '"TimeStamp,UserName,UserSID,UserId,AppName,AddId,AutoIncId,BackgroundBytesRead,BackgroundBytesWritten,BackgroundContextSwitches,BackgroundCycleTime,BackgroundNumReadOperations,BackgroundNumWriteOperations,BackgroundNumberOfFlushes,FaceTime,ForegroundBytesRead,ForegroundBytesWritten,ForegroundContextSwitches,ForegroundCycleTime,ForegroundNumReadOperations,ForegroundNumWriteOperations,ForegroundNumberOfFlushes,Table,TableName" > {outfolder}\{outfile}'
-
-intense:
-  - name: thor_analysis
-    binary: '{tool_path}/thor-lite/thor64-lite.exe'
-    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
-    outfolder: IOC_Findings\thor_analysis
-    outfile: '*.txt'
-    input: none
-  - name: thor_datasource
-    binary: '{tool_path}/thor-lite/thor64-lite.exe'
-    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
-    outfolder: IOC_Findings\thor_datasource
-    outfile: '*.txt'
-    input: base
-    para: false
-
