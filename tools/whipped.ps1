@@ -106,6 +106,9 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
             $drive_mount_start = $(($osf_mount -match 'Created device\s') -replace 'Created device\s*\d+:\s*(\w):.*','$1')
         }
         Write-Host "[ ] Mounted image to drive: $drive_mount_start"
+        if ($drive_mount_start -ne "") {
+            $free_drives = $drive_mount_start
+        }
     }
 
     $done = $false
@@ -351,6 +354,10 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
             if ($uploaded -eq $True) {
                 # Download the wiskess folder
                 Download-Cloud $out_URL "$local_storage\"
+                # If there's a artefacts/collection.zip, expand it
+                if ($(Test-Path -PathType Leaf "$local_storage\$($wiskess_folder)\Artefacts\collection.7z")) {
+                    7z x "$local_storage\$($wiskess_folder)\Artefacts\collection.7z" -o"$local_storage\$($wiskess_folder)\Artefacts"
+                }
             }
             if ($(Test-Path -Path "$local_storage\$($wiskess_folder)")) {
                 # Remove the Artefacts folder
@@ -387,6 +394,10 @@ $data_source_list.Split($split_char).Trim() | ForEach-Object {
         }
 
         Write-Host "---------------- Upload Data ----------------"
+        # Archive the Artefacts folder, if exists
+        if ($(Test-Path -PathType Container "$local_storage\$($wiskess_folder)\Artefacts\")) {
+            7z a "$local_storage\$($wiskess_folder)\Artefacts\collection.7z" "$local_storage\$($wiskess_folder)\Artefacts\*" -sdel
+        }
         if ($(Test-Path -PathType Container "$local_storage\$($wiskess_folder)")) {
             Upload-Cloud "$local_storage\$($wiskess_folder)" "$out_link" "$wiskess_folder"
         }

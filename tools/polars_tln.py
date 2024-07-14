@@ -53,7 +53,7 @@ def get_hostname(dict_tln):
           host = host.collect()[0].item()
           return host
         except Exception as e:
-          print(f'Ran into an error when trying to get the hostname from the registry.')
+          print('Ran into an error when trying to get the hostname from the registry.')
           print('Error was:', e)
       else:
         print(f"Unable to get hostname from registry file: {file}")

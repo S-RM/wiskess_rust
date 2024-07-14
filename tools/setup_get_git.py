@@ -52,7 +52,7 @@ def make_symlink(target_dir: str, program: str, script_os: str):
     file_type_regex = re.compile('x-(?:dos-executable|dosexec|msdownload)')
     file_mime_regex = re.compile('PE32\+ executable \(console\) x86-64, for MS Windows')
   elif script_os == 'linux':
-    file_type_regex = re.compile('x(?:-pie|)-executable')
+    file_type_regex = re.compile('x(?:-pie|)-executable|application/x-sharedlib')
     file_mime_regex = re.compile('ELF 64-bit LSB shared object, x86-64')
   else:
     file_type_regex = re.compile('(?:application|x-.*-exec)')

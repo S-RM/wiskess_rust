@@ -305,7 +305,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
          "https://github.com/EricZimmerman/Get-ZimmermanTools.git",
          "https://github.com/williballenthin/python-registry.git",
          "https://github.com/williballenthin/shellbags",
-         "https://github.com/keydet89/RegRipper3.0.git"
+         "https://github.com/keydet89/RegRipper3.0.git",
+         "https://github.com/keydet89/RegRipper4.0.git"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
