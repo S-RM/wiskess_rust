@@ -189,7 +189,7 @@ fn has_any_lines(filepath: &String) -> Result<String, io::Error> {
 }
 
 pub fn check_path(file_path: PathBuf) -> PathBuf {
-    let file_path = if !(file_path.exists() && file_path.is_file()) {
+    let file_path = if !file_path.exists() && !file_path.is_file() {
         let path_str = inquire::Text::new(
             format!("Unable to find file: {}. Please check the path and enter again.", file_path.display()).as_str()
         ).prompt().unwrap();

@@ -2,8 +2,8 @@ pub mod config {
   use std::path::PathBuf;
 
 use indicatif::MultiProgress;
-use rocket::http::uri::Path;
 use serde::{Deserialize, Serialize};
+use struct_iterable::Iterable;
 
   /// Top level structure of config file
   #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -69,7 +69,7 @@ use serde::{Deserialize, Serialize};
   }
 
   // Set struct for interal args
-  #[derive(Debug, Clone)]
+  #[derive(Debug, Clone, Iterable)]
   pub struct MainArgs {
       pub out_path: String,
       pub start_date: String,
@@ -90,7 +90,7 @@ use serde::{Deserialize, Serialize};
   }
 
   // Set struct for whipped args
-  #[derive(Debug, Serialize, Deserialize, Clone)]
+  #[derive(Debug, Serialize, Deserialize, Clone, Iterable)]
   pub struct WhippedArgs {
     pub config: PathBuf,
     pub artefacts_config: PathBuf,

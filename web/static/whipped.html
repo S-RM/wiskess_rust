@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <title>WISKESS - Whipped Form</title>
+  </head>
+  <body>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+        <a class="navbar-brand" href="#">WISKESS</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" href="/">Home</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/wiskess_form">WISKESS</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" aria-current="page" href="#">Whipped by WISKESS</a>
+            </li>
+            </ul>
+        </div>
+        </div>
+    </nav>
+      <div class="container">
+        <h1>Wiskess Process App</h1>
+        <h3>Whipped by Wiskess: Process a list of collections or images</h3>
+        <form action=/whipped_sent method=POST enctype="multipart/form-data">
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="case_name">Case Name:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="case_name" placeholder="Enter case name" name="case_name">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="local_storage">Local Storage Path:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="local_storage" placeholder="X:\" name="local_storage" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="in_link">In Link:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="in_link" placeholder="link to Azure Storage or AWS S3" name="in_link" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="out_link">Out Link:</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="out_link" placeholder="link to Azure Storage or AWS S3" name="out_link" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="start_date">Start Date:</label>
+            <div class="col-sm-10">
+              <input type="date" class="form-control" id="start_date" name="start_date" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="end_date">End Date:</label>
+            <div class="col-sm-10">
+              <input type="date" class="form-control" id="end_date" name="end_date" required>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="ioc_file">IOC File:</label>
+            <div class="col-sm-10">
+              <input type="file" class="form-control" id="ioc_file" name="ioc_file" required accept=".txt">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="config">Process Config File:</label>
+            <div class="col-sm-10">
+              <select name="config" class="form-select" id="config" >
+                  <option value="main_win.yaml" selected>main_win.yaml</option>
+                  <option value="win_art_linux.yaml">win_art_linux.yaml</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="artefacts_config">Artefacts Config File:</label>
+            <div class="col-sm-10">
+              <select name="artefacts_config" class="form-select" id="artefacts_config" >
+                  <option value="artefacts_linux.yaml">artefacts_linux.yaml</option>
+                  <option value="artefacts.yaml" selected>artefacts.yaml</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="update">Update:</label>
+            <div class="col-sm-10">
+              <select name="update" class="form-select" id="update" >
+                  <option value="yes">yes</option>
+                  <option value="no" selected>no</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="keep_evidence">Keep Evidence:</label>
+            <div class="col-sm-10">
+              <select name="keep_evidence" class="form-select" id="keep_evidence" >
+                  <option value="yes">yes</option>
+                  <option value="no" selected>no</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <label class="col-form-label col-sm-2" for="data_source_list">Data Source List:</label>
+            <div class="col-sm-10">
+              <textarea class="form-control" id="data_source_list" name="data_source_list" placeholder="Enter a comma separated list of the data you want to process, i.e. image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" required></textarea>
+            </div>
+          </div>
+          <div class="row mb-3">        
+            <div class="col-sm-offset-2 col-sm-10">
+            <input class="btn btn-primary" type="submit" value="Submit">
+            </div>
+          </div>
+        </form>
+      </div>
+    </body>
+</html>

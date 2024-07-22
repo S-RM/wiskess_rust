@@ -43,6 +43,7 @@ enum Commands {
         #[arg(short, long)]
         verbose: bool
     },
+    /// launch the webui
     Gui {},
     /// whipped pipeline process commands
     Whipped {
@@ -157,7 +158,10 @@ fn main() {
             scripts::run_setup(&tool_path, github_token, verbose);
         },
         Commands::Gui {  } => {
-            web::main();
+            match web::main(tool_path) {
+                Ok(_) => println!("GUI closed"),
+                Err(e) => println!("[!] Something went wrong. Error: {e}"),
+            };
         },
         Commands::Whipped { 
             config,
