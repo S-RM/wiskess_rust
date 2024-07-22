@@ -1,6 +1,6 @@
 [package]
 name = "wiskess_rust"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 author = "Gavin Hull"
 about = "Automated Windows Disk Processing"
