@@ -20,26 +20,42 @@ def get_reg_val(find_value, dict_tln):
             if re.search(dict_tln['registry']['regex_file'], file):
                 try:
                     df = pl.scan_csv(os.path.join(dict_tln['registry']['file'],file))
-                    host = df.select(
-                        ["ValueName","ValueData"]
-                        ).filter(
+                    value = df.filter(
                         pl.col("ValueName") == find_value
                         ).select(
                         pl.col("ValueData")
                         )
-                    host = host.collect()[0].item()
-                    return host
+                    value = value.collect()
+                    value = pl.concat(value).str.concat(", ").item()
+                    return value
                 except Exception as e:
-                    print(f'Ran into an error when trying to get the hostname from the registry.')
+                    print(f'Ran into an error when trying to get the value from the registry.')
                     print('Error was:', e) 
     return 'Unknown'
 
 
+def get_security_retention(channel, art_type, dict_tln):
+    if os.path.exists(dict_tln[art_type]['file']):
+        # get the timestamp from the earliest event in the Security Channel
+        try:
+            df = pl.scan_csv(os.path.join(dict_tln[art_type]['file']))
+            security_events = df.filter(
+                pl.col('Channel') == channel
+            ).select(
+                dict_tln[art_type]['times']
+            ).sort(
+                dict_tln[art_type]['times']
+            )
+            security_retention = f"From: {security_events.first().collect().item()} to: {security_events.last().collect().item()}"
+            return security_retention
+        except Exception as e:
+            print(f'Ran into an error when trying to get the earliest EVTX event from the Security channel.')
+            print('Error was:', e)
+    return '',''
+            
 
 def get_hostname(dict_tln):
     host_reg = get_reg_val("ComputerName", dict_tln)
-    #   else:
-    #     print(f"Unable to get hostname from registry file: {file}")
 
     # hostname not found in registry
     if os.path.exists(dict_tln['hayabusa']['file']):
@@ -47,11 +63,9 @@ def get_hostname(dict_tln):
         print("Getting hostname from hayabusa last line ", dict_tln['hayabusa']['file'])
         try:
             df = pl.scan_csv(os.path.join(dict_tln['hayabusa']['file']))
-            host_evt = df.select(
-                ["Channel","Computer"]
-            ).filter(
+            host_evt = df.filter(
                 (pl.col("Channel") == "Sec") &
-                (pl.col("EventID") == "4624")
+                (pl.col("EventID") == 4624)
             ).select(
                 pl.col("Computer")
             )
@@ -81,17 +95,30 @@ def get_hostinfo(out_filepath, out_file):
         'times': ['datetime'],    
         'fmt_time': '%FT%T%.f'    
         },
-        # # TODO: FileExecution
-        # # TODO: Network
+        'event-logs': {
+        'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
+        'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
+        'msg': ['EventId','Level','Provider','Channel','Computer','UserId','MapDescription','UserName','RemoteHost','Payload'],
+        'times': ['TimeCreated'],
+        'fmt_time': '%F %T%.f'
+        },
     }
 
     host_reg, host_evt = get_hostname(dict_tln)
+    
+    security_retention = get_security_retention('Security', 'event-logs', dict_tln)
+    if security_retention == "":
+        security_retention = get_security_retention('Sec', 'hayabusa', dict_tln)
+    
     host_info = {
         'Hostname Registry': host_reg,
         'Hostname Event Logs': host_evt,
-        'Product Name': get_reg_val("ProductName", dict_tln),
+        'Windows Version (Product Name)': get_reg_val("ProductName", dict_tln),
+        'Windows Version (Display Version)': get_reg_val("DisplayVersion", dict_tln),
         'Build Lab': get_reg_val("BuildLab", dict_tln),
         'Timezone': get_reg_val("TimeZoneKeyName", dict_tln),
+        'ActiveTimeBias': get_reg_val("ActiveTimeBias", dict_tln),
+        'Bias': get_reg_val("Bias", dict_tln),
         'IP Address': get_reg_val("IPAddress", dict_tln),
         'DHCP IP Address': get_reg_val("DhcpIPAddress", dict_tln),
         'DHCP Default Gateway': get_reg_val("DhcpDefaultGateway", dict_tln),
@@ -99,6 +126,7 @@ def get_hostinfo(out_filepath, out_file):
         'Install Date': get_reg_val("InstallDate", dict_tln),
         'Shutdown Time': get_reg_val("ShutdownTime", dict_tln),
         'Last Logged On User': get_reg_val("LastLoggedOnUser", dict_tln),
+        'Security Log Retention': security_retention
     }
 
     out_file = os.path.join(f"{out_filepath}/{out_file}")
