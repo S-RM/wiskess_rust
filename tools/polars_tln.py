@@ -198,147 +198,147 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['datetime'],
       'fmt_time': '%FT%T%.f'
     },
-    # 'amcache': {
-    #   'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
-    #   'file': os.path.join(*[f'{out_filepath}','FileExecution']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','amcache.csv']),
-    #   'msg': ['SHA1','FullPath','FileExtension','ProductName'],
-    #   'times': ['FileKeyLastWriteTimestamp','FileIDLastWriteTimestamp'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'prefetch': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileExecution','prefetch_Timeline.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','prefetch.csv']),
-    #   'msg': ['ExecutableName'],
-    #   'times': ['RunTime'],
-    #   'fmt_time': '%F %T%.f'
-    # },
-    # 'appcompatcache': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileExecution','appcompatcache.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','appcompatcache.csv']),
-    #   'msg': ['ControlSet','CacheEntryPosition','Path','Executed','Duplicate','SourceFile'],
-    #   'times': ['LastModifiedTimeUTC'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'sccm_execution': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileExecution','SCCM_RecentlyUsedApplication.psv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','sccm_recentlyused.csv']),
-    #   'msg': ['FolderPath','ExplorerFileName','LastUserName','LaunchCount','FileDescription','CompanyName','ProductName'],
-    #   'times': ['LastUsedTime'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'network_sum': {
-    #   'regex_file': r'(?:SumECmd_DETAIL_ClientsDetailed_Output)\.csv$',
-    #   'file': os.path.join(*[f'{out_filepath}','Network']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','network.csv']),
-    #   'msg': ['Count','DayNumber','RoleGuid','RoleDescription','AuthenticatedUserName','TotalAccesses','IpAddress','ClientName','TenantId','SourceFile'],
-    #   'times': ['InsertDate','LastAccess'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'browser-hist_us': {
-    #   # for browsing history processed on machines with timestamps in UK format
-    #   'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
-    #   'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
-    #   'times': ['Visit Time'],
-    #   'fmt_time': '%d/%m/%Y %T'
-    # },
-    # 'browser-hist_uk': { 
-    #   # for browsing history processed on machines with timestamps in US format
-    #   'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
-    #   'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
-    #   'times': ['Visit Time'],
-    #   'fmt_time': '%m/%d/%Y %T'
-    # },
-    # 'shellbags': {
-    #   'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
-    #   'file': os.path.join(*[f'{out_filepath}','UserActivity']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','shellbags.csv']),
-    #   'msg': ['AbsolutePath','ShellType','Value'],
-    #   'times': ['CreatedOn','ModifiedOn','AccessedOn','LastWriteTime','FirstInteracted','LastInteracted'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'jump-lists': {
-    #   'regex_file': r'(?:AutomaticDestinations|CustomDestinations)\.csv$',
-    #   'file': os.path.join(*[f'{out_filepath}','UserActivity']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','jump-lists.csv']),
-    #   'msg': ['SourceFile','AppIdDescription','MachineID','LocalPath','CommonPath','TargetIDAbsolutePath','FileSize','Arguments'],
-    #   'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'lnk-files': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem','lnk-files.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','lnk-files.csv']),
-    #   'msg': ['SourceFile','FileSize','RelativePath','WorkingDirectory','LocalPath','NetworkPath','CommonPath','Arguments','MachineID'],
-    #   'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'recycle-bin': {
-    #   'regex_file': r'RBCmd_Output\.csv$',
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','recycle-bin.csv']),
-    #   'msg': ['FileName','FileSize'],
-    #   'times': ['DeletedOn'],
-    #   'fmt_time': '%F %T'
-    # },
-    # 'mft':{
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem','MFTECmd.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','MFTECmd.csv']),
-    #   'msg':['ParentPath','FileName','Extension','FileSize'],
-    #   'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
-    #   'fmt_time': '%F %T%.f'
-    # },
-    # 'event-logs': {
-    #   'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
-    #   'msg': ['EventId','Level','Provider','Channel','Computer','UserId','MapDescription','UserName','RemoteHost','Payload'],
-    #   'times': ['TimeCreated'],
-    #   'fmt_time': '%F %T%.f'
-    # },
-    # 'usnjrnl-j':{
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl-j-file.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl-j-file.csv']),
-    #   'msg': ['Name','Extension','EntryNumber','ParentEntryNumber','ParentPath','UpdateReasons','FileAttributes'],
-    #   'times': ['UpdateTimestamp'],
-    #   'fmt_time': '%F %T%.f'
-    # },
-    # 'rusty_usnjrnl': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl_j.json']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl_j_rusty.csv']),
-    #   'msg': ['file_name','full_name','file_name_length','reason','file_attributes'],
-    #   'times': ['timestamp'],
-    #   'fmt_time': '%FT%T%.f'
-    # },
-    # 'mft_dump': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileSystem','mft.csv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','mft_dump.csv']),
-    #   'msg': ['FullPath','TotalEntrySize','FileSize','StandardInfoFlags','FileNameFlags','IsADirectory','IsDeleted','HasAlternateDataStreams'],
-    #   'times': ['StandardInfoLastModified','StandardInfoLastAccess','StandardInfoCreated','FileNameLastModified','FileNameLastAccess','FileNameCreated'],
-    #   'fmt_time': '%FT%T%.f'
-    # },
-    # 'hindsight': {
-    #   'file': os.path.join(*[f'{out_filepath}','Network','hindsight.jsonl']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','hindsight.csv']),
-    #   'msg': ['url','title','timestamp_desc','message','value','interpretation','transition_friendly','data_type','visit_count','typed_count','source_long','profile'],
-    #   'times': ['datetime'],
-    #   'fmt_time': '%FT%T%.f'
-    # },
-    # 'regripper_exe': {
-    #   'file': os.path.join(*[f'{out_filepath}','FileExecution','regripper_amcache.psv']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','regripper_amcache.csv']),
-    #   'msg': ['source','system','user','description'],
-    #   'times': ['time'],
-    #   'fmt_time': '%s'
-    # },
-    # 'regripper_reg': {
-    #   'regex_file': r'^regripper.*\.psv$',
-    #   'file': os.path.join(*[f'{out_filepath}','Registry','regripper_tln']),
-    #   'out': os.path.join(*[f'{out_filepath}','Timeline','regripper.csv']),
-    #   'msg': ['source','system','user','description'],
-    #   'times': ['time'],
-    #   'fmt_time': '%s'
-    # },
+    'amcache': {
+      'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
+      'file': os.path.join(*[f'{out_filepath}','FileExecution']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','amcache.csv']),
+      'msg': ['SHA1','FullPath','FileExtension','ProductName'],
+      'times': ['FileKeyLastWriteTimestamp','FileIDLastWriteTimestamp'],
+      'fmt_time': '%F %T'
+    },
+    'prefetch': {
+      'file': os.path.join(*[f'{out_filepath}','FileExecution','prefetch_Timeline.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','prefetch.csv']),
+      'msg': ['ExecutableName'],
+      'times': ['RunTime'],
+      'fmt_time': '%F %T%.f'
+    },
+    'appcompatcache': {
+      'file': os.path.join(*[f'{out_filepath}','FileExecution','appcompatcache.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','appcompatcache.csv']),
+      'msg': ['ControlSet','CacheEntryPosition','Path','Executed','Duplicate','SourceFile'],
+      'times': ['LastModifiedTimeUTC'],
+      'fmt_time': '%F %T'
+    },
+    'sccm_execution': {
+      'file': os.path.join(*[f'{out_filepath}','FileExecution','SCCM_RecentlyUsedApplication.psv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','sccm_recentlyused.csv']),
+      'msg': ['FolderPath','ExplorerFileName','LastUserName','LaunchCount','FileDescription','CompanyName','ProductName'],
+      'times': ['LastUsedTime'],
+      'fmt_time': '%F %T'
+    },
+    'network_sum': {
+      'regex_file': r'(?:SumECmd_DETAIL_ClientsDetailed_Output)\.csv$',
+      'file': os.path.join(*[f'{out_filepath}','Network']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','network.csv']),
+      'msg': ['Count','DayNumber','RoleGuid','RoleDescription','AuthenticatedUserName','TotalAccesses','IpAddress','ClientName','TenantId','SourceFile'],
+      'times': ['InsertDate','LastAccess'],
+      'fmt_time': '%F %T'
+    },
+    'browser-hist_us': {
+      # for browsing history processed on machines with timestamps in UK format
+      'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
+      'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
+      'times': ['Visit Time'],
+      'fmt_time': '%d/%m/%Y %T'
+    },
+    'browser-hist_uk': { 
+      # for browsing history processed on machines with timestamps in US format
+      'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
+      'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
+      'times': ['Visit Time'],
+      'fmt_time': '%m/%d/%Y %T'
+    },
+    'shellbags': {
+      'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
+      'file': os.path.join(*[f'{out_filepath}','UserActivity']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','shellbags.csv']),
+      'msg': ['AbsolutePath','ShellType','Value'],
+      'times': ['CreatedOn','ModifiedOn','AccessedOn','LastWriteTime','FirstInteracted','LastInteracted'],
+      'fmt_time': '%F %T'
+    },
+    'jump-lists': {
+      'regex_file': r'(?:AutomaticDestinations|CustomDestinations)\.csv$',
+      'file': os.path.join(*[f'{out_filepath}','UserActivity']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','jump-lists.csv']),
+      'msg': ['SourceFile','AppIdDescription','MachineID','LocalPath','CommonPath','TargetIDAbsolutePath','FileSize','Arguments'],
+      'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
+      'fmt_time': '%F %T'
+    },
+    'lnk-files': {
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','lnk-files.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','lnk-files.csv']),
+      'msg': ['SourceFile','FileSize','RelativePath','WorkingDirectory','LocalPath','NetworkPath','CommonPath','Arguments','MachineID'],
+      'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
+      'fmt_time': '%F %T'
+    },
+    'recycle-bin': {
+      'regex_file': r'RBCmd_Output\.csv$',
+      'file': os.path.join(*[f'{out_filepath}','FileSystem']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','recycle-bin.csv']),
+      'msg': ['FileName','FileSize'],
+      'times': ['DeletedOn'],
+      'fmt_time': '%F %T'
+    },
+    'mft':{
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','MFTECmd.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','MFTECmd.csv']),
+      'msg':['ParentPath','FileName','Extension','FileSize'],
+      'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
+      'fmt_time': '%F %T%.f'
+    },
+    'event-logs': {
+      'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
+      'msg': ['EventId','Level','Provider','Channel','Computer','UserId','MapDescription','UserName','RemoteHost','Payload'],
+      'times': ['TimeCreated'],
+      'fmt_time': '%F %T%.f'
+    },
+    'usnjrnl-j':{
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl-j-file.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl-j-file.csv']),
+      'msg': ['Name','Extension','EntryNumber','ParentEntryNumber','ParentPath','UpdateReasons','FileAttributes'],
+      'times': ['UpdateTimestamp'],
+      'fmt_time': '%F %T%.f'
+    },
+    'rusty_usnjrnl': {
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl_j.json']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl_j_rusty.csv']),
+      'msg': ['file_name','full_name','file_name_length','reason','file_attributes'],
+      'times': ['timestamp'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'mft_dump': {
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','mft.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','mft_dump.csv']),
+      'msg': ['FullPath','TotalEntrySize','FileSize','StandardInfoFlags','FileNameFlags','IsADirectory','IsDeleted','HasAlternateDataStreams'],
+      'times': ['StandardInfoLastModified','StandardInfoLastAccess','StandardInfoCreated','FileNameLastModified','FileNameLastAccess','FileNameCreated'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'hindsight': {
+      'file': os.path.join(*[f'{out_filepath}','Network','hindsight.jsonl']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','hindsight.csv']),
+      'msg': ['url','title','timestamp_desc','message','value','interpretation','transition_friendly','data_type','visit_count','typed_count','source_long','profile'],
+      'times': ['datetime'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'regripper_exe': {
+      'file': os.path.join(*[f'{out_filepath}','FileExecution','regripper_amcache.psv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','regripper_amcache.csv']),
+      'msg': ['source','system','user','description'],
+      'times': ['time'],
+      'fmt_time': '%s'
+    },
+    'regripper_reg': {
+      'regex_file': r'^regripper.*\.psv$',
+      'file': os.path.join(*[f'{out_filepath}','Registry','regripper_tln']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','regripper.csv']),
+      'msg': ['source','system','user','description'],
+      'times': ['time'],
+      'fmt_time': '%s'
+    },
     'srum_net_usages': {
       'regex_file': r'_SrumECmd_NetworkUsages_Output\.csv$',
       'file': os.path.join(*[f'{out_filepath}','Network']),
