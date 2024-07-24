@@ -196,7 +196,10 @@ pub mod web {
             multi_pb: MultiProgress::new()
         };
 
-        let items = struct_to_vec_main(&args);
+        let mut items = struct_to_vec_main(&args);
+        items.push(format!("Process config: {}", config.display()));
+        items.push(format!("Artefacts config: {}", artefacts_config.display()));
+        items.push(format!("Data source: {}", params.data_source.to_string()));
 
         let msg = format!("You have submitted the following to be processed: {}.", 
             items.join("; ")
@@ -240,6 +243,8 @@ pub mod web {
         let ioc_path = save_file(&state, &params.case_name, params.ioc_file);
 
         let ioc_filename = ioc_path.into_os_string().into_string().unwrap();
+
+        // pre-process the data_source_list, splitting by new lines and spaces
 
         // put the args into a whipped structure
         let args = config::WhippedArgs {

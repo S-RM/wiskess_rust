@@ -44,9 +44,7 @@ def get_hostname(dict_tln):
       if re.search(dict_tln['registry']['regex_file'], file):
         try:
           df = pl.scan_csv(os.path.join(dict_tln['registry']['file'],file))
-          host = df.select(
-            ["ValueName","ValueData"]
-            ).filter(
+          host = df.filter(
               pl.col("ValueName") == "ComputerName"
             ).select(
               pl.col("ValueData")
@@ -64,8 +62,11 @@ def get_hostname(dict_tln):
     print("Getting hostname from hayabusa last line ", dict_tln['hayabusa']['file'])
     try:
       df = pl.scan_csv(os.path.join(dict_tln['hayabusa']['file']))
-      host = df.select(
-        ["Computer"]
+      host = df.filter(
+          (pl.col("Channel") == "Sec") &
+          (pl.col("EventID") == 4624)
+      ).select(
+          pl.col("Computer")
       )
       host = host.tail(1).collect().item().split('.')[0]
     except Exception as e:
@@ -355,9 +356,6 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['Timestamp'],
       'fmt_time': '%F %X'
     }
-
-    # # TODO: FileExecution
-    # # TODO: Network
   }
 
   host = get_hostname(dict_tln)

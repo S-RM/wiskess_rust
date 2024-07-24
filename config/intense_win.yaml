@@ -34,6 +34,13 @@ wiskers:
     outfile: lnk-files.csv
     input: user_dir
     github: https://github.com/EricZimmerman/LECmd.git
+  - name: evtx_dump
+    binary: 'fd'
+    args: '.* -e evtx -p {input} -x {tool_path}\evtx\evtx.exe -o jsonl > {outfolder}\{outfile}'
+    outfolder: EventLogs
+    outfile: evtx_dump.json
+    input: winevt
+    github: https://github.com/omerbenamram/evtx.git
   - name: EvtxECmd
     binary: '{tool_path}\Get-ZimmermanTools\net6\EvtxECmd\EvtxECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile}'
@@ -48,6 +55,14 @@ wiskers:
     outfile: hayabusa.csv
     input: winevt
     github: 
+    para: false
+  - name: chainsaw_evtx
+    binary: '{tool_path}\chainsaw\chainsaw.exe'
+    args: 'hunt {input} -s {tool_path}\chainsaw\chainsaw\sigma -r {tool_path}\chainsaw\chainsaw\rules --mapping {tool_path}\chainsaw\chainsaw\mappings\sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
+    outfolder: EventLogs\chainsaw
+    outfile: sigma.csv
+    input: winevt
+    github: https://github.com/WithSecureLabs/chainsaw.git
     para: false
   - name: chainsaw_shim
     binary: '{tool_path}\chainsaw\chainsaw.exe'
@@ -200,6 +215,21 @@ wiskers:
     outfile: '*Destinations.csv'
     input: user_dir
     github:
+  - name: KStrike
+    binary: py
+    args: '{tool_path}/KStrike/KStrike.py {input}\Current.mdb > {outfolder}\{outfile}'
+    input: sum
+    valid_path: '{root}\Windows\System32\LogFiles\Sum\Current.mdb'
+    outfolder: Network
+    outfile: UAL_Kstrike.psv
+    github: https://github.com/brimorlabs/KStrike
+  - name: shellbags_usrclass
+    binary: fd
+    args: '-i USRCLASS\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
+    outfolder: UserActivity
+    outfile: shellbags.csv
+    input: user_dir
+    github: https://github.com/williballenthin/shellbags
   - name: shellbags_ntuser
     binary: fd
     args: '-i NTUSER\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
@@ -207,6 +237,13 @@ wiskers:
     outfile: shellbags.csv
     input: user_dir
     github: https://github.com/williballenthin/shellbags
+  - name: rdp_bitmap
+    binary: py
+    args: '{tool_path}\bmc_run.py {outfolder} {input}'
+    outfolder: Network
+    outfile: '*-bitmap/*.bmp'
+    input: rdp_bitmap
+    github: https://github.com/ANSSI-FR/bmc-tools
   - name: regripper_amcache
     binary: '{tool_path}\RegRipper3.0\rip.exe'
     args: '-aT -r {input} 1>> {outfolder}\{outfile}'
@@ -317,12 +354,25 @@ reporters:
     script_posh: '"IOC_match,lines,data,path" > {outfolder}\{outfile}'
 
 enrichers:
+  - name: polars enrich
+    binary: py
+    args: '{tool_path}/polars_enrich.py {out_path} {outfile} {tool_path}'
+    outfolder: IOC_Findings
+    outfile: enriched_indicators.xlsx
+    input: none
   - name: iocs_analysis
     binary: rg.exe
     args: '--hidden --trim -zUiFf {ioc_file} {out_path} > {outfolder}/{outfile}'
     outfolder: IOC_Findings
     outfile: iocs_analysis.txt
     input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_pagefile
+    binary: rg.exe
+    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_pagefile.txt
+    input: pagefile
     github: https://github.com/BurntSushi/ripgrep.git
   - name: iocs_datasource
     binary: rg.exe
@@ -337,12 +387,32 @@ enrichers:
     outfolder: IOC_Findings\loki_analysis
     outfile: '*.log'
     input: none
+  - name: loki_datasource
+    binary: '{tool_path}/loki/loki/loki.exe'
+    args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
+    outfolder: IOC_Findings\loki_datasource
+    outfile: '*.log'
+    input: base
+    para: false
   # - name: thor_analysis
   #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
   #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
   #   outfolder: IOC_Findings\thor_analysis
   #   outfile: '*.txt'
   #   input: none
+  # - name: thor_datasource
+  #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
+  #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
+  #   outfolder: IOC_Findings\thor_datasource
+  #   outfile: '*.txt'
+  #   input: base
+  #   para: false
+  - name: Executablelist 
+    binary: 'pwsh.exe'
+    args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'
+    outfolder: FileExecution
+    outfile: MISP
+    input: pagefile
   - name: jq_chainsaw_srum
     binary: jq
     args: -r -f {tool_path}\jq_filters\jq_chainsaw_srum_filter.txt {out_path}\Network\chainsaw_srum.json >> {outfolder}\{outfile}

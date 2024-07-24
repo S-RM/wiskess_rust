@@ -13,7 +13,10 @@ use chrono::NaiveDate;
 use glob::glob;
 
 pub fn make_folders(out_path: &Path) {
-    fs::create_dir_all(out_path).expect("Failed to create folder");
+    println!("[-] Making dir: {}", out_path.display());
+    fs::create_dir_all(out_path).expect(
+        format!("Failed to create folder {}", out_path.display()).as_str()
+    );
 }
 
 pub(crate) fn line_count(file_path: &Path) -> usize {
