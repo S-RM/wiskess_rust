@@ -79,6 +79,11 @@ This command will launch the Web user interface. This is still WIP, where curren
 * a single data source - using the main wiskess module
 * multiple data sources hosted locally, or in the cloud (Azure storage or AWS S3) - using the whipped module
 
+![image](https://github.com/user-attachments/assets/014a0d99-4625-4b79-b033-54156256ff8a)
+
+![image](https://github.com/user-attachments/assets/e4f04d25-a5c0-456b-93ad-b3229b8d0f03)
+
+
 I intend to extend the functionality of the GUI to see the current progress and a view of the processed files and folder. Until then, please review the progress in from the terminal that you launched the Web UI, and review the processed data in either explorer, VSCode or tool of your choice.
 
 # Process configurations
