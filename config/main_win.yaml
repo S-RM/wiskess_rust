@@ -200,13 +200,6 @@ wiskers:
     outfile: '*Destinations.csv'
     input: user_dir
     github:
-  - name: shellbags_ntuser
-    binary: fd
-    args: '-i NTUSER\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
-    outfolder: UserActivity
-    outfile: shellbags.csv
-    input: user_dir
-    github: https://github.com/williballenthin/shellbags
   - name: regripper_amcache
     binary: '{tool_path}\RegRipper3.0\rip.exe'
     args: '-aT -r {input} 1>> {outfolder}\{outfile}'

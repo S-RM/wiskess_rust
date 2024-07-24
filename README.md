@@ -74,6 +74,27 @@ run `wiskess_rust.exe setup -g <your github token>` using a terminal with Admini
 
 The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
 
+# WISKESS Web UI `wiskess_rust.exe gui`
+This command will launch the Web user interface. This is still WIP, where currently you can submit two commands to wiskess, including:
+* a single data source - using the main wiskess module
+* multiple data sources hosted locally, or in the cloud (Azure storage or AWS S3) - using the whipped module
+
+I intend to extend the functionality of the GUI to see the current progress and a view of the processed files and folder. Until then, please review the progress in from the terminal that you launched the Web UI, and review the processed data in either explorer, VSCode or tool of your choice.
+
+# Process configurations
+There are multiple configurations that can be used to process data. The default one 'config/main_win.yaml' is designed for use on Windows OS. This includes most of the commonly used process tools of wiskess. If you need a more thorough investigation, and don't mind waiting a bit longer for the processing to complete use `config/intense_win.yaml`. The intense config includes these tools:
+* Chainsaw EVTX
+* EVTX Dump
+* williballenthin Shellbags
+* KStrike
+* RDP Bitmap
+* Polars Enrich
+* IOCs over pagefile
+* Executablelist
+* Loki over the datasource
+
+You can set the process config using the argument `--config my_fav_tools.yaml` in both wiskess and whipped by wiskess commands.
+
 # Whipped by WISKESS `wiskess_rust.exe whipped`
 This command will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
 
