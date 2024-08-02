@@ -1,31 +1,45 @@
+data_dir: X:\vector-data
+
 sources:
   g_syslog:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-      - /home/ubuntu/uac-collection/?root?/var/log/syslog*
-      - /home/ubuntu/uac-collection/?root?/var/log/messages*
+      - X:\*\?root?\var\log\syslog*
+      - X:\*\?root?\var\log\messages*
   g_auth:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-      - /home/ubuntu/uac-collection/?root?/var/log/auth*log*
-      - /home/ubuntu/uac-collection/?root?/var/log/secure*
+      - X:\*\?root?\var\log\auth*log*
+      - X:\*\?root?\var\log\secure*
   g_nginx:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-      - /home/ubuntu/uac-collection/?root?/var/log/nginx/*log*
+      - X:\*\?root?\var\log\nginx\*log*
   g_apache:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-      - /home/ubuntu/uac-collection/?root?/var/log/apache2/
+      - X:\*\?root?\var\log\apache2\
   g_bodyfile:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-      - /home/ubuntu/uac-collection/bodyfile/bodyfile.txt
+      - X:\*\bodyfile\bodyfile.txt
   g_journal:
     type: file
+    fingerprint:
+      strategy: device_and_inode
     include:
-    # needs the following command run (can be in parallel) $ journalctl -D /home/ubuntu/uac-collection/\[root\]/var/log/journal/ -o json --utc > /home/ubuntu/uac-collection/journal.log
-      - /home/ubuntu/uac-collection/journal.log
+    # needs the following command run (can be in parallel) $ journalctl -D X:\*\\[root\]\var\log\journal\ -o json --utc > X:\*\journal.log
+      - X:\*\journal.log
 
 transforms:
   remap_syslog:
@@ -75,41 +89,41 @@ sinks:
     type: file
     inputs:
       - g_journal
-    path: /tmp/vector-journal.log
+    path: X:\*\vector-journal.log
     encoding:
       codec: json
   sink_syslog:
     type: file
     inputs:
       - remap_syslog
-    path: /tmp/vector-syslog.log
+    path: X:\*\vector-syslog.log
     encoding:
       codec: json
   sink_auth:
     type: file
     inputs:
       - remap_auth
-    path: /tmp/vector-auth.log
+    path: X:\*\vector-auth.log
     encoding:
       codec: json
   sink_nginx:
     type: file
     inputs:
       - remap_nginx
-    path: /tmp/vector-nginx.log
+    path: X:\*\vector-nginx.log
     encoding:
       codec: json
   sink_bodyfile:
     type: file
     inputs:
       - remap_bodyfile
-    path: /tmp/vector-bodyfile.log
+    path: X:\*\vector-bodyfile.log
     encoding:
       codec: json
   sink_apache:
     type: file
     inputs:
       - remap_apache
-    path: /tmp/vector-apache.log
+    path: X:\*\vector-apache.log
     encoding:
       codec: json
