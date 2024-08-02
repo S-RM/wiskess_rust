@@ -23,6 +23,7 @@
 !/tools/MISP.yaml
 !/tools/Executablelist.ps1
 !/tools/jq_filters/*
+!/tools/polars_vector_tln.py
 /output_test
 /testing_wr
 /logs
