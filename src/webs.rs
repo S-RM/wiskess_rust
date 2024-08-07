@@ -1,12 +1,12 @@
 pub mod web {
     use std::{
-        any::{Any, TypeId}, env, fs::File, io::Write, path::{Path, PathBuf}
+        any::{Any, TypeId}, io::Write, path::{Path, PathBuf}
     };
 
     use actix_multipart::form::{
             tempfile::{TempFile, TempFileConfig}, text::Text, MultipartForm
         };
-    use actix_web::{body, cookie::Cookie, middleware, web, App, Error, HttpResponse, HttpServer, Responder, Result};
+    use actix_web::{middleware, web, App, HttpResponse, HttpServer, Responder, Result};
     use indicatif::MultiProgress;
     use struct_iterable::Iterable;
 
@@ -192,6 +192,7 @@ pub mod web {
             tool_path: state.tool_path.clone(),
             ioc_file: ioc_filename,
             silent,
+            collect: true,
             out_log: PathBuf::new(),
             multi_pb: MultiProgress::new()
         };
@@ -228,11 +229,11 @@ pub mod web {
         log::info!("Received request to run whipped");
 
         let keep_evidence = match params.keep_evidence.as_str() {
-            "true" => true,
+            "yes" => true,
             &_ => false,
         };
         let update = match params.update.as_str() {
-            "true" => true,
+            "yes" => true,
             &_ => false,
         };
         
