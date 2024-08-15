@@ -132,6 +132,15 @@ wiskers:
     input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
+  - name: srumdump
+    binary: '{tool_path}\srum-dump\srum_dump2.6.exe'
+    args: '-i {input} -r {input_other} -t {tool_path}\srum-dump\SRUM_TEMPLATE3.xlsx -o {outfolder}\{outfile}'
+    outfolder: Network
+    outfile: srum-dump.xlsx
+    input: srum
+    input_other: software
+    valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
+    github: https://github.com/MarkBaggett/srum-dump.git
   - name: hindsight
     binary: '{tool_path}\hindsight\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
@@ -381,32 +390,32 @@ enrichers:
     outfile: iocs_datasource.txt
     input: base
     github: https://github.com/BurntSushi/ripgrep.git
-  - name: loki_analysis
-    binary: '{tool_path}/loki/loki/loki.exe'
-    args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
-    outfolder: IOC_Findings\loki_analysis
-    outfile: '*.log'
-    input: none
-  - name: loki_datasource
-    binary: '{tool_path}/loki/loki/loki.exe'
-    args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
-    outfolder: IOC_Findings\loki_datasource
-    outfile: '*.log'
-    input: base
-    para: false
-  # - name: thor_analysis
-  #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
-  #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
-  #   outfolder: IOC_Findings\thor_analysis
-  #   outfile: '*.txt'
+  # - name: loki_analysis
+  #   binary: '{tool_path}/loki/loki/loki.exe'
+  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
+  #   outfolder: IOC_Findings\loki_analysis
+  #   outfile: '*.log'
   #   input: none
-  # - name: thor_datasource
-  #   binary: '{tool_path}/thor-lite/thor64-lite.exe'
-  #   args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
-  #   outfolder: IOC_Findings\thor_datasource
-  #   outfile: '*.txt'
+  # - name: loki_datasource
+  #   binary: '{tool_path}/loki/loki/loki.exe'
+  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
+  #   outfolder: IOC_Findings\loki_datasource
+  #   outfile: '*.log'
   #   input: base
   #   para: false
+  - name: thor_analysis
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {out_path} -e {outfolder}'
+    outfolder: IOC_Findings\thor_analysis
+    outfile: '*.txt'
+    input: none
+  - name: thor_datasource
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --intense --cross-platform --max_file_size 500MB --threads 0 -p {input} -e {outfolder}'
+    outfolder: IOC_Findings\thor_datasource
+    outfile: '*.txt'
+    input: base
+    para: false
   - name: Executablelist 
     binary: 'pwsh.exe'
     args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'

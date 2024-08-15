@@ -1,6 +1,6 @@
 pub mod web {
     use std::{
-        any::{Any, TypeId}, io::Write, path::{Path, PathBuf}
+        any::{Any, TypeId}, path::{Path, PathBuf}
     };
 
     use actix_multipart::form::{
@@ -207,7 +207,7 @@ pub mod web {
         );
         log::info!("{}", msg);
 
-        let res = actix_web::rt::spawn( async move {
+        let _res = actix_web::rt::spawn( async move {
             wiskess::start_wiskess(args, &config, &artefacts_config, &params.data_source);
         });
 
@@ -267,7 +267,7 @@ pub mod web {
         let msg = format!("You have submitted the following to be processed: {}", items.join("; "));
         log::info!("{}", msg);
         
-        let res = actix_web::rt::spawn( async move {
+        let _res = actix_web::rt::spawn( async move {
                 scripts::run_whipped(&state.tool_path, args);
         });
 

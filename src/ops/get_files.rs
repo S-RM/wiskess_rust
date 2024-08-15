@@ -14,7 +14,7 @@ use anyhow::{bail, Context, Result};
 use ntfs::indexes::NtfsFileNameIndex;
 use ntfs::structured_values::{NtfsFileName, NtfsFileNamespace};
 use ntfs::{Ntfs, NtfsFile, NtfsReadSeek};
-use regex::{Regex, RegexBuilder};
+use regex::{RegexBuilder};
 use sector_reader::SectorReader;
 
 struct CommandInfo<'n, T>

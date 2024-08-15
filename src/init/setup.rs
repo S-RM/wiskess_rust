@@ -93,15 +93,46 @@ pub fn setup_linux(v: bool, github_token: String) {
     let pb2 = prog_spin_init(480, &m, "yellow");
     prog_spin_msg(&pb, "Wiskess - Setup Linux".to_string());
     prog_spin_msg(&pb2, "Installing packages...".to_string());
-
     let mut outmsg = String::new();
     let options = ScriptOptions::new();
+
+    let pb3 = prog_spin_init(240, &m, "white");
+
+    let apt_pkgs = vec![
+        "p7zip-full",
+        "awscli",
+        "fd-find",
+        "git",
+        "ripgrep",
+        "python2.7",
+        "python-pip",
+        "regripper",
+        "python3-pip",
+        "jq",
+    ];    
+    prog_spin_msg(&pb2, "Installing APT packages...".to_string());
+    for pkg in apt_pkgs.iter() {
+        let msg = format!("Getting: {}", pkg);
+        prog_spin_msg(&pb3, msg.to_string());    
+    	let (code, output, error) = run_script::run_script!(
+            r#"
+             tool_dir="$PWD/tools/"
+             cd $tool_dir
+             pkg="$1"
+             apt-get -y install $pkg
+             "#,
+             &vec![pkg.to_string()],
+             &options
+        ).unwrap();
+        outmsg.push_str(&output_script(v, code, output, error));
+    }
+
+
+    prog_spin_msg(&pb2, "Installing Python packages...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
          tool_dir="$PWD/tools/"
          cd $tool_dir
-         sudo apt-get update
-         sudo apt-get -y install p7zip-full awscli fd-find git ripgrep python2.7 python-pip regripper python3-pip jq
          python3 -m ensurepip --default-pip
          python3 -m pip install polars chardet datetime filetype requests libesedb-python python-magic --no-warn-script-location
          python3 -m pip install colorama yara-python psutil rfc5424-logging-handler netaddr --no-warn-script-location
@@ -109,8 +140,6 @@ pub fn setup_linux(v: bool, github_token: String) {
          "#
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
-
-    let pb3 = prog_spin_init(240, &m, "white");
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
     let urls = vec![
@@ -284,6 +313,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 	    "https://github.com/forensicmatt/RustyUsn",
         "https://github.com/obsidianforensics/hindsight.git",
         "https://github.com/Neo23x0/loki.git",
+        "https://github.com/MarkBaggett/srum-dump.git"
     ];
     for url in urls.iter() {
         let msg = format!("Getting: {}", url);
@@ -305,8 +335,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
          "https://github.com/EricZimmerman/Get-ZimmermanTools.git",
          "https://github.com/williballenthin/python-registry.git",
          "https://github.com/williballenthin/shellbags",
-         "https://github.com/keydet89/RegRipper3.0.git",
-         "https://github.com/keydet89/RegRipper4.0.git"
+         "https://github.com/keydet89/RegRipper4.0.git",
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);

@@ -78,7 +78,8 @@ use struct_iterable::Iterable;
       pub ioc_file: String,
       pub silent: bool,
       pub out_log: PathBuf,
-      pub multi_pb: MultiProgress
+      pub multi_pb: MultiProgress,
+      pub collect: bool
   }
 
   // Set struct for setup args

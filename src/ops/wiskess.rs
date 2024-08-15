@@ -109,6 +109,7 @@ pub(crate) fn init_wiskess(args: config::MainArgs) -> (String, chrono::prelude::
         tool_path: args.tool_path,
         ioc_file: args.ioc_file,
         silent: args.silent,
+        collect: args.collect,
         out_log,
         multi_pb: MultiProgress::new()
     };

@@ -117,6 +117,15 @@ wiskers:
     input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
+  - name: srumdump
+    binary: '{tool_path}\srum-dump\srum_dump2.6.exe'
+    args: '-i {input} -r {input_other} -t {tool_path}\srum-dump\SRUM_TEMPLATE3.xlsx -o {outfolder}\{outfile}'
+    outfolder: Network
+    outfile: srum-dump.xlsx
+    input: srum
+    input_other: software
+    valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
+    github: https://github.com/MarkBaggett/srum-dump.git
   - name: hindsight
     binary: '{tool_path}\hindsight\hindsight.exe'
     args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'

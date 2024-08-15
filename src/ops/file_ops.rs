@@ -13,7 +13,7 @@ use chrono::NaiveDate;
 use glob::glob;
 
 pub fn make_folders(out_path: &Path) {
-    println!("[-] Making dir: {}", out_path.display());
+    // println!("[-] Making dir: {}", out_path.display());
     fs::create_dir_all(out_path).expect(
         format!("Failed to create folder {}", out_path.display()).as_str()
     );

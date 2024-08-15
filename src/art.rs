@@ -82,7 +82,7 @@ pub mod paths {
             Ok(value) => value,
             Err(value) => return value,
         };
-        if env::consts::OS == "windows" {
+        if env::consts::OS == "windows" && main_args.collect {
             // set the path where artefacts are copied to
             let dest_path = Path::new(&main_args.out_path).join("Artefacts");
             file_ops::make_folders(&dest_path);

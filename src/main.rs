@@ -30,6 +30,9 @@ struct Args {
     silent: bool,
     #[clap(subcommand)]
     command: Commands,
+    /// Optoin to prevent making a collection from a mounted image
+    #[arg(short, long, action = ArgAction::SetFalse)]
+    no_collection: bool
 }
 
 #[derive(Debug, Subcommand)]
@@ -41,7 +44,7 @@ enum Commands {
         github_token: String,
         /// Print additional info to the stdout
         #[arg(short, long)]
-        verbose: bool
+        verbose: bool,
     },
     /// launch the webui
     Gui {},
@@ -147,6 +150,10 @@ fn main() {
         Some(&_) => tool_path.to_path_buf(),
     };
 
+    // Set no_collection to true - only valid for images
+    let collect = args.no_collection;
+    println!("[ ] Collection is set to {}", collect);
+
     // TODO: check the config file exists
 
     match args.command {
@@ -217,6 +224,7 @@ fn main() {
                 tool_path,
                 ioc_file,
                 silent: args.silent,
+                collect,
                 out_log: PathBuf::new(),
                 multi_pb: MultiProgress::new()
             };
