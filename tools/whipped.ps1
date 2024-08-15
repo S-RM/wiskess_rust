@@ -81,7 +81,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     } elseif ($image -Match "-flat\.vmdk$") {
         $osf_mount = $True
     }
-    if ($image -Match "\.(?:vhd|vhdx|ova|vdi)$") {
+    if ($image -Match "\.(?:vhdx|ova|vdi)$") {
         # OSFMount doesn't support these image types, so either convert or use AIM
         $osf_mount = $False
     }
