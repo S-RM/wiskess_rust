@@ -132,7 +132,7 @@ fn check_binary(binary: &String, arg: &str) -> bool {
 
 /// run the binary with the given argument, which is a string
 /// returns the output of what was ran, including the stdout and stderr
-fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &Path) -> std::process::Output {
+pub fn run_wisker(wisker_binary: &String, wisker_arg: &String, out_log: &Path) -> std::process::Output {
     let wisker_cmd = format!("{} {}", 
         &wisker_binary, 
         &wisker_arg);

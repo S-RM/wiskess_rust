@@ -3,11 +3,13 @@ mod ops;
 mod art;
 mod init;
 mod webs;
+mod whipped;
 
 use crate::configs::config;
 use crate::ops::{file_ops, wiskess};
 use crate::init::scripts;
 use crate::webs::web;
+use crate::whipped::whip_main;
 
 use std::path::PathBuf;
 use std::{path::Path,env};
@@ -109,6 +111,19 @@ enum Commands {
         /// IOC list file
         #[arg(short, long)]
         ioc_file: String,
+    },
+    TestWhip {
+        /// file path to the data source; either mounted or the root folder
+        #[arg(short, long, default_value = "")]
+        data_source_list: String,
+        /// file path where the data is temporarily downloaded to and Wiskess output is stored locally
+        #[arg(short, long)]
+        local_storage: String,
+        /// The azure storage or AWS S3 link that the data is stored on, 
+        /// i.e. for azure https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
+        /// i.e. for AWS S3 s3://mybucket-with-data
+        #[arg(long)]
+        in_link: String,
     }
 }
 
@@ -235,5 +250,12 @@ fn main() {
 
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },
+        Commands::TestWhip {
+            data_source_list,
+            local_storage,
+            in_link
+        } => {
+            whip_main::whip_main(&data_source_list, &local_storage, &in_link, &tool_path);
+        }
     }
 }
