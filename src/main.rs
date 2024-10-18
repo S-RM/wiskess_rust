@@ -113,18 +113,42 @@ enum Commands {
         ioc_file: String,
     },
     TestWhip {
+        /// config file of the binaries to run as processors
+        #[arg(short, long, default_value = "config/main_win.yaml")]
+        config: PathBuf,
+        /// config file of the artefact file paths
+        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long, default_value = "")]
         data_source_list: String,
         /// file path where the data is temporarily downloaded to and Wiskess output is stored locally
         #[arg(short, long)]
         local_storage: String,
-        /// The azure storage or AWS S3 link that the data is stored on, 
-        /// i.e. for azure https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
-        /// i.e. for AWS S3 s3://mybucket-with-data
-        #[arg(long)]
+        /// Start date - typically the earliest time of the incident, or a few days before
+        #[arg(long, default_value = "2024-01-01")]
+        start_date: String,
+        /// End date - the current date or end of the incident timeframe
+        #[arg(long, default_value = "2024-05-01")]
+        end_date: String,
+        /// IOC list file
+        #[arg(short, long, default_value = "iocs.txt")]
+        ioc_file: String,
+        /// The link that the data is stored on, i.e https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
+        #[arg(long, default_value = "")]
         in_link: String,
-    }
+        /// The link where you need the wiskess output uploaded to, 
+        /// i.e. https://myaccount.file.core.windows.net/results/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s
+        #[arg(long, default_value = "")]
+        out_link: String,
+        /// Set this flag to update the Wiskess results, such as changing the timeframe or after adding new IOCs to the list.
+        #[arg(short, long)]
+        update: bool,
+        /// Set this flag to keep the downloaded data on your local storage. Useful if wanting to process the data after Wiskess. 
+        /// Caution: make sure you have enough disk space for all the data source list.
+        #[arg(short, long)]
+        keep_evidence: bool,
+    },
 }
 
 fn show_banner() {
@@ -251,11 +275,34 @@ fn main() {
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },
         Commands::TestWhip {
+            config,
+            artefacts_config,
             data_source_list,
             local_storage,
-            in_link
+            start_date,
+            end_date,
+            ioc_file,      
+            in_link,
+            out_link,
+            update,
+            keep_evidence,
         } => {
-            whip_main::whip_main(&data_source_list, &local_storage, &in_link, &tool_path);
+            // put the args into a whipped structure
+            let args = config::WhippedArgs {
+                config,
+                artefacts_config,
+                data_source_list,
+                local_storage,
+                start_date,
+                end_date,
+                ioc_file,      
+                in_link,
+                out_link,
+                update,
+                keep_evidence,
+            };
+
+            whip_main::whip_main(args, &tool_path);
         }
     }
 }

@@ -224,21 +224,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     );
 
     // check binary is installed
-    let mut installed = false;
-    if wisker.chk_exists {
-        for test_arg in ["-h", "help", "--version", "-v", "-V"] {
-            if check_binary(&wisker_binary, test_arg) {
-                installed = true;
-                break;
-            }
-        }
-    } else {
-        installed = true;
-    }
-    let mut err_msg = "".to_string();
-    if !installed {
-        err_msg = format!("[!] The path `{}` is not a correct executable binary file.", wisker_binary); 
-    }
+    let err_msg = installed_binary_check(wisker.chk_exists, &wisker_binary);
             
     // Check if the outfile already exists, ask user to overwrite
     let check_outfile = Path::new(&folder_path_str).join(&wisker.outfile);
@@ -248,6 +234,25 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
         true
     );
     (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg)
+}
+
+pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
+    let mut installed = false;
+    if chk_exists {
+        for test_arg in ["-h", "help", "--version", "-v", "-V"] {
+            if check_binary(binary, test_arg) {
+                installed = true;
+                break;
+            }
+        }
+    } else {
+        installed = true;
+    }
+    let mut err_msg = "".to_string();
+    if !installed {
+        err_msg = format!("[!] The path `{}` is not a correct executable binary file.", binary); 
+    }
+    err_msg
 }
 
 pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
