@@ -236,7 +236,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['InsertDate','LastAccess'],
       'fmt_time': '%F %T'
     },
-    'browser-hist_us': {
+    'browser-hist_uk': {
       # for browsing history processed on machines with timestamps in UK format
       'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
@@ -244,13 +244,13 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['Visit Time'],
       'fmt_time': '%d/%m/%Y %T'
     },
-    'browser-hist_uk': { 
+    'browser-hist_us': { 
       # for browsing history processed on machines with timestamps in US format
       'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','browser-hist.csv']),
       'msg': ['URL','Title','Visited From','Visit Type','Web Browser','User Profile'],
       'times': ['Visit Time'],
-      'fmt_time': '%m/%d/%Y %T'
+      'fmt_time': '%m/%d/%Y %r'
     },
     'shellbags': {
       'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
@@ -321,7 +321,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
     'hindsight': {
       'file': os.path.join(*[f'{out_filepath}','Network','hindsight.jsonl']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','hindsight.csv']),
-      'msg': ['url','title','timestamp_desc','message','value','interpretation','transition_friendly','data_type','visit_count','typed_count','source_long','profile'],
+      'msg': ['url','timestamp_desc','message','value','interpretation','data_type','source_long','profile'],
       'times': ['datetime'],
       'fmt_time': '%FT%T%.f'
     },
