@@ -500,30 +500,4 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
             // remove the data source files and extracted folder
     // else log a message saying use update flag or delete the process folder from the out_link
     // log a message to state the data source has been processed
-
-
-    // let object_list_result = s3_client.list_objects_v2(list_request).await.unwrap();
-    // if let Some(contents) = object_list_result.contents {
-    //     for object in contents {
-    //         if let Some(key) = object.key {
-    //             let extensions = vec!["zip", "7z", "vmdk", "vhdx", "vhd", "eo1", "vdi", "ex01", "raw"];
-    //             if extensions.iter().any(|&ext| key.ends_with(ext)) {
-    //                 // Download the file
-    //                 println!("Downloading: {}", key);
-    //                 download_file(&s3_client, &bucket_name, &key).await;
-
-    //                 let local_path = format!("x:/{}", key);
-    //                 let file_metadata = metadata(&local_path).unwrap();
-    //                 let file_type = MimeGuess::from_path(&local_path);
-
-    //                 println!("File size: {} bytes", file_metadata.len());
-    //                 println!("File type: {:?}", file_type);
-
-    //                 // Delete the file
-    //                 let _ = fs::remove_file(local_path).await;
-    //                 println!("File deleted: {}", key);
-    //             }
-    //         }
-    //     }
-    // }
 }
