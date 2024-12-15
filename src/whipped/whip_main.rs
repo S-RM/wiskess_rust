@@ -10,7 +10,6 @@ use serde::Deserialize;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::metadata;
-use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use std::process::Command;
@@ -78,14 +77,22 @@ fn split_and_trim(data_source_list: &str) -> Vec<String> {
 /// * `log_name` - The file where logs are stored
 /// * `data_folder` - the path to where the data extracted/copied to, i.e. collection.zip is extracted to collection-extracted
 fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) -> Result<Vec<PathBuf>> {
+    
     // log the data downloaded and its size
     let data_meta = metadata(&file_path)?;
-    file_ops::log_msg(log_name, format!(
-        "Downloaded file: {} with size: {} and type: {:?}.", 
-        file_path.display(),
-        data_meta.file_size(),
-        data_meta.file_type(),
-    ));
+    
+    #[cfg (target_os = "windows")] {
+        use std::os::windows::fs::MetadataExt;
+        
+        file_ops::log_msg(log_name, format!(
+            "Downloaded file: {} with size: {} and type: {:?}.", 
+            file_path.display(),
+            data_meta.file_size(),
+            data_meta.file_type(),
+        ));
+    }
+
+    
     // get the type of data downloaded, i.e. image, folder or archive
     let mut process_vector: Vec<PathBuf> = Vec::new();
     if file_path.is_dir() {
