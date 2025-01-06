@@ -13,7 +13,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
             };
 	},
         "linux" => {
-            setup::setup_linux(verbose, github_token);
+            setup::setup_linux(verbose, github_token, tool_path);
         },
         &_ => todo!()
     }

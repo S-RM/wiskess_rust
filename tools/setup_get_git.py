@@ -46,14 +46,15 @@ def make_symlink(target_dir: str, program: str, script_os: str):
     if os.path.islink(target_file):
       os.unlink(target_file)
     else:
+      print(f'[!] Target file already exists and is not a symlink, so not creating link.')
       return
 
   if script_os == 'windows':
     file_type_regex = re.compile('x-(?:dos-executable|dosexec|msdownload)')
-    file_mime_regex = re.compile('PE32\+ executable \(console\) x86-64, for MS Windows')
+    file_mime_regex = re.compile('PE32\\+ executable \\(console\\) x86-64, for MS Windows')
   elif script_os == 'linux':
     file_type_regex = re.compile('x(?:-pie|)-executable|application/x-sharedlib')
-    file_mime_regex = re.compile('ELF 64-bit LSB shared object, x86-64')
+    file_mime_regex = re.compile('ELF 64-bit LSB (shared object|pie executable), x86-64')
   else:
     file_type_regex = re.compile('(?:application|x-.*-exec)')
     file_mime_regex = re.compile('x86-64')
@@ -66,22 +67,24 @@ def make_symlink(target_dir: str, program: str, script_os: str):
         file_type = magic.from_file(f_path, mime=True)
         file_mime = magic.from_file(f_path)
         if file_type_regex.search(file_type) and file_mime_regex.search(file_mime):
-          print(f'[+] Creating link for: {f_path}, with type: {file_type}')
+          print(f'[+] Creating link for: {f_path}, with type: {file_type}. Target file: {target_file}')
           source_file = f_path
           break
   if source_file != '' and source_file != target_file:
     os.symlink(source_file, target_file)
     # make the source executable
     sf_stats = os.stat(source_file)
-    os.chmod(source_file, sf_stats.st_mode | stat.S_IEXEC)
+    os.chmod(source_file, sf_stats.st_mode | 0o774)
     # make the symlink executable
     tf_stats = os.stat(target_file)
-    os.chmod(target_file, tf_stats.st_mode | stat.S_IEXEC)
+    os.chmod(target_file, tf_stats.st_mode | 0o774)
+  else:
+    print(f'[!] No link created for {program} at path: {target_file}')
 
 
 def get_release(token: str, url: str, script_os: str):
     repo = urlparse(url).path
-    repo = re.sub('\.git$', '', repo)
+    repo = re.sub('\\.git$', '', repo)
     program = repo.split('/')[-1]
 
     headers = {
