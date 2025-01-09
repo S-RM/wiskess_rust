@@ -135,11 +135,11 @@ enum Commands {
         #[arg(short, long, default_value = "iocs.txt")]
         ioc_file: String,
         /// The link that the data is stored on, i.e https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
-        #[arg(long, default_value = "")]
+        #[arg(long)]
         in_link: String,
         /// The link where you need the wiskess output uploaded to, 
         /// i.e. https://myaccount.file.core.windows.net/results/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s
-        #[arg(long, default_value = "")]
+        #[arg(long)]
         out_link: String,
         /// Set this flag to update the Wiskess results, such as changing the timeframe or after adding new IOCs to the list.
         #[arg(short, long)]

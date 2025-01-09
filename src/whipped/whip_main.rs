@@ -139,7 +139,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
     // if data is an archive, extract it to the extracted folder 
     let data_str = data_file.clone().into_os_string();
     let extract_flag = format!("-o{}", data_folder.display());
-    let unzip_cmd = ["x", data_str.to_str().unwrap(), extract_flag.as_str()].to_vec();
+    let unzip_cmd = ["x", "-aos", data_str.to_str().unwrap(), extract_flag.as_str()].to_vec();
                         
     let bin_path = Path::new("7z.exe").to_path_buf();
     let _json_data = run_cmd(bin_path, unzip_cmd, log_name).unwrap();
@@ -238,7 +238,8 @@ async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, tool_p
     let log_name = Path::new("whipped.log");
     let output_file = output.join(file);
     let output_str = output_file.into_os_string();
-    let az_cmd = ["copy", azure_url, output_str.to_str().unwrap()].to_vec();
+    let wr_azure_url = format!("'{azure_url}'");
+    let az_cmd = ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec();
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
     let _json_data = run_cmd(bin_path, az_cmd, log_name)?;
@@ -292,7 +293,8 @@ async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
 /// * `azure_url` - The Azure URL to list files from.
 async fn list_azure_files(azure_url: &str, tool_path: &PathBuf) -> Result<Vec<String>> {
     let log_name = Path::new("whipped.log");
-    let az_cmd = ["list", azure_url].to_vec();
+    let wr_azure_url = format!("'{azure_url}'");
+    let az_cmd = ["list", wr_azure_url.as_str()].to_vec();
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
     let json_data = run_cmd(bin_path, az_cmd, log_name)?;
