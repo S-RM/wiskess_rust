@@ -392,13 +392,13 @@ enrichers:
     github: https://github.com/BurntSushi/ripgrep.git
   # - name: loki_analysis
   #   binary: '{tool_path}/loki/loki/loki.exe'
-  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
+  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {out_path} --logfolder {outfolder}'
   #   outfolder: IOC_Findings\loki_analysis
   #   outfile: '*.log'
   #   input: none
   # - name: loki_datasource
   #   binary: '{tool_path}/loki/loki/loki.exe'
-  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {input} --logfolder {outfolder}'
+  #   args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {input} --logfolder {outfolder}'
   #   outfolder: IOC_Findings\loki_datasource
   #   outfile: '*.log'
   #   input: base
