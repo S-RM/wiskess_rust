@@ -208,7 +208,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
 /// * `s3_url` - The S3 URL of the file
 /// * `folder` - The path to download to
 async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String) -> Result<PathBuf> {
-    let region = "eu-central-1";
+    // let region = "eu-central-1";
     let log_name = Path::new("whipped.log");
 
     if !output.exists() {
@@ -216,7 +216,7 @@ async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String) -> Result<Pa
         file_ops::make_folders(&output);
     }
     
-    let args = format!("s3 cp {s3_url} {} --region {region} --output=json", output.display());
+    let args = format!("s3 cp {s3_url} {} --output=json", output.display());
     exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
 
     let out_file = if output.join(file).exists() {
@@ -272,19 +272,22 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, tool_path: 
 /// * `s3_url` - The S3 URL to list files from.
 async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
     let bucket = s3_url.trim_start_matches("s3://");
-    let region = "eu-central-1";
+    // let region = "eu-central-1";
     let log_name = Path::new("whipped.log");
     
     // aws s3api list-objects-v2 --bucket ir-evidence-falcon --region eu-central-1 --output=json
-    let args = format!("s3api list-objects-v2 --bucket {bucket} --region {region} --output=json");
+    let args = format!("s3api list-objects-v2 --bucket {bucket} --output=json");
     let json_data = exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
 
     // Deserialize the JSON string to the Contents struct
+    println!("[ ] JSON from AWS S3 list: {:?}", json_data.stdout);
     let contents: Contents = serde_json::from_str(&String::from_utf8(json_data.stdout)?)?;
+    println!("[ ] Contents from AWS S3 list: {:?}", contents);
     
     // Collect all Key values into a vector
     let files = contents.contents.into_iter().map(|item| item.key).collect();
-
+    
+    println!("[ ] Files from AWS S3 list: {:?}", files);
     Ok(files)
 }
 
