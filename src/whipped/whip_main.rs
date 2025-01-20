@@ -252,16 +252,21 @@ async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, tool_p
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 async fn get_file(in_link: &String, output: &PathBuf, file: &String, tool_path: &PathBuf) -> Result<PathBuf> {
     let out_file = output.join(&file);
-    println!("[?] checking {}", out_file.display());
-    if out_file.exists() && metadata(&out_file).unwrap().len() > 0 {
-        println!("[ ] Already downloaded {}, delete it if wanting to download again", out_file.display());
-        return Ok(out_file);
+    let out_file_parent = output.parent().unwrap().join(&file);
+    for data_path in [out_file, out_file_parent] {
+        println!("[?] checking {}", data_path.display());
+        if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
+            println!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display());
+            return Ok(data_path);
+        }
     }
+    
     if in_link.starts_with("s3") {
         get_s3_file(&in_link, &output, &file).await
     } else if in_link.starts_with("https://") {
         get_azure_file(&in_link, &output, &file, &tool_path).await
     } else {
+        println!("[!] Unknown URL format. {in_link}");
         panic!("Unknown URL format.");
     }
 }
@@ -276,15 +281,19 @@ async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
     let log_name = Path::new("whipped.log");
     
     // aws s3api list-objects-v2 --bucket ir-evidence-falcon --region eu-central-1 --output=json
-    let args = format!("s3api list-objects-v2 --bucket {bucket} --region {region} --output=json");
+    // let args = format!("s3api list-objects-v2 --bucket {bucket} --region {region} --output=json");
+    let args = format!("s3api list-objects-v2 --bucket {bucket} --output=json");
     let json_data = exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
 
     // Deserialize the JSON string to the Contents struct
+    println!("[ ] JSON from AWS S3 list: {:?}", json_data.stdout);
     let contents: Contents = serde_json::from_str(&String::from_utf8(json_data.stdout)?)?;
+    println!("[ ] Contents from AWS S3 list: {:?}", contents);
     
     // Collect all Key values into a vector
     let files = contents.contents.into_iter().map(|item| item.key).collect();
-
+    
+    println!("[ ] Files from AWS S3 list: {:?}", files);
     Ok(files)
 }
 
@@ -312,6 +321,7 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf) -> Result<Vec<St
 
     // Print the collected paths.
     println!("Path: {:?}", paths);
+    println!("Data: {:?}", data.to_string());
 
     Ok(paths)
 
