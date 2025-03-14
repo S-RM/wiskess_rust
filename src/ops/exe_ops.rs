@@ -1,3 +1,4 @@
+use core::str;
 use std::{collections::HashMap, io::Write, path::Path, process::{Command, Stdio}};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
@@ -108,12 +109,16 @@ pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String
 
 fn log_exe_output(out_log: &Path, output: &std::process::Output) {
     if out_log.exists() {
-        for o in output.stdout.clone() {
-            file_ops::log_msg(&out_log, o.to_string());
+        match str::from_utf8(&output.stdout) {
+            Ok(v) => file_ops::log_msg(out_log, v.to_string()),
+            Err(e) => file_ops::log_msg(out_log, format!("Invalid UTF-8 sequence: {}", e)),
         }
-        for e in output.stderr.clone() {
-            file_ops::log_msg(&out_log, e.to_string());
-        }
+        // for o in output.stdout.clone() {
+        //     file_ops::log_msg(&out_log, o.to_string());
+        // }
+        // for e in output.stderr.clone() {
+        //     file_ops::log_msg(&out_log, e.to_string());
+        // }
     }
 }
 
