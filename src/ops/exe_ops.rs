@@ -349,7 +349,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
                     
                     // crossbeam: start
-                    match exit_rx.recv_timeout(Duration::from_secs(60)) {
+                    match exit_rx.recv_timeout(Duration::from_secs(3600)) {
                     // match res {
                         Ok(_) | Err(RecvTimeoutError::Timeout) => {
                             // Timeout or exit signal received.

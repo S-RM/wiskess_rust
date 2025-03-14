@@ -139,7 +139,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
     // if data is an archive, extract it to the extracted folder 
     let data_str = data_file.clone().into_os_string();
     let extract_flag = format!("-o{}", data_folder.display());
-    let unzip_cmd = ["x", "-aos", data_str.to_str().unwrap(), extract_flag.as_str(), "> /dev/null"].to_vec();
+    let unzip_cmd = ["x", "-aos", data_str.to_str().unwrap(), extract_flag.as_str()].to_vec();
                         
     let bin_path = Path::new("7z.exe").to_path_buf();
     let _json_data = run_cmd(bin_path, unzip_cmd, log_name).unwrap();
@@ -203,11 +203,32 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
     });
 }
 
+/// run_cmd runs a binary with a command, in windows it uses powershell, 
+/// in linux it uses the default shell of the operating system.
+/// # Arguments
+/// * `bin_path` - the path to the binary to run
+/// * `cmd` - a vector of commands to run, these are joined with spaces before running
+fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path) -> Result<std::process::Output, anyhow::Error> {
+    let binary = bin_path
+        .into_os_string()
+        .into_string()
+        .unwrap();
+
+    let cmd = cmd.join(" ");
+    
+    let output = match env::consts::OS {
+        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new()),
+        "linux" => run_wisker(&binary, &cmd, log_name),
+        &_ => todo!()
+    };
+    Ok(output)
+}
+
 /// Download a file from an S3 bucket.
 /// # Arguments
 /// * `s3_url` - The S3 URL of the file
 /// * `folder` - The path to download to
-async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String) -> Result<PathBuf> {
+async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse: bool) -> Result<PathBuf> {
     // let region = "eu-central-1";
     let log_name = Path::new("whipped.log");
 
@@ -234,11 +255,14 @@ async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String) -> Result<Pa
 /// * `output` - the path to where the file will be downloaded
 /// * `file` - the name of the file on the azure store
 /// * `tool_path` - the path to the tools, such as where azcopy.exe would be
-async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
+async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let output_file = output.join(file);
     let output_str = output_file.into_os_string();
     let wr_azure_url = format!("'{azure_url}'");
-    let az_cmd = ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec();
+    let az_cmd = match recurse {
+        true => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap(), "--recusive"].to_vec(),
+        false => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec(),
+    };
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
     let _json_data = run_cmd(bin_path, az_cmd, log_name)?;
@@ -253,7 +277,7 @@ async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, tool_p
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 /// * `output` - The path to where the data will be downloaded to
 /// * `file` - the name of the file to download
-async fn get_file(in_link: &String, output: &PathBuf, file: &String, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
+async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let out_file = output.join(&file);
     let out_file_parent = output.parent().unwrap().join(&file);
     for data_path in [out_file, out_file_parent] {
@@ -267,9 +291,9 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, tool_path: 
     }
     
     if in_link.starts_with("s3") {
-        get_s3_file(&in_link, &output, &file).await
+        get_s3_file(&in_link, &output, &file, recurse).await
     } else if in_link.starts_with("https://") {
-        get_azure_file(&in_link, &output, &file, &tool_path, log_name).await
+        get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else {
         println!("[!] Unknown URL format. {in_link}");
         panic!("Unknown URL format.");
@@ -389,22 +413,6 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path)
 
 }
 
-fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path) -> Result<std::process::Output, anyhow::Error> {
-    let binary = bin_path
-        .into_os_string()
-        .into_string()
-        .unwrap();
-
-    let cmd = cmd.join(" ");
-    
-    let output = match env::consts::OS {
-        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new()),
-        "linux" => run_wisker(&binary, &cmd, log_name),
-        &_ => todo!()
-    };
-    Ok(output)
-}
-
 /// List files from either an S3 or Azure link.
 ///
 /// # Arguments
@@ -495,6 +503,25 @@ fn process_data(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: 
     }
 }
 
+/// update_processed_data downloads the process folder, expands any collected files, 
+/// then removes any empty or files that need reprocessing after any change to the results
+async fn update_processed_data(out_link: &String, process_folder: &Path, tool_path: &PathBuf, log_name: &Path) {
+    // download wiskess folder
+    let process_folder_str = process_folder.to_str().unwrap().to_string();
+    let output_path =  process_folder.parent().unwrap().to_path_buf();
+    _ = get_file(out_link, &output_path, &process_folder_str, true, tool_path, log_name).await;
+    // if artefacts/collection.zip exists, expand it
+    let zip_path = output_path.join("Artefacts").join("collection.zip");
+    if zip_path.exists() {
+        let zip_out_cmd = format!("-o{}", process_folder.display());
+        let zip_cmd = ["x", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
+        let bin_path = Path::new("7z.exe").to_path_buf();
+        _ = run_cmd(bin_path, zip_cmd, log_name);
+    }
+    // remove any process result files that are zero size
+    // remove timeline folder, ioc summary and ioc in analysis
+}
+
 
 #[tokio::main]
 pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
@@ -532,7 +559,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
         // if the process folder doens't exist in the out_link or the update flag is set
         if !is_processed || args.update {
             // download the data
-            let data_file = get_file(&in_link_url, &out_folder_path, &data_item, &tool_path, log_name).await?;
+            let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?;
             match data_file.exists() {
                 true => file_ops::log_msg(log_name, "Download complete".to_string()),
                 false => bail!("Unable to get file. Something wrong with downloading the file.")
@@ -540,6 +567,10 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
             // pre-process data into process_vector
             let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path)?;
             file_ops::log_msg(log_name, format!("Pre-processed data: {:?}", process_vector));
+            // update the data
+            if args.update {
+                update_processed_data(&out_link_url, &out_folder_path, tool_path, log_name).await;
+            }
             // process the data with a loop through the process_vector, set the process folder path
             let mut wiskess_args = config::MainArgs {
                 out_path: wiskess_folder.clone().into_os_string().into_string().unwrap(),
@@ -559,17 +590,16 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                 process_data(data_source, &log_name, wiskess_args.clone(), args.config.clone(), args.artefacts_config.clone());
                 // upload the data
                 upload_file(&wiskess_folder, &args.out_link, &tool_path, log_name).await;
-                // remove the data source files and extracted folder
-                if !args.keep_evidence {
-                    let _ = remove(data_source);
-                }
             }
         } else {
-            file_ops::log_msg(log_name, format!("Already processed {data_item}"));
-            if !args.keep_evidence {
-                println!("[ ] Removing {}", data_item);
-                let _ = remove(data_item);
-            }
+            file_ops::log_msg(
+                log_name, 
+                format!("Already processed {data_item}. If wanting to process again either delete the folder here and online or use the `--update` flag"));
+        }
+        // remove the data source files and extracted folder
+        if !args.keep_evidence {
+            println!("[ ] Removing {}", out_folder_path.display());
+            let _ = remove(out_folder_path);
         }
 
         // debug below
@@ -578,11 +608,4 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
     }
 
     Ok(())
-        // update the data
-            // if update flag is set download the process folder
-                // if artefacts/collection.zip exists, expand it
-                // remove any process result files that are zero size
-                // remove timeline folder, ioc summary and ioc in analysis
-    // else log a message saying use update flag or delete the process folder from the out_link
-    // log a message to state the data source has been processed
 }
