@@ -1,5 +1,5 @@
 use crate::configs::config::{self, MainArgs, WhippedArgs};
-use crate::ops::exe_ops::{installed_binary_check, run_wisker};
+use crate::ops::exe_ops::{installed_binary_check, run_wisker, run_posh};
 use crate::ops::{file_ops, wiskess};
 
 use super::super::ops::exe_ops;
@@ -11,6 +11,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::metadata;
 use std::path::{Path, PathBuf};
+use std::env;
 use walkdir::WalkDir;
 use std::process::Command;
 use fs_extra::dir::{create, move_dir, CopyOptions};
@@ -328,11 +329,24 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf) -> Result<Vec<St
 }
 
 fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path) -> Result<std::process::Output, anyhow::Error> {
-    let binary = bin_path
+    let mut binary = bin_path
         .into_os_string()
         .into_string()
         .unwrap();
-    let output = run_wisker(&binary, &cmd.join(" "), log_name);
+
+    let cmd = cmd.join(" ");
+    
+    let output = match env::consts::OS {
+        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new()),
+        "linux" => run_wisker(&binary, &cmd, log_name),
+        &_ => todo!()
+    };
+    // let cmd = match env::consts::OS {
+    //     "windows" => format!("\"{}\"", cmd.join(" ")),
+    //     "linux" => cmd.join(" "),
+    //     &_ => todo!()
+    // };
+    // let output = run_wisker(&binary, &cmd, log_name);
     Ok(output)
     // let mut command = Command::new(binary);
     // command.args(cmd);

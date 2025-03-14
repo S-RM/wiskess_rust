@@ -6,6 +6,9 @@ use std::fs::{canonicalize, OpenOptions};
 use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
 use super::file_ops;
+use std::time::Duration;
+use crossbeam::channel;
+use crossbeam::channel::RecvTimeoutError;
 
 // fn get_pid_process(process_name: &String) -> (u32, f32) {
 //     let mut s = System::new_with_specifics(
@@ -68,11 +71,11 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// run powershell, checking filepaths for powershell or pwsh
 /// 
 /// Args:
-/// * func: set whether the payload is executed as file or command
+/// * func: set whether the payload is executed as file `-f` or command `-c`
 /// * payload: either script or command
 /// * out_log: the file path to the wiskess log
 /// * git_token: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
-pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String) {
+pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String) -> std::process::Output {
     if out_log.exists() {
         file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
     }
@@ -99,15 +102,16 @@ pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String
         eprintln!("Interrupted!");
     }
 
-    log_exe_output(out_log, output);
+    log_exe_output(out_log, &output);
+    output
 }
 
-fn log_exe_output(out_log: &Path, output: std::process::Output) {
+fn log_exe_output(out_log: &Path, output: &std::process::Output) {
     if out_log.exists() {
-        for o in output.stdout {
+        for o in output.stdout.clone() {
             file_ops::log_msg(&out_log, o.to_string());
         }
-        for e in output.stderr {
+        for e in output.stderr.clone() {
             file_ops::log_msg(&out_log, e.to_string());
         }
     }
@@ -255,12 +259,37 @@ pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
     err_msg
 }
 
+/// run_commands executes a list of "wiskers" (commands or tasks) in parallel using the specified number of threads.
+/// 
+/// This function sets up a thread pool and filters the commands to be run based on whether they should 
+/// execute in parallel. It then spawns a new thread for each command, managing synchronization through 
+/// channels for capturing output and handling existing output files.
+/// 
+/// # Arguments
+/// * `func` - A vector of `Wiskers` that defines the commands or tasks to be executed. 
+///   Each `Wisker` contains various attributes such as `para`, `name`, `input`, among others.
+/// * `main_args` - A reference to `MainArgs` from the `config` module, which stores main configuration 
+///   options like output log paths or other parameters required to execute a command.
+/// * `data_paths` - A hash map holding data path mappings. These are used to locate input files required 
+///   by the wiskers for execution.
+/// * `threads` - The number of threads to utilize in the thread pool for parallel execution. If set to 1, 
+///   commands are forced to execute sequentially.
+/// 
+/// # Behavior
+/// - The function initializes a progress indicator and calculates the total number of tasks to be run.
+/// - It checks whether an existing output file prevents the execution of a command unless overwriting is permitted.
+/// - Each command's output (stdout and stderr) is sent through a channel and logged accordingly.
+/// - Commands are spawned using a thread pool, which facilitates running them in parallel if allowed.
+/// 
+/// This function does not explicitly return a value but will perform file write operations for logging 
+/// the standard output and errors for each command executed.
 pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
         .unwrap();
 
+    // crossbeam: let mut run_para = threads != 1;
     let mut run_para = true;
     if threads == 1 {
         run_para = false;
@@ -272,7 +301,11 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .filter(|w| w.para == run_para)
         .collect();
 
-    let (tx, rx) = std::sync::mpsc::channel();
+    // crossbeam:
+    let (tx, rx) = channel::unbounded();
+    let (exit_tx, exit_rx): (channel::Sender<()>, channel::Receiver<()>) = channel::bounded(1);  // Use bounded channel for signaling potential timeout exit
+    // original:
+    // let (tx, rx) = std::sync::mpsc::channel();
     
     // Setup progress bar second level
     let pb = setup::prog_spin_init(960, &main_args.multi_pb, "yellow");
@@ -285,33 +318,53 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
         let pb_clone = pb.clone();
+        // crossbeam:
+        let exit_rx = exit_rx.clone();
         
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
             if input_file != "wiskess_none" {
+                // Build the variables needed to run the binary
                 let (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg) = load_wisker(
                     &main_args_c, 
                     &wisker, 
                     data_paths_c);
         
+                // Create the sub progress bar
                 let pb2_clone = setup::prog_spin_after(&pb_clone, 480, &main_args_c.multi_pb, "white");
                 setup::prog_spin_msg(&pb2_clone, format!("Running: {}", &wisker.name));
                 pb2_clone.inc(1);
 
                 if overwrite_file {
                     if wisker.script {
-                        run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string());
+                        // it has a powershell script, which gets run before the binary
+                        _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string());
                     }
-                    
+
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
-                
-                    file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
-                        &wisker.name, 
-                        &wisker_binary,
-                        &wisker_arg));
+                    
+                    // crossbeam: start
+                    match exit_rx.recv_timeout(Duration::from_secs(60)) {
+                    // match res {
+                        Ok(_) | Err(RecvTimeoutError::Timeout) => {
+                            // Timeout or exit signal received.
+                            file_ops::log_msg(&main_args_c.out_log, format!("[-] Timeout: {} exceeded 60 mins", wisker.name));
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            // crossbeam: end
+                            // run the binary with the args
                         
-                    tx.send(output.stdout).unwrap();
-                    tx.send(output.stderr).unwrap();
+                            file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
+                                &wisker.name, 
+                                &wisker_binary,
+                                &wisker_arg));
+                                
+                            tx.send(output.stdout).unwrap();
+                            tx.send(output.stderr).unwrap();
+                            // crossbeam: start
+                        }
+                    }
+                    // crossbeam: end
                 } else {    
                     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
                     let file_path = format!("{}/{}", &folder_path, &wisker.outfile);
