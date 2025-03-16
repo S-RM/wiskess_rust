@@ -147,7 +147,6 @@ pub mod paths {
         let base_path = Path::new(&data_paths_clone["base"]);
         match base_path.parent() {
             Some(_) => {
-                println!("[DEBUG] This is likely a collection, not collecting.");
                 return Err(data_paths_clone);
             },
             None => (),

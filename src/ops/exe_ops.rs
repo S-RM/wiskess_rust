@@ -8,8 +8,6 @@ use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
 use super::file_ops;
 use std::time::Duration;
-use crossbeam::channel;
-use crossbeam::channel::RecvTimeoutError;
 
 // fn get_pid_process(process_name: &String) -> (u32, f32) {
 //     let mut s = System::new_with_specifics(
@@ -248,7 +246,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
 pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
     let mut installed = false;
     if chk_exists {
-        for test_arg in ["-h", "help", "--version", "-v", "-V"] {
+        for test_arg in ["-h", "help", "--version", "-v", "-V", "-c print('wiskess')"] {
             if check_binary(binary, test_arg) {
                 installed = true;
                 break;
@@ -294,11 +292,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .build()
         .unwrap();
 
-    // crossbeam: let mut run_para = threads != 1;
-    let mut run_para = true;
-    if threads == 1 {
-        run_para = false;
-    }
+    let mut run_para = threads != 1;
 
     let func_c = func.clone();
     let wiskers: Vec<config::Wiskers> = func_c
@@ -306,11 +300,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .filter(|w| w.para == run_para)
         .collect();
 
-    // crossbeam:
-    let (tx, rx) = channel::unbounded();
-    let (exit_tx, exit_rx): (channel::Sender<()>, channel::Receiver<()>) = channel::bounded(1);  // Use bounded channel for signaling potential timeout exit
-    // original:
-    // let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel();
     
     // Setup progress bar second level
     let pb = setup::prog_spin_init(960, &main_args.multi_pb, "yellow");
@@ -323,8 +313,6 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         let main_args_c = main_args.clone();
         let data_paths_c = data_paths.clone();
         let pb_clone = pb.clone();
-        // crossbeam:
-        let exit_rx = exit_rx.clone();
         
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
@@ -348,28 +336,15 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
 
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
                     
-                    // crossbeam: start
-                    match exit_rx.recv_timeout(Duration::from_secs(3600)) {
-                    // match res {
-                        Ok(_) | Err(RecvTimeoutError::Timeout) => {
-                            // Timeout or exit signal received.
-                            file_ops::log_msg(&main_args_c.out_log, format!("[-] Timeout: {} exceeded 60 mins", wisker.name));
-                        }
-                        Err(RecvTimeoutError::Disconnected) => {
-                            // crossbeam: end
-                            // run the binary with the args
+                    // run the binary with the args
+                    file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
+                        &wisker.name, 
+                        &wisker_binary,
+                        &wisker_arg));
                         
-                            file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
-                                &wisker.name, 
-                                &wisker_binary,
-                                &wisker_arg));
-                                
-                            tx.send(output.stdout).unwrap();
-                            tx.send(output.stderr).unwrap();
-                            // crossbeam: start
-                        }
-                    }
-                    // crossbeam: end
+                    tx.send(output.stdout).unwrap();
+                    tx.send(output.stderr).unwrap();
+                            
                 } else {    
                     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
                     let file_path = format!("{}/{}", &folder_path, &wisker.outfile);

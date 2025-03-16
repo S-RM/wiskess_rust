@@ -260,7 +260,7 @@ async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, recurs
     let output_str = output_file.into_os_string();
     let wr_azure_url = format!("'{azure_url}'");
     let az_cmd = match recurse {
-        true => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap(), "--recusive"].to_vec(),
+        true => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap(), "--recursive"].to_vec(),
         false => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec(),
     };
     
@@ -405,8 +405,7 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path)
 
     if paths.is_empty() {
         // Print the collected paths.
-        println!("Path: {:?}", paths);
-        println!("Data: {:?}", data.to_string());
+        println!("[!] No paths or data found in azure");
     }
 
     Ok(paths)
@@ -507,9 +506,10 @@ fn process_data(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: 
 /// then removes any empty or files that need reprocessing after any change to the results
 async fn update_processed_data(out_link: &String, process_folder: &Path, tool_path: &PathBuf, log_name: &Path) {
     // download wiskess folder
-    let process_folder_str = process_folder.to_str().unwrap().to_string();
+    let process_folder_name = process_folder.file_name().unwrap().to_str().unwrap().to_string();
     let output_path =  process_folder.parent().unwrap().to_path_buf();
-    _ = get_file(out_link, &output_path, &process_folder_str, true, tool_path, log_name).await;
+    file_ops::log_msg(log_name, format!("[ ] Updating data... link: {} at path: {}",out_link, output_path.display()));
+    _ = get_file(out_link, &output_path, &process_folder_name, true, tool_path, log_name).await;
     // if artefacts/collection.zip exists, expand it
     let zip_path = output_path.join("Artefacts").join("collection.zip");
     if zip_path.exists() {
@@ -549,11 +549,12 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
         );
         let wiskess_folder = Path::new(&args.local_storage)
             .join(&out_folder.replace("-extracted", "-Wiskess"));
+        let wiskess_folder_name = wiskess_folder.file_name().unwrap().to_str().unwrap();
         let out_folder_path = Path::new(&args.local_storage).join(&out_folder);
         // set the in_link based on the item of the data_list
         let in_link_url = set_link(&args.in_link, &data_item);
         // set the out_link based on the provided out_link and the process folder
-        let out_link_url = set_link(&args.out_link, &out_folder.replace("-extracted", "-Wiskess"));
+        let out_link_url = set_link(&args.out_link, &wiskess_folder_name);
         // check if the process folder exists in the out_link
         let is_processed = !list_files(&out_link_url, &tool_path, log_name).await?.is_empty();
         // if the process folder doens't exist in the out_link or the update flag is set
@@ -569,7 +570,13 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
             file_ops::log_msg(log_name, format!("Pre-processed data: {:?}", process_vector));
             // update the data
             if args.update {
-                update_processed_data(&out_link_url, &out_folder_path, tool_path, log_name).await;
+                println!("[ ] Updating the processed data...");
+                update_processed_data(
+                    &out_link_url,
+                    &wiskess_folder,
+                    tool_path,
+                    log_name
+                ).await;
             }
             // process the data with a loop through the process_vector, set the process folder path
             let mut wiskess_args = config::MainArgs {
