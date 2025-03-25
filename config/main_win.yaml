@@ -93,6 +93,7 @@ wiskers:
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
     input: objects
+    chk_exists: false
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
@@ -100,6 +101,7 @@ wiskers:
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects
+    chk_exists: false
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: Prefetch
     binary: '{tool_path}\Get-ZimmermanTools\net6\PECmd.exe'
@@ -294,12 +296,14 @@ reporters:
     outfolder: Timeline
     outfile: '*.json'
     input: none
+    chk_exists: false
   - name: polars hostinfo
     binary: py
     args: '{tool_path}/polars_hostinfo.py {out_path} {outfile}'
     outfolder: Timeline
     outfile: 'Host_Information.txt'
     input: none
+    chk_exists: false
   - name: iocs_summary
     binary: rg.exe
     args: '-aiwFf {ioc_file} {outfolder} --json > {outfolder}/{outfile}'

@@ -293,6 +293,7 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
         }
     }
     
+    println!("[ ] Downloading: {}", file);
     if in_link.starts_with("s3") {
         get_s3_file(&in_link, &output, &file, recurse).await
     } else if in_link.starts_with("https://") {
