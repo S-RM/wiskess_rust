@@ -302,7 +302,7 @@ fn main() {
                 keep_evidence,
             };
 
-            whip_main::whip_main(args, &tool_path);
+            let _ = whip_main::whip_main(args, &tool_path);
         }
     }
 }

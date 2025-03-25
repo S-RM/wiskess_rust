@@ -3,33 +3,9 @@ use std::{collections::HashMap, io::Write, path::Path, process::{Command, Stdio}
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
-// use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
 use super::file_ops;
-use std::time::Duration;
-
-// fn get_pid_process(process_name: &String) -> (u32, f32) {
-//     let mut s = System::new_with_specifics(
-//         RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
-//     );
-//     let cpu_cores = s.physical_core_count();
-//     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-//     s.refresh_cpu();
-//     for (pid, process) in s.processes() {
-//         match process.name() {
-//             process_name => {
-//                 let cpu_usage = if let Some(process) = s.process(*pid) {
-//                     process.cpu_usage()
-//                 } else {
-//                     0.0
-//                 };
-//                 return (pid.as_u32(), cpu_usage / cpu_cores.unwrap() as f32)
-//             }
-//         }
-//     }
-//     (0, 0.0)
-// }
 
 pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     let mut pwsh = "pwsh".to_string();
@@ -60,7 +36,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 
     if let Some(exit_code) = output.status.code() {
         if exit_code != 0 {
-            eprintln!("Failed.");
+            eprintln!("Failed to run whipped script at path {}.", script);
         }
     } else {
         eprintln!("Interrupted!");
@@ -95,7 +71,7 @@ pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String
 
     if let Some(exit_code) = output.status.code() {
         if exit_code != 0 {
-            eprintln!("Failed.");
+            eprintln!("Failed to run PowerShell payload: {}.", payload);
         }
     } else {
         eprintln!("Interrupted!");
@@ -292,7 +268,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         .build()
         .unwrap();
 
-    let mut run_para = threads != 1;
+    let run_para = threads != 1;
 
     let func_c = func.clone();
     let wiskers: Vec<config::Wiskers> = func_c

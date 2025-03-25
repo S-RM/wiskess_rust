@@ -15,7 +15,7 @@ use std::env;
 use walkdir::WalkDir;
 use fs_extra::dir::{create, move_dir, remove, CopyOptions};
 use fs_extra::file::{move_file, CopyOptions as FileCopyOptions};
-use inquire::Text;
+// use inquire::{Confirm, Text};
 
 #[derive(Debug, Deserialize)]
 struct Item {
@@ -237,7 +237,10 @@ async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse: boo
         file_ops::make_folders(&output);
     }
     
-    let args = format!("s3 cp {s3_url} {} --output=json", output.display());
+    let args = match recurse {
+        true => format!("s3 cp {s3_url} {} --output=json --recursive", output.display()),
+        false => format!("s3 cp {s3_url} {} --output=json", output.display())
+    };
     exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
 
     let out_file = if output.join(file).exists() {
@@ -347,6 +350,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
         let _json_data = run_cmd(bin_path, zip_cmd, log_name).unwrap();
     }
     // upload the process folder
+    println!("[ ] Uploading: {}", in_folder.display());
     if out_link.starts_with("s3") {
         put_s3_file(&in_folder, &out_link).await
     } else if out_link.starts_with("https://") {
@@ -403,11 +407,6 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path)
         }
     }
 
-    if paths.is_empty() {
-        // Print the collected paths.
-        println!("[!] No paths or data found in azure");
-    }
-
     Ok(paths)
 
 }
@@ -435,13 +434,13 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path) -> R
 /// no Windows folder is found, all the drives are processed.
 /// # Arguments
 /// * `args` - the arguments needed to pass to the start_wiskess function
-fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: PathBuf, artefacts_config: PathBuf) {
+fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, _config: PathBuf, _artefacts_config: PathBuf) {
     // TODO: set free_drives as the drive letters that are available and have no disk mounted
     // Loop through three mounting tools: arsenal image mounter, osf_mount, and qemu-nbd
     let aim_ds_path = format!("--filename=\"{}\"", data_source.display());
     let osf_ds_path = format!("'{}'", data_source.display());
     let tool_map = HashMap::from([
-        // ("{tool_path}/aim_cli.exe", vec!["--mount", "--readonly", &aim_ds_path, "--fakesig", "--background"]),
+        ("{tool_path}/aim_cli.exe", vec!["--mount", "--readonly", &aim_ds_path, "--fakesig", "--background"]),
         ("C:/Program Files/OSFMount/OSFMount.com", vec!["-a", "-t", "file", "-f", &osf_ds_path, "-v", "all"]), 
         // ("qemu-nbd", vec!["-c", "/dev/ndb1", &osf_ds_path])
     ]);
@@ -458,11 +457,15 @@ fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, config:
             println!("[+] Running {} {}", bin_path.display(), cmd.join(" "));
             let output = run_cmd(bin_path, cmd, &log_name);
             println!("{}", String::from_utf8(output.unwrap().stdout).unwrap());
-            let status = Text::new("Has it been mounted?").prompt();
+            // let status = Confirm::new("Has it been mounted?").with_default(false).prompt();
+            // if successfully mounted break the loop
+            // if status. {
+            //     Ok(true) => break,
+            //     &_ => continue,
+            // }
         }
         // get the drive letter and loop through mounted drives
         // if drive letter not found, loop through free_drives to find any that have mounted drives
-        // if successfully mounted break the loop
         break;
     }
     if !any_tool {
@@ -524,21 +527,20 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
 
 
 #[tokio::main]
-pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
-    let mut data_list = Vec::new();
-    
+pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {    
     let log_name = Path::new("whipped_main.log");
 
-    if args.data_source_list == "" {
+    let data_list = if args.data_source_list == "" {
         // if no data source list provided, list the files/blobs/objects in the in_link
-        data_list = list_files(&args.in_link, &tool_path, log_name).await?;
+        let data_list = list_files(&args.in_link, &tool_path, log_name).await?;
         if data_list.is_empty() {
             bail!("Error: user provided no data list and we were unable to list any files from link: {}", &args.in_link)
         }
+        data_list
     } else {
         // split the data source list by either commas, new lines, if needed
-        data_list = split_and_trim(&args.data_source_list);
-    }
+        split_and_trim(&args.data_source_list)
+    };
     // loop through the data_list
     for data_item in data_list {
         println!("[ ] processing {data_item}");
