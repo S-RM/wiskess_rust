@@ -367,7 +367,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
-            py ./setup_get_git.py "%1" "%2" windows
+            py ./setup_get_git.py %1 %2 windows
             "#,
             &vec![github_token.clone(), url.to_string()],
             &options

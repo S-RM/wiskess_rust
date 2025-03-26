@@ -12,13 +12,16 @@ use crate::webs::web;
 use crate::whipped::whip_main;
 
 use std::path::PathBuf;
+use std::process::exit;
 use std::{path::Path,env};
+use anyhow::bail;
 use clap::{ArgAction, Parser, Subcommand};
 use ctrlc;
 use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
+use windows_elevate::check_elevated;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -166,6 +169,19 @@ fn show_banner() {
     println!("{}", style(msg_version).yellow());
 }
 
+fn check_elevation() -> Result<(), anyhow::Error>{
+    match env::consts::OS {
+        "windows" => {
+            let is_elevated = check_elevated().expect("Failed to call check_elevated");
+            if !is_elevated {
+                bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
+            }
+        },
+        &_ => {}
+    }
+    Ok(())
+}
+
 fn main() {
     // Set exit handler
     ctrlc::set_handler(move || {
@@ -178,6 +194,15 @@ fn main() {
 
     // Display banner
     show_banner();
+
+    // check we are running as administrator or as root
+    match check_elevation() {
+        Ok(()) => println!("[+] Running with elated permissions"),
+        Err(e) => {
+            println!("[!] Please use an elevated terminal. Error: {}", e);
+            exit(0)
+        }
+    }
 
     // Set tool path
     let tool_path = Path::new(&args.tool_path);

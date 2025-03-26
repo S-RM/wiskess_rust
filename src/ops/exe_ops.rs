@@ -46,11 +46,12 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// run powershell, checking filepaths for powershell or pwsh
 /// 
 /// Args:
-/// * func: set whether the payload is executed as file `-f` or command `-c`
-/// * payload: either script or command
-/// * out_log: the file path to the wiskess log
-/// * git_token: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
-pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String) -> std::process::Output {
+/// * `func`: set whether the payload is executed as file `-f` or command `-c`
+/// * `payload`: either script or command
+/// * `out_log`: the file path to the wiskess log
+/// * `git_token`: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
+/// * `show_err`: don't show an error if the command doesn't work. 
+pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String, show_err: bool) -> std::process::Output {
     if out_log.exists() {
         file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
     }
@@ -70,7 +71,7 @@ pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String
     let output = command.execute_output().unwrap();
 
     if let Some(exit_code) = output.status.code() {
-        if exit_code != 0 {
+        if exit_code != 0  && show_err {
             eprintln!("Failed to run PowerShell payload: {}.", payload);
         }
     } else {
@@ -307,7 +308,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                 if overwrite_file {
                     if wisker.script {
                         // it has a powershell script, which gets run before the binary
-                        _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string());
+                        _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string(), true);
                     }
 
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);

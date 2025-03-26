@@ -142,7 +142,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
     let unzip_cmd = ["x", "-aos", data_str.to_str().unwrap(), extract_flag.as_str()].to_vec();
                         
     let bin_path = Path::new("7z.exe").to_path_buf();
-    let _json_data = run_cmd(bin_path, unzip_cmd, log_name).unwrap();
+    let _json_data = run_cmd(bin_path, unzip_cmd, log_name, true).unwrap();
     // TODO: check for archives at one level deep, adding paths to the process_vector
     // loop through the extracted archive at one level down, adding relevant data to process_vector
     let entries: Vec<PathBuf> = WalkDir::new(data_folder)
@@ -208,7 +208,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
 /// # Arguments
 /// * `bin_path` - the path to the binary to run
 /// * `cmd` - a vector of commands to run, these are joined with spaces before running
-fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path) -> Result<std::process::Output, anyhow::Error> {
+fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: bool) -> Result<std::process::Output, anyhow::Error> {
     let binary = bin_path
         .into_os_string()
         .into_string()
@@ -217,7 +217,7 @@ fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path) -> Result<std::pr
     let cmd = cmd.join(" ");
     
     let output = match env::consts::OS {
-        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new()),
+        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new(), show_err),
         "linux" => run_wisker(&binary, &cmd, log_name),
         &_ => todo!()
     };
@@ -268,7 +268,7 @@ async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, recurs
     };
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let _json_data = run_cmd(bin_path, az_cmd, log_name)?;
+    let _json_data = run_cmd(bin_path, az_cmd, log_name, true)?;
 
     Ok(output.join(file))
 }
@@ -333,7 +333,7 @@ async fn put_azure_file(input: &PathBuf, azure_url: &str, tool_path: &Path, log_
     let az_cmd = ["copy", input_str.to_str().unwrap(), wr_azure_url.as_str(), "--recursive"].to_vec();
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let _json_data = run_cmd(bin_path, az_cmd, log_name).unwrap();
+    let _json_data = run_cmd(bin_path, az_cmd, log_name, true).unwrap();
 }
 
 /// Upload files to either S3 or Azure storage
@@ -348,7 +348,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
         let zip_cmd = ["a", zip_path.to_str().unwrap(), art_folder.to_str().unwrap()].to_vec();
                             
         let bin_path = Path::new("7z.exe").to_path_buf();
-        let _json_data = run_cmd(bin_path, zip_cmd, log_name).unwrap();
+        let _json_data = run_cmd(bin_path, zip_cmd, log_name, true).unwrap();
     }
     // upload the process folder
     println!("[ ] Uploading: {}", in_folder.display());
@@ -390,12 +390,13 @@ async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
 /// List files in an Azure container.
 /// # Arguments
 /// * `azure_url` - The Azure URL to list files from.
-async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path) -> Result<Vec<String>> {
+/// * `show_err` - used for showing if the command was run OK. Set to false for not showing error and listing all files.
+async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
     let wr_azure_url = format!("'{azure_url}'");
     let az_cmd = ["list", wr_azure_url.as_str()].to_vec();
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let json_data = run_cmd(bin_path, az_cmd, log_name)?;
+    let json_data = run_cmd(bin_path, az_cmd, log_name, show_err)?;
 
     let mut paths = Vec::new();
     let data = String::from_utf8(json_data.stdout)?;
@@ -404,7 +405,16 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path)
     for line in data.lines() {
         // Split each line at the first semicolon and collect the first part.
         if let Some((path, _)) = line.split_once(";") {
-            paths.push(path.trim().to_string());
+            // exclude paths with unsupported extensions
+            match show_err {
+                true => {
+                    match Path::new(path).extension().unwrap_or_default().to_str().unwrap_or("") {
+                        "zip"|"rar"|"7z"|"vmdk"|"vhdx"|"vhd"|"e01"|"vdi"|"ex01"|"raw" => paths.push(path.trim().to_string()),
+                        &_ => continue,
+                        }
+                    },
+                false => paths.push(path.trim().to_string())
+            }
         }
     }
 
@@ -416,11 +426,11 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path)
 ///
 /// # Arguments
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
-async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path) -> Result<Vec<String>> {
+async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
     let files = if in_link.starts_with("s3") {
         list_s3_files(&in_link).await?
     } else if in_link.starts_with("https://") {
-        list_azure_files(&in_link, &tool_path, log_name).await?
+        list_azure_files(&in_link, &tool_path, log_name, show_err).await?
     } else {
         panic!("Unknown URL format.");
     };
@@ -456,7 +466,7 @@ fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, _config
         || bin_path.exists() {
             any_tool = true;
             println!("[+] Running {} {}", bin_path.display(), cmd.join(" "));
-            let output = run_cmd(bin_path, cmd, &log_name);
+            let output = run_cmd(bin_path, cmd, &log_name, true);
             println!("{}", String::from_utf8(output.unwrap().stdout).unwrap());
             // let status = Confirm::new("Has it been mounted?").with_default(false).prompt();
             // if successfully mounted break the loop
@@ -520,7 +530,7 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
         let zip_out_cmd = format!("-o{}", process_folder.display());
         let zip_cmd = ["x", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
         let bin_path = Path::new("7z.exe").to_path_buf();
-        _ = run_cmd(bin_path, zip_cmd, log_name);
+        _ = run_cmd(bin_path, zip_cmd, log_name, true);
     }
     // remove any process result files that are zero size
     // remove timeline folder, ioc summary and ioc in analysis
@@ -533,7 +543,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
 
     let data_list = if args.data_source_list == "" {
         // if no data source list provided, list the files/blobs/objects in the in_link
-        let data_list = list_files(&args.in_link, &tool_path, log_name).await?;
+        let data_list = list_files(&args.in_link, &tool_path, log_name, true).await?;
         if data_list.is_empty() {
             bail!("Error: user provided no data list and we were unable to list any files from link: {}", &args.in_link)
         }
@@ -559,7 +569,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
         // set the out_link based on the provided out_link and the process folder
         let out_link_url = set_link(&args.out_link, &wiskess_folder_name);
         // check if the process folder exists in the out_link
-        let is_processed = !list_files(&out_link_url, &tool_path, log_name).await?.is_empty();
+        let is_processed = !list_files(&out_link_url, &tool_path, log_name, false).await?.is_empty();
         // if the process folder doens't exist in the out_link or the update flag is set
         if !is_processed || args.update {
             // download the data
