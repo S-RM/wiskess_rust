@@ -2,11 +2,11 @@ use crate::configs::config::{self, MainArgs, WhippedArgs};
 use crate::ops::exe_ops::{installed_binary_check, run_wisker, run_posh};
 use crate::ops::{file_ops, wiskess};
 
-use super::super::ops::exe_ops;
+use super::whip_s3;
+use super::whip_az;
 
 use anyhow::{bail, Ok};
 use indicatif::MultiProgress;
-use serde::Deserialize;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::metadata;
@@ -16,20 +16,6 @@ use walkdir::WalkDir;
 use fs_extra::dir::{create, move_dir, remove, CopyOptions};
 use fs_extra::file::{move_file, CopyOptions as FileCopyOptions};
 // use inquire::{Confirm, Text};
-
-#[derive(Debug, Deserialize)]
-struct Item {
-    key: String,
-    // last_modified: String,
-    // etag: String,
-    // size: u64,
-    // storage_class: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Contents {
-    contents: Vec<Item>,
-}
 
 /// set_link determines whether the link is an AWS S3 or Azure Blob Storage URL using 
 /// regex patterns. It then appends the provided component to the base URL accordingly.
@@ -208,7 +194,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
 /// # Arguments
 /// * `bin_path` - the path to the binary to run
 /// * `cmd` - a vector of commands to run, these are joined with spaces before running
-fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: bool) -> Result<std::process::Output, anyhow::Error> {
+pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: bool) -> Result<std::process::Output, anyhow::Error> {
     let binary = bin_path
         .into_os_string()
         .into_string()
@@ -222,55 +208,6 @@ fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: bool) -
         &_ => todo!()
     };
     Ok(output)
-}
-
-/// Download a file from an S3 bucket.
-/// # Arguments
-/// * `s3_url` - The S3 URL of the file
-/// * `folder` - The path to download to
-async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse: bool) -> Result<PathBuf> {
-    // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
-
-    if !output.exists() {
-        // make the output folder
-        file_ops::make_folders(&output);
-    }
-    
-    let args = match recurse {
-        true => format!("s3 cp {s3_url} {} --output=json --recursive", output.display()),
-        false => format!("s3 cp {s3_url} {} --output=json", output.display())
-    };
-    exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
-
-    let out_file = if output.join(file).exists() {
-        output.join(file)
-    } else {
-        PathBuf::new()
-    };
-
-    Ok(out_file)
-}
-
-/// Download a file from an Azure Storage, returning the path to the downloaded file
-/// # Arguments
-/// * `azure_url` - the url to the azure store hosting the file
-/// * `output` - the path to where the file will be downloaded
-/// * `file` - the name of the file on the azure store
-/// * `tool_path` - the path to the tools, such as where azcopy.exe would be
-async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
-    let output_file = output.join(file);
-    let output_str = output_file.into_os_string();
-    let wr_azure_url = format!("'{azure_url}'");
-    let az_cmd = match recurse {
-        true => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap(), "--recursive"].to_vec(),
-        false => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec(),
-    };
-    
-    let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let _json_data = run_cmd(bin_path, az_cmd, log_name, true)?;
-
-    Ok(output.join(file))
 }
 
 /// Get files from either an S3 or Azure link. First checks if the file name exists in the path
@@ -295,45 +232,13 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
     
     println!("[ ] Downloading: {}", file);
     if in_link.starts_with("s3") {
-        get_s3_file(&in_link, &output, &file, recurse).await
+        whip_s3::get_s3_file(&in_link, &output, &file, recurse).await
     } else if in_link.starts_with("https://") {
-        get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
+        whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else {
         println!("[!] Unknown URL format. {in_link}");
         panic!("Unknown URL format.");
     }
-}
-
-/// Download a file from an S3 bucket.
-/// # Arguments
-/// * `input` - the path to where the file will be uploaded
-/// * `s3_url` - The S3 URL of the file
-async fn put_s3_file(input: &PathBuf, s3_url: &str) {
-    // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
-
-    if !input.exists() {
-        // make the output folder
-        println!("[!] Folder or file to upload does not exist, cannot be found at {}", input.display());
-        return;
-    }
-    
-    let args = format!("s3 cp {} {s3_url} --output=json", input.display());
-    exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
-}
-
-/// Download a file from an Azure Storage, returning the path to the downloaded file
-/// # Arguments
-/// * `input` - the path to where the file will be uploaded
-/// * `azure_url` - the url to the azure store hosting the file
-/// * `tool_path` - the path to the tools, such as where azcopy.exe would be
-async fn put_azure_file(input: &PathBuf, azure_url: &str, tool_path: &Path, log_name: &Path) {
-    let wr_azure_url = format!("'{azure_url}'");
-    let input_str = &input.clone().into_os_string();
-    let az_cmd = ["copy", input_str.to_str().unwrap(), wr_azure_url.as_str(), "--recursive"].to_vec();
-    
-    let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let _json_data = run_cmd(bin_path, az_cmd, log_name, true).unwrap();
 }
 
 /// Upload files to either S3 or Azure storage
@@ -353,73 +258,13 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
     // upload the process folder
     println!("[ ] Uploading: {}", in_folder.display());
     if out_link.starts_with("s3") {
-        put_s3_file(&in_folder, &out_link).await
+        whip_s3::put_s3_file(&in_folder, &out_link).await
     } else if out_link.starts_with("https://") {
-        put_azure_file(&in_folder, &out_link, &tool_path, log_name).await
+        whip_az::put_azure_file(&in_folder, &out_link, &tool_path, log_name).await
     } else {
         println!("[!] Unknown URL format. {out_link}");
         panic!("Unknown URL format.");
     }
-}
-
-/// List files in an S3 bucket.
-/// # Arguments
-/// * `s3_url` - The S3 URL to list files from.
-async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
-    let bucket = s3_url.trim_start_matches("s3://");
-    // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
-    
-    // aws s3api list-objects-v2 --bucket ir-evidence-falcon --region eu-central-1 --output=json
-    // let args = format!("s3api list-objects-v2 --bucket {bucket} --region {region} --output=json");
-    let args = format!("s3api list-objects-v2 --bucket {bucket} --output=json");
-    let json_data = exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
-
-    // Deserialize the JSON string to the Contents struct
-    println!("[ ] JSON from AWS S3 list: {:?}", json_data.stdout);
-    let contents: Contents = serde_json::from_str(&String::from_utf8(json_data.stdout)?)?;
-    println!("[ ] Contents from AWS S3 list: {:?}", contents);
-    
-    // Collect all Key values into a vector
-    let files = contents.contents.into_iter().map(|item| item.key).collect();
-    
-    println!("[ ] Files from AWS S3 list: {:?}", files);
-    Ok(files)
-}
-
-/// List files in an Azure container.
-/// # Arguments
-/// * `azure_url` - The Azure URL to list files from.
-/// * `show_err` - used for showing if the command was run OK. Set to false for not showing error and listing all files.
-async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
-    let wr_azure_url = format!("'{azure_url}'");
-    let az_cmd = ["list", wr_azure_url.as_str()].to_vec();
-    
-    let bin_path = tool_path.join("azcopy").join("azcopy.exe");
-    let json_data = run_cmd(bin_path, az_cmd, log_name, show_err)?;
-
-    let mut paths = Vec::new();
-    let data = String::from_utf8(json_data.stdout)?;
-
-    // Iterate over each line.
-    for line in data.lines() {
-        // Split each line at the first semicolon and collect the first part.
-        if let Some((path, _)) = line.split_once(";") {
-            // exclude paths with unsupported extensions
-            match show_err {
-                true => {
-                    match Path::new(path).extension().unwrap_or_default().to_str().unwrap_or("") {
-                        "zip"|"rar"|"7z"|"vmdk"|"vhdx"|"vhd"|"e01"|"vdi"|"ex01"|"raw" => paths.push(path.trim().to_string()),
-                        &_ => continue,
-                        }
-                    },
-                false => paths.push(path.trim().to_string())
-            }
-        }
-    }
-
-    Ok(paths)
-
 }
 
 /// List files from either an S3 or Azure link.
@@ -428,9 +273,9 @@ async fn list_azure_files(azure_url: &str, tool_path: &PathBuf, log_name: &Path,
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
     let files = if in_link.starts_with("s3") {
-        list_s3_files(&in_link).await?
+        whip_s3::list_s3_files(&in_link).await?
     } else if in_link.starts_with("https://") {
-        list_azure_files(&in_link, &tool_path, log_name, show_err).await?
+        whip_az::list_azure_files(&in_link, &tool_path, log_name, show_err).await?
     } else {
         panic!("Unknown URL format.");
     };
