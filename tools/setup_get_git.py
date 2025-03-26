@@ -29,7 +29,7 @@ def get_files(response: str, target_dir: str):
       elif file_type.mime == 'application/gzip':
         # extract it
         shutil.unpack_archive(filename, target_dir)
-      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec'):
+      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
         shutil.copy(filename, target_dir)
       else:
         print(f'[!] Unable to extract release {filename} archive with mime type: {file_type.mime}')
