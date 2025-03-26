@@ -1,33 +1,11 @@
+use core::str;
 use std::{collections::HashMap, io::Write, path::Path, process::{Command, Stdio}};
 use execute::{shell, Execute};
 use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
-// use sysinfo::{CpuRefreshKind, RefreshKind, System};
 use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
 use super::file_ops;
-
-// fn get_pid_process(process_name: &String) -> (u32, f32) {
-//     let mut s = System::new_with_specifics(
-//         RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
-//     );
-//     let cpu_cores = s.physical_core_count();
-//     std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
-//     s.refresh_cpu();
-//     for (pid, process) in s.processes() {
-//         match process.name() {
-//             process_name => {
-//                 let cpu_usage = if let Some(process) = s.process(*pid) {
-//                     process.cpu_usage()
-//                 } else {
-//                     0.0
-//                 };
-//                 return (pid.as_u32(), cpu_usage / cpu_cores.unwrap() as f32)
-//             }
-//         }
-//     }
-//     (0, 0.0)
-// }
 
 pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     let mut pwsh = "pwsh".to_string();
@@ -58,7 +36,7 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 
     if let Some(exit_code) = output.status.code() {
         if exit_code != 0 {
-            eprintln!("Failed.");
+            eprintln!("Failed to run whipped script at path {}.", script);
         }
     } else {
         eprintln!("Interrupted!");
@@ -68,11 +46,12 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
 /// run powershell, checking filepaths for powershell or pwsh
 /// 
 /// Args:
-/// * func: set whether the payload is executed as file or command
-/// * payload: either script or command
-/// * out_log: the file path to the wiskess log
-/// * git_token: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
-pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String) {
+/// * `func`: set whether the payload is executed as file `-f` or command `-c`
+/// * `payload`: either script or command
+/// * `out_log`: the file path to the wiskess log
+/// * `git_token`: the user's token for use in the setup, can be a blank string if not in use, i.e. ""
+/// * `show_err`: don't show an error if the command doesn't work. 
+pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String, show_err: bool) -> std::process::Output {
     if out_log.exists() {
         file_ops::log_msg(&out_log, format!("[ ] Powershell function running: {} with payload: {}", func, payload));
     }
@@ -92,24 +71,29 @@ pub fn run_posh(func: &str, payload: &String, out_log: &Path, git_token: &String
     let output = command.execute_output().unwrap();
 
     if let Some(exit_code) = output.status.code() {
-        if exit_code != 0 {
-            eprintln!("Failed.");
+        if exit_code != 0  && show_err {
+            eprintln!("Failed to run PowerShell payload: {}.", payload);
         }
     } else {
         eprintln!("Interrupted!");
     }
 
-    log_exe_output(out_log, output);
+    log_exe_output(out_log, &output);
+    output
 }
 
-fn log_exe_output(out_log: &Path, output: std::process::Output) {
+fn log_exe_output(out_log: &Path, output: &std::process::Output) {
     if out_log.exists() {
-        for o in output.stdout {
-            file_ops::log_msg(&out_log, o.to_string());
+        match str::from_utf8(&output.stdout) {
+            Ok(v) => file_ops::log_msg(out_log, v.to_string()),
+            Err(e) => file_ops::log_msg(out_log, format!("Invalid UTF-8 sequence: {}", e)),
         }
-        for e in output.stderr {
-            file_ops::log_msg(&out_log, e.to_string());
-        }
+        // for o in output.stdout.clone() {
+        //     file_ops::log_msg(&out_log, o.to_string());
+        // }
+        // for e in output.stderr.clone() {
+        //     file_ops::log_msg(&out_log, e.to_string());
+        // }
     }
 }
 
@@ -224,21 +208,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     );
 
     // check binary is installed
-    let mut installed = false;
-    if wisker.chk_exists {
-        for test_arg in ["-h", "help", "--version", "-v", "-V"] {
-            if check_binary(&wisker_binary, test_arg) {
-                installed = true;
-                break;
-            }
-        }
-    } else {
-        installed = true;
-    }
-    let mut err_msg = "".to_string();
-    if !installed {
-        err_msg = format!("[!] The path `{}` is not a correct executable binary file.", wisker_binary); 
-    }
+    let err_msg = installed_binary_check(wisker.chk_exists, &wisker_binary);
             
     // Check if the outfile already exists, ask user to overwrite
     let check_outfile = Path::new(&folder_path_str).join(&wisker.outfile);
@@ -250,16 +220,56 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
     (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg)
 }
 
+pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
+    let mut installed = false;
+    if chk_exists {
+        for test_arg in ["-h", "help", "--version", "-v", "-V", "-c print('wiskess')"] {
+            if check_binary(binary, test_arg) {
+                installed = true;
+                break;
+            }
+        }
+    } else {
+        installed = true;
+    }
+    let mut err_msg = "".to_string();
+    if !installed {
+        err_msg = format!("[!] The path `{}` is not a correct executable binary file.", binary); 
+    }
+    err_msg
+}
+
+/// run_commands executes a list of "wiskers" (commands or tasks) in parallel using the specified number of threads.
+/// 
+/// This function sets up a thread pool and filters the commands to be run based on whether they should 
+/// execute in parallel. It then spawns a new thread for each command, managing synchronization through 
+/// channels for capturing output and handling existing output files.
+/// 
+/// # Arguments
+/// * `func` - A vector of `Wiskers` that defines the commands or tasks to be executed. 
+///   Each `Wisker` contains various attributes such as `para`, `name`, `input`, among others.
+/// * `main_args` - A reference to `MainArgs` from the `config` module, which stores main configuration 
+///   options like output log paths or other parameters required to execute a command.
+/// * `data_paths` - A hash map holding data path mappings. These are used to locate input files required 
+///   by the wiskers for execution.
+/// * `threads` - The number of threads to utilize in the thread pool for parallel execution. If set to 1, 
+///   commands are forced to execute sequentially.
+/// 
+/// # Behavior
+/// - The function initializes a progress indicator and calculates the total number of tasks to be run.
+/// - It checks whether an existing output file prevents the execution of a command unless overwriting is permitted.
+/// - Each command's output (stdout and stderr) is sent through a channel and logged accordingly.
+/// - Commands are spawned using a thread pool, which facilitates running them in parallel if allowed.
+/// 
+/// This function does not explicitly return a value but will perform file write operations for logging 
+/// the standard output and errors for each command executed.
 pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_paths: &HashMap<String, String>, threads: usize) {
     let pool = ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
         .unwrap();
 
-    let mut run_para = true;
-    if threads == 1 {
-        run_para = false;
-    }
+    let run_para = threads != 1;
 
     let func_c = func.clone();
     let wiskers: Vec<config::Wiskers> = func_c
@@ -284,22 +294,26 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
             if input_file != "wiskess_none" {
+                // Build the variables needed to run the binary
                 let (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg) = load_wisker(
                     &main_args_c, 
                     &wisker, 
                     data_paths_c);
         
+                // Create the sub progress bar
                 let pb2_clone = setup::prog_spin_after(&pb_clone, 480, &main_args_c.multi_pb, "white");
                 setup::prog_spin_msg(&pb2_clone, format!("Running: {}", &wisker.name));
                 pb2_clone.inc(1);
 
                 if overwrite_file {
                     if wisker.script {
-                        run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string());
+                        // it has a powershell script, which gets run before the binary
+                        _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string(), true);
                     }
-                    
+
                     let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
-                
+                    
+                    // run the binary with the args
                     file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
                         &wisker.name, 
                         &wisker_binary,
@@ -307,6 +321,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                         
                     tx.send(output.stdout).unwrap();
                     tx.send(output.stderr).unwrap();
+                            
                 } else {    
                     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
                     let file_path = format!("{}/{}", &folder_path, &wisker.outfile);

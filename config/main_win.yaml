@@ -1,6 +1,6 @@
 wiskers:
   - name: MFTECmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileSystem
     outfile: MFTECmd.csv
@@ -14,28 +14,28 @@ wiskers:
     input: mft
     github: https://github.com/omerbenamram/mft
   - name: usnjrnl-j
-    binary: '{tool_path}\Get-ZimmermanTools\net6\MFTECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileSystem
     outfile: usnjrnl-j-file.csv
     input: j_file
     github: https://github.com/EricZimmerman/MFTECmd.git
   - name: rbcmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\RBCmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\RBCmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: FileSystem
     outfile: '*RBCmd_Output.csv'
     input: recycle_bin
     github: https://github.com/EricZimmerman/RBCmd.git
   - name: lnk
-    binary: '{tool_path}\Get-ZimmermanTools\net6\LECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\LECmd.exe'
     args: -d {input} --csv {outfolder} --csvf {outfile} -q
     outfolder: FileSystem
     outfile: lnk-files.csv
     input: user_dir
     github: https://github.com/EricZimmerman/LECmd.git
   - name: EvtxECmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\EvtxECmd\EvtxECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\EvtxECmd\EvtxECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: EventLogs
     outfile: EvtxECmd-All.csv
@@ -59,7 +59,7 @@ wiskers:
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AmcacheParser
-    binary: '{tool_path}\Get-ZimmermanTools\net6\AmcacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\AmcacheParser.exe'
     args: '-f {input} --csv {outfolder} -i'
     outfolder: FileExecution
     outfile: '*_Amcache_*'
@@ -74,14 +74,14 @@ wiskers:
     outfile: chainsaw_srum.json
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: AppCompatCache
-    binary: '{tool_path}\Get-ZimmermanTools\net6\AppCompatCacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\AppCompatCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileExecution
     outfile: appcompatcache.csv
     input: system
     github: https://github.com/EricZimmerman/AppCompatCacheParser.git
   - name: RecentFileCacheParser
-    binary: '{tool_path}\Get-ZimmermanTools\net6\RecentFileCacheParser.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\RecentFileCacheParser.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
     outfolder: FileExecution
     outfile: RecentFileCache.csv
@@ -93,6 +93,7 @@ wiskers:
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
     input: objects
+    chk_exists: false
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
@@ -100,16 +101,17 @@ wiskers:
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects
+    chk_exists: false
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: Prefetch
-    binary: '{tool_path}\Get-ZimmermanTools\net6\PECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\PECmd.exe'
     args: '-d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
     outfolder: FileExecution
     outfile: prefetch.csv
     input: prefetch
     github: https://github.com/EricZimmerman/Prefetch.git
   - name: SrumECmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\SrumECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\SrumECmd.exe'
     args: '-f {input} -r {input_other} --csv {outfolder}'
     outfolder: Network
     outfile: '*_SrumECmd_*.csv'
@@ -159,7 +161,7 @@ wiskers:
         }
       }'
   - name: SumECmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\SumECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\SumECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: Network
     outfile: '*SumECmd*.csv'
@@ -182,35 +184,35 @@ wiskers:
         }
     }'
   - name: RegSystem
-    binary: '{tool_path}\Get-ZimmermanTools\net6\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\Get-ZimmermanTools\net6\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\RECmd\RECmd.exe'
+    args: '--bn {tool_path}\Get-ZimmermanTools\net9\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
     outfile: reg-System.csv
     input: system_config
     github:
   - name: RegUser
-    binary: '{tool_path}\Get-ZimmermanTools\net6\RECmd\RECmd.exe'
-    args: '--bn {tool_path}\Get-ZimmermanTools\net6\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\RECmd\RECmd.exe'
+    args: '--bn {tool_path}\Get-ZimmermanTools\net9\RECmd\BatchExamples\Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: Registry
     outfile: reg-User.csv
     input: user_dir
     github:
   - name: SBE
-    binary: '{tool_path}\Get-ZimmermanTools\net6\SBECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\SBECmd.exe'
     args: '-d {input} --csv {outfolder}'
     outfolder: UserActivity
     outfile: '*SBECmd_Messages.txt'
     input: user_dir
     github:
   - name: JLECmd
-    binary: '{tool_path}\Get-ZimmermanTools\net6\JLECmd.exe'
+    binary: '{tool_path}\Get-ZimmermanTools\net9\JLECmd.exe'
     args: '-d {input} --csv {outfolder} -q'
     outfolder: UserActivity
     outfile: '*Destinations.csv'
     input: user_dir
     github:
   - name: regripper_amcache
-    binary: '{tool_path}\RegRipper3.0\rip.exe'
+    binary: '{tool_path}\RegRipper4.0\rip.exe'
     args: '-aT -r {input} 1>> {outfolder}\{outfile}'
     input: amcache
     outfolder: FileExecution
@@ -225,28 +227,28 @@ wiskers:
     github: https://www.kali.org/tools/regripper/
   - name: regripper_sam_tln
     binary: fd
-    args: -i SAM {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i SAM {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_sam.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_security_tln
     binary: fd
-    args: -i Security {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i Security {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_security.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_software_tln
     binary: fd
-    args: -i Software {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i Software {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_software.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_system_tln
     binary: fd
-    args: -i System {input} -x {tool_path}\RegRipper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i System {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_system.psv
     input: system_config
@@ -260,28 +262,28 @@ wiskers:
     github: https://www.kali.org/tools/regripper/
   - name: regripper_sam
     binary: fd
-    args: -i SAM {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i SAM {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_sam.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_security
     binary: fd
-    args: -i Security {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i Security {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_security.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_software
     binary: fd
-    args: -i Software {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i Software {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_software.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_system
     binary: fd
-    args: -i System {input} -x {tool_path}\RegRipper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i System {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_system.txt
     input: system_config
@@ -294,12 +296,14 @@ reporters:
     outfolder: Timeline
     outfile: '*.json'
     input: none
+    chk_exists: false
   - name: polars hostinfo
     binary: py
     args: '{tool_path}/polars_hostinfo.py {out_path} {outfile}'
     outfolder: Timeline
     outfile: 'Host_Information.txt'
     input: none
+    chk_exists: false
   - name: iocs_summary
     binary: rg.exe
     args: '-aiwFf {ioc_file} {outfolder} --json > {outfolder}/{outfile}'
@@ -335,7 +339,7 @@ enrichers:
     github: https://github.com/BurntSushi/ripgrep.git
   - name: loki_analysis
     binary: '{tool_path}/loki/loki/loki.exe'
-    args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait --onlyrelevant -s 15000 -p {out_path} --logfolder {outfolder}'
+    args: '--intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {out_path} --logfolder {outfolder}'
     outfolder: IOC_Findings\loki_analysis
     outfile: '*.log'
     input: none

@@ -1,6 +1,9 @@
 use std::{env, io, path::Path, time::Duration};
+use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
+
+use crate::ops::file_ops;
 // extern crate git2;
 // use git2::Repository;
 
@@ -53,17 +56,6 @@ pub fn prog_spin_stop(pb: &ProgressBar,msg: String) {
     pb.finish_with_message(msg);
 }
 
-// fn clone_repo(url: &str) -> String {
-//     let mut msg = format!("Cloning repo: {}", url);
-//     let git_name = url.split("/").collect::<Vec<&str>>().pop().unwrap();
-//     let repo_name = git_name.replace(".git", "");
-//     match Repository::clone(url, format!("./{}", repo_name)) {
-//         Ok(repo) => repo,
-//         Err(e) => msg.push_str(format!("failed to clone: {}", e).as_str()),
-//     };
-//     msg
-// }
-
 /// format the outputs of a script command to a string 
 /// Args:
 /// * `versbose` - show the stdout of the script
@@ -86,7 +78,7 @@ fn output_script(verbose: bool, code: i32, output: String, error: String) -> Str
     outmsg
 }
 
-pub fn setup_linux(v: bool, github_token: String) {
+pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Result<()> {
     // Setup progress bars    
     let m = MultiProgress::new();
     let pb = prog_spin_init(960, &m, "magenta");
@@ -96,11 +88,16 @@ pub fn setup_linux(v: bool, github_token: String) {
     let mut outmsg = String::new();
     let options = ScriptOptions::new();
 
+    // change director to tool_path
+    let main_path = env::current_dir()?;
+    let tool_path_str = tool_path.as_os_str().to_os_string().into_string().unwrap();
+    env::set_current_dir(tool_path)?;
+
     let pb3 = prog_spin_init(240, &m, "white");
 
     let apt_pkgs = vec![
         "p7zip-full",
-        "awscli",
+      //"awscli",
         "fd-find",
         "git",
         "ripgrep",
@@ -108,6 +105,7 @@ pub fn setup_linux(v: bool, github_token: String) {
         "python-pip",
         "regripper",
         "python3-pip",
+        "python3-venv",
         "jq",
     ];    
     prog_spin_msg(&pb2, "Installing APT packages...".to_string());
@@ -116,8 +114,6 @@ pub fn setup_linux(v: bool, github_token: String) {
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
-             tool_dir="$PWD/tools/"
-             cd $tool_dir
              pkg="$1"
              apt-get -y install $pkg
              "#,
@@ -131,15 +127,49 @@ pub fn setup_linux(v: bool, github_token: String) {
     prog_spin_msg(&pb2, "Installing Python packages...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-         tool_dir="$PWD/tools/"
-         cd $tool_dir
-         python3 -m ensurepip --default-pip
-         python3 -m pip install polars chardet datetime filetype requests libesedb-python python-magic --no-warn-script-location
-         python3 -m pip install colorama yara-python psutil rfc5424-logging-handler netaddr --no-warn-script-location
+        tool_path="$1"
+         python3 -m venv venv
+         . $tool_path/venv/bin/activate
+         apt install python3-pip
+         python -m ensurepip --default-pip
+         python -m pip install polars chardet datetime filetype requests libesedb-python python-magic --no-warn-script-location
+         python -m pip install colorama yara-python psutil rfc5424-logging-handler netaddr --no-warn-script-location
          pip2 install python-registry
-         "#
+         "#,
+         &vec![tool_path_str.to_string()],
+         &options
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
+
+
+    prog_spin_msg(&pb2, "Installing python packages using pip...".to_string());
+    let pips = vec![
+        "pip",
+        "polars",
+        "chardet",
+        "datetime",
+        "filetype",
+        "requests",
+        "python-magic",
+        "PyQt6",
+        "libesedb-python",
+        "awscli"
+    ];
+    for pip in pips.iter() {
+        let msg = format!("Python installing: {}", pip);
+        prog_spin_msg(&pb3, msg.to_string());    
+        let (code, output, error) = run_script::run_script!(
+            r#"
+            tool_path="$1"
+            . $tool_path/venv/bin/activate
+            python -m pip install -U $2
+            "#,
+            &vec![tool_path_str.to_string(), pip.to_string()],
+            &options
+        ).unwrap();
+        outmsg.push_str(&output_script(v, code, output, error));
+    }
+
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
     let urls = vec![
@@ -155,13 +185,13 @@ pub fn setup_linux(v: bool, github_token: String) {
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
-             tool_dir="$PWD/tools/"
-             cd $tool_dir
-	     github_token="$1"
+    	     github_token="$1"
              url="$2"
-             python3 $tool_dir/setup_get_git.py $github_token $url linux
+             tool_path="$3"
+             . $tool_path/venv/bin/activate
+             python ./setup_get_git.py $github_token $url linux
              "#,
-             &vec![github_token.clone(), url.to_string()],
+             &vec![github_token.clone(), url.to_string(), tool_path_str.to_string()],
              &options
         ).unwrap();
         outmsg.push_str(&output_script(v, code, output, error));
@@ -178,9 +208,7 @@ pub fn setup_linux(v: bool, github_token: String) {
         let msg = format!("Cloning: {}", repo);
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
-            r#"
-             tool_dir="$PWD/tools/"
-             cd $tool_dir
+            r#" 
              repo="$1"
              git clone $repo
              "#,
@@ -194,42 +222,58 @@ pub fn setup_linux(v: bool, github_token: String) {
 
     prog_spin_msg(&pb2, "Installing Loki and dependencies...".to_string());
     let (code, output, error) = run_script::run_script!(
-        r#"
-         tool_dir="$PWD/tools/"
+        r#" 
+         tool_dir="$1"
          cd "$tool_dir/loki"
-         python3 loki-upgrader.py
-         "#
+         $tool_dir/venv/bin/python3 loki-upgrader.py
+         "#,
+         &vec![tool_path_str.to_string()],
+         &options
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Getting Chainsaw shimcache patterns...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-         tool_dir="$PWD/tools/"
+         tool_dir="$1"
          wget "https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt" -O "$tool_dir/shimcache_patterns.txt"
-         "#
+         "#,
+         &vec![tool_path_str.to_string()],
+         &options
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Installing Vector...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-         tool_dir="$PWD/tools/"
-         cd $tool_dir
+         tool_dir="$1"
          curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash -s -- -y
          wget -q https://aka.ms/downloadazcopy-v10-linux
          tar -xvf downloadazcopy-v10-linux
-         cp ./azcopy_linux_amd64_*/azcopy $tool_dir
-         rm -rf downloadazcopy-v10-linux ./azcopy_linux_amd64_*
+         mv "$tool_dir"/azcopy_linux_amd64_* "$tool_dir"/azcopy
+         ln -s "$tool_dir"/azcopy/azcopy "$tool_dir"/azcopy/azcopy.exe
+         rm -rf downloadazcopy-v10-linux
+         ln -s "`which 7z`" /usr/bin/7z.exe
          exit 0
-         "#
+         "#,
+         &vec![tool_path_str.to_string()],
+         &options
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
+    // install dotnet9
+    // wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    // chmod +x dotnet-install.sh
+    // ./dotnet-install.sh --channel 9.0
+
+    // Change directory back to what it was before setup
+    env::set_current_dir(main_path)?;
     prog_spin_stop(&pb2, "".to_string());
 
     prog_spin_stop(&pb, "[ ] Setup complete".to_string());
     print!("{}", outmsg);
+
+    Ok(())
 }
 
 pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<()> {
@@ -239,6 +283,16 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let pb2 = prog_spin_init(480, &m, "yellow");
     prog_spin_msg(&pb, "Wiskess - Setup Windows".to_string());
     prog_spin_msg(&pb2, "Installing packages...".to_string());
+    
+    // Start logging 
+    let setup_log_path = Path::new("wiskess_setup.log");
+    let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
+    let log_time = Utc::now();
+    let log_time_str = log_time.format(&date_time_fmt).to_string();
+    file_ops::log_msg(
+        setup_log_path,
+         format!("[SETUP] Starting the setup of wiskess tools at {}", log_time_str)
+    );
 
     // change director to tool_path
     let main_path = env::current_dir()?;
@@ -248,6 +302,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let options = ScriptOptions::new();
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         RefreshEnv.cmd
         "#
@@ -257,6 +312,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli, jq and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         choco install -y git 7zip python2 fd osfmount awscli jq
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
@@ -268,6 +324,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Getting Python-Cim and Azcopy...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         py -2 -m pip install python-cim python-registry six
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
         7z e ".\AzCopy.zip" -o"azcopy\" azcopy.exe -r -aoa
@@ -296,6 +353,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
         let (code, output, error) = run_script::run_script!(
             r#"
+            @echo off
             py -3 -m pip install -U %1
             "#,
             &vec![pip.to_string()],
@@ -320,7 +378,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
-            py ./setup_get_git.py "%1" "%2" windows
+            @echo off
+            py ./setup_get_git.py %1 %2 windows
             "#,
             &vec![github_token.clone(), url.to_string()],
             &options
@@ -342,6 +401,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
+            @echo off
             set PATH=%PATH%;C:\Program Files\Git\cmd\
             git clone "%1"
             "#,
@@ -358,6 +418,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     env::set_current_dir(Path::new(tool_path).join("loki").join("loki"))?;
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
          .\loki-upgrader.exe
          "#
     ).unwrap();
@@ -368,7 +429,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Getting EZTools and Chainsaw shimcache patterns...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "& .\Get-ZimmermanTools\Get-ZimmermanTools.ps1 -NetVersion 6 -Dest .\Get-ZimmermanTools"
+        @echo off
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "& .\Get-ZimmermanTools\Get-ZimmermanTools.ps1 -NetVersion 9 -Dest .\Get-ZimmermanTools"
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt' -OutFile .\shimcache_patterns.txt"
         "#
     ).unwrap();
@@ -379,8 +441,9 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 
     prog_spin_stop(&pb2, "".to_string());
 
-    prog_spin_stop(&pb, "[ ] Setup complete".to_string());
-    print!("{}", outmsg);
+    let msg = format!("[ ] Setup completed. Please check the setup log for any errors: {}", setup_log_path.display());
+    prog_spin_stop(&pb, msg);
+    file_ops::log_msg(setup_log_path, outmsg);
 
     Ok(())
 }

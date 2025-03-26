@@ -8,12 +8,12 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
         "windows" => {
             // Run the setup for windows
             match setup::setup_win(verbose, github_token, tool_path) {
-                Ok(_) => println!("Setup ran OK"),
+                Ok(_) => {},
                 Err(e) => println!("[!] Some error occured: {e}")
             };
 	},
         "linux" => {
-            setup::setup_linux(verbose, github_token);
+            let _ = setup::setup_linux(verbose, github_token, tool_path);
         },
         &_ => todo!()
     }
