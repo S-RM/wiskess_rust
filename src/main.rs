@@ -47,8 +47,8 @@ enum Commands {
         /// Personal github token to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
         #[arg(short, long)]
         github_token: String,
-        /// Print additional info to the stdout
-        #[arg(short, long)]
+        /// Print additional info to the stdout, default is true
+        #[arg(short, long, action = ArgAction::SetTrue)]
         verbose: bool,
     },
     /// launch the webui
@@ -216,7 +216,6 @@ fn main() {
 
     // Set no_collection to true - only valid for images
     let collect = args.no_collection;
-    println!("[ ] Collection is set to {}", collect);
 
     // TODO: check the config file exists
 

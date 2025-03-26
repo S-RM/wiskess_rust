@@ -1,6 +1,9 @@
 use std::{env, io, path::Path, time::Duration};
+use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
+
+use crate::ops::file_ops;
 // extern crate git2;
 // use git2::Repository;
 
@@ -52,17 +55,6 @@ pub fn prog_spin_msg(pb: &ProgressBar, msg: String) {
 pub fn prog_spin_stop(pb: &ProgressBar,msg: String) {
     pb.finish_with_message(msg);
 }
-
-// fn clone_repo(url: &str) -> String {
-//     let mut msg = format!("Cloning repo: {}", url);
-//     let git_name = url.split("/").collect::<Vec<&str>>().pop().unwrap();
-//     let repo_name = git_name.replace(".git", "");
-//     match Repository::clone(url, format!("./{}", repo_name)) {
-//         Ok(repo) => repo,
-//         Err(e) => msg.push_str(format!("failed to clone: {}", e).as_str()),
-//     };
-//     msg
-// }
 
 /// format the outputs of a script command to a string 
 /// Args:
@@ -269,6 +261,11 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
+    // install dotnet9
+    // wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    // chmod +x dotnet-install.sh
+    // ./dotnet-install.sh --channel 9.0
+
     // Change directory back to what it was before setup
     env::set_current_dir(main_path)?;
     prog_spin_stop(&pb2, "".to_string());
@@ -286,6 +283,16 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let pb2 = prog_spin_init(480, &m, "yellow");
     prog_spin_msg(&pb, "Wiskess - Setup Windows".to_string());
     prog_spin_msg(&pb2, "Installing packages...".to_string());
+    
+    // Start logging 
+    let setup_log_path = Path::new("wiskess_setup.log");
+    let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
+    let log_time = Utc::now();
+    let log_time_str = log_time.format(&date_time_fmt).to_string();
+    file_ops::log_msg(
+        setup_log_path,
+         format!("[SETUP] Starting the setup of wiskess tools at {}", log_time_str)
+    );
 
     // change director to tool_path
     let main_path = env::current_dir()?;
@@ -295,6 +302,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let options = ScriptOptions::new();
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         RefreshEnv.cmd
         "#
@@ -304,6 +312,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli, jq and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         choco install -y git 7zip python2 fd osfmount awscli jq
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
@@ -315,6 +324,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Getting Python-Cim and Azcopy...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
         py -2 -m pip install python-cim python-registry six
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
         7z e ".\AzCopy.zip" -o"azcopy\" azcopy.exe -r -aoa
@@ -343,6 +353,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
         let (code, output, error) = run_script::run_script!(
             r#"
+            @echo off
             py -3 -m pip install -U %1
             "#,
             &vec![pip.to_string()],
@@ -367,6 +378,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
+            @echo off
             py ./setup_get_git.py %1 %2 windows
             "#,
             &vec![github_token.clone(), url.to_string()],
@@ -389,6 +401,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
+            @echo off
             set PATH=%PATH%;C:\Program Files\Git\cmd\
             git clone "%1"
             "#,
@@ -405,6 +418,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     env::set_current_dir(Path::new(tool_path).join("loki").join("loki"))?;
     let (code, output, error) = run_script::run_script!(
         r#"
+        @echo off
          .\loki-upgrader.exe
          "#
     ).unwrap();
@@ -415,7 +429,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Getting EZTools and Chainsaw shimcache patterns...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "& .\Get-ZimmermanTools\Get-ZimmermanTools.ps1 -NetVersion 6 -Dest .\Get-ZimmermanTools"
+        @echo off
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "& .\Get-ZimmermanTools\Get-ZimmermanTools.ps1 -NetVersion 9 -Dest .\Get-ZimmermanTools"
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt' -OutFile .\shimcache_patterns.txt"
         "#
     ).unwrap();
@@ -426,8 +441,9 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 
     prog_spin_stop(&pb2, "".to_string());
 
-    prog_spin_stop(&pb, "[ ] Setup complete".to_string());
-    print!("{}", outmsg);
+    let msg = format!("[ ] Setup completed. Please check the setup log for any errors: {}", setup_log_path.display());
+    prog_spin_stop(&pb, msg);
+    file_ops::log_msg(setup_log_path, outmsg);
 
     Ok(())
 }
