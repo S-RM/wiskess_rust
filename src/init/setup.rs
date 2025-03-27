@@ -78,6 +78,18 @@ fn output_script(verbose: bool, code: i32, output: String, error: String) -> Str
     outmsg
 }
 
+/// start logging and return the path to the log file
+fn start_setup_log(setup_log_path: &Path) {
+    // Start logging 
+    let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
+    let log_time = Utc::now();
+    let log_time_str = log_time.format(&date_time_fmt).to_string();
+    file_ops::log_msg(
+        setup_log_path,
+         format!("[SETUP] Starting the setup of wiskess tools at {}", log_time_str)
+    );
+}
+
 pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Result<()> {
     // Setup progress bars    
     let m = MultiProgress::new();
@@ -87,6 +99,10 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     prog_spin_msg(&pb2, "Installing packages...".to_string());
     let mut outmsg = String::new();
     let options = ScriptOptions::new();
+
+    // start the log
+    let setup_log_path = Path::new("wiskess_setup.log");
+    start_setup_log(setup_log_path);
 
     // change director to tool_path
     let main_path = env::current_dir()?;
@@ -261,10 +277,17 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
-    // install dotnet9
-    // wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
-    // chmod +x dotnet-install.sh
-    // ./dotnet-install.sh --channel 9.0
+    prog_spin_msg(&pb2, "Installing dotnet9...".to_string());
+    let (code, output, error) = run_script::run_script!(
+        r#"
+        wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+        chmod +x dotnet-install.sh
+        ./dotnet-install.sh --channel 9.0
+         "#,
+         &vec![tool_path_str.to_string()],
+         &options
+    ).unwrap();
+    outmsg.push_str(&output_script(v, code, output, error));
 
     // Change directory back to what it was before setup
     env::set_current_dir(main_path)?;
@@ -284,17 +307,11 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb, "Wiskess - Setup Windows".to_string());
     prog_spin_msg(&pb2, "Installing packages...".to_string());
     
-    // Start logging 
+    // start the log
     let setup_log_path = Path::new("wiskess_setup.log");
-    let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
-    let log_time = Utc::now();
-    let log_time_str = log_time.format(&date_time_fmt).to_string();
-    file_ops::log_msg(
-        setup_log_path,
-         format!("[SETUP] Starting the setup of wiskess tools at {}", log_time_str)
-    );
-
-    // change director to tool_path
+    start_setup_log(setup_log_path);
+    
+        // change director to tool_path
     let main_path = env::current_dir()?;
     env::set_current_dir(tool_path)?;
 
@@ -436,6 +453,16 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
 
+    prog_spin_msg(&pb2, "Installing dotnet9...".to_string());
+    let (code, output, error) = run_script::run_script!(
+        r#"
+        @echo off
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/b0032fde-aac9-4c3e-b78c-4bd605910241/8d2aa21baac4aef9b996671cd8a48fb2/dotnet-sdk-9.0.202-win-x64.exe" -OutFile "dotnet-sdk-9.0.202-win-x64.exe" -UseBasicParsing"
+        .\dotnet-sdk-9.0.202-win-x64.exe /install /passive
+        "#
+    ).unwrap();
+    outmsg.push_str(&output_script(v, code, output, error));
+
     // Change directory back to what it was before setup
     env::set_current_dir(main_path)?;
 
@@ -445,5 +472,6 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_stop(&pb, msg);
     file_ops::log_msg(setup_log_path, outmsg);
 
-    Ok(())
+Ok(())
 }
+

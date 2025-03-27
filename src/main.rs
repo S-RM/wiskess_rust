@@ -62,7 +62,7 @@ enum Commands {
         #[arg(short, long, default_value = "config/artefacts.yaml")]
         artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "")]
         data_source_list: String,
         /// file path where the data is temporarily downloaded to and Wiskess output is stored locally
         #[arg(short, long)]
@@ -74,7 +74,7 @@ enum Commands {
         #[arg(long)]
         end_date: String,
         /// IOC list file
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "iocs.txt")]
         ioc_file: String,
         /// The link that the data is stored on, i.e https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s
         #[arg(long)]
@@ -115,7 +115,7 @@ enum Commands {
         #[arg(short, long)]
         ioc_file: String,
     },
-    TestWhip {
+    OldWhip {
         /// config file of the binaries to run as processors
         #[arg(short, long, default_value = "config/main_win.yaml")]
         config: PathBuf,
@@ -123,16 +123,16 @@ enum Commands {
         #[arg(short, long, default_value = "config/artefacts.yaml")]
         artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
-        #[arg(short, long, default_value = "")]
+        #[arg(short, long)]
         data_source_list: String,
         /// file path where the data is temporarily downloaded to and Wiskess output is stored locally
         #[arg(short, long)]
         local_storage: String,
         /// Start date - typically the earliest time of the incident, or a few days before
-        #[arg(long, default_value = "2024-01-01")]
+        #[arg(long)]
         start_date: String,
         /// End date - the current date or end of the incident timeframe
-        #[arg(long, default_value = "2024-05-01")]
+        #[arg(long)]
         end_date: String,
         /// IOC list file
         #[arg(short, long, default_value = "iocs.txt")]
@@ -269,7 +269,7 @@ fn main() {
                 keep_evidence,
             };
 
-            scripts::run_whipped(&tool_path, args)
+            let _ = whip_main::whip_main(args, &tool_path);
         },
         Commands::Wiskess { 
             config, 
@@ -298,7 +298,7 @@ fn main() {
 
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },
-        Commands::TestWhip {
+        Commands::OldWhip {
             config,
             artefacts_config,
             data_source_list,
@@ -310,7 +310,15 @@ fn main() {
             out_link,
             update,
             keep_evidence,
-        } => {
+        } => {          
+            // Confirm date is valid
+            let start_date = file_ops::check_date(start_date, &"start date".to_string());
+            let end_date = file_ops::check_date(end_date, &"end date".to_string());
+
+            // check if config paths exist
+            let config = file_ops::check_path(config);
+            let artefacts_config = file_ops::check_path(artefacts_config);
+
             // put the args into a whipped structure
             let args = config::WhippedArgs {
                 config,
@@ -326,7 +334,7 @@ fn main() {
                 keep_evidence,
             };
 
-            let _ = whip_main::whip_main(args, &tool_path);
+            scripts::run_whipped(&tool_path, args)
         }
     }
 }
