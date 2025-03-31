@@ -66,17 +66,12 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
     
     // log the data downloaded and its size
     let data_meta = metadata(&file_path)?;
-    
-    #[cfg (target_os = "windows")] {
-        use std::os::windows::fs::MetadataExt;
-        
-        file_ops::log_msg(log_name, format!(
-            "Downloaded file: {} with size: {} and type: {:?}.", 
-            file_path.display(),
-            data_meta.file_size(),
-            data_meta.file_type(),
-        ));
-    }
+    file_ops::log_msg(log_name, format!(
+        "Downloaded file: {} with size: {} and type: {:?}.", 
+        file_path.display(),
+        data_meta.len(),
+        data_meta.file_type(),
+    ));
 
     
     // get the type of data downloaded, i.e. image, folder or archive
