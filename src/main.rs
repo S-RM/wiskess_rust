@@ -14,13 +14,13 @@ use crate::whipped::whip_main;
 use std::path::PathBuf;
 use std::process::exit;
 use std::{path::Path,env};
-use anyhow::bail;
 use clap::{ArgAction, Parser, Subcommand};
 use ctrlc;
 use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
+use anyhow::bail;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -173,6 +173,12 @@ fn check_elevation() -> Result<(), anyhow::Error>{
         use windows_elevate::check_elevated;
         let is_elevated = check_elevated().expect("Failed to call check_elevated");
         if !is_elevated {
+            bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
+        }
+    }
+    #[cfg (target_os = "linux")] {
+        use nix::unistd::Uid;
+        if !Uid::effective.is_root() {
             bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
         }
     }
