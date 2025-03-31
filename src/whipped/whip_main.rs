@@ -268,7 +268,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
     let files = if in_link.starts_with("s3") {
-        whip_s3::list_s3_files(&in_link, log_name).await?
+        whip_s3::list_s3_files(&in_link, log_name, show_err).await?
     } else if in_link.starts_with("https://") {
         whip_az::list_azure_files(&in_link, &tool_path, log_name, show_err).await?
     } else {

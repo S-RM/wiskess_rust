@@ -69,7 +69,10 @@ pub async fn put_s3_file(input: &PathBuf, s3_url: &str, log_name: &Path) {
 /// List files in an S3 bucket.
 /// # Arguments
 /// * `s3_url` - The S3 URL to list files from.
-pub async fn list_s3_files(s3_url: &str, log_name: &Path) -> Result<Vec<String>> {
+pub async fn list_s3_files(s3_url: &str, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
+    if show_err {
+        return Ok(vec!["".to_string()])
+    }
     let bucket = s3_url.trim_start_matches("s3://");
     // let region = "eu-central-1";
     
@@ -81,11 +84,9 @@ pub async fn list_s3_files(s3_url: &str, log_name: &Path) -> Result<Vec<String>>
     // Deserialize the JSON string to the Contents struct
     let json_data_str = &String::from_utf8(json_data.stdout)?;
     let payload: Payload = serde_json::from_str(json_data_str)?;
-    println!("[ ] Contents from AWS S3 list: {:?}", payload);
+    file_ops::log_msg(log_name, format!("[ ] Contents from AWS S3 list: {:?}", payload));
     
     // Collect all Key values into a vector
     let files = payload.contents.into_iter().map(|item| item.key).collect();
-    
-    println!("[ ] Files from AWS S3 list: {:?}", files);
     Ok(files)
 }
