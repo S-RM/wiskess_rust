@@ -21,7 +21,6 @@ use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
-use windows_elevate::check_elevated;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -172,6 +171,7 @@ fn show_banner() {
 fn check_elevation() -> Result<(), anyhow::Error>{
     match env::consts::OS {
         "windows" => {
+            use windows_elevate::check_elevated;
             let is_elevated = check_elevated().expect("Failed to call check_elevated");
             if !is_elevated {
                 bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
