@@ -227,7 +227,7 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
     
     println!("[ ] Downloading: {}", file);
     if in_link.starts_with("s3") {
-        whip_s3::get_s3_file(&in_link, &output, &file, recurse).await
+        whip_s3::get_s3_file(&in_link, &output, &file, recurse, log_name).await
     } else if in_link.starts_with("https://") {
         whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else {
@@ -253,7 +253,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
     // upload the process folder
     println!("[ ] Uploading: {}", in_folder.display());
     if out_link.starts_with("s3") {
-        whip_s3::put_s3_file(&in_folder, &out_link).await
+        whip_s3::put_s3_file(&in_folder, &out_link, log_name).await
     } else if out_link.starts_with("https://") {
         whip_az::put_azure_file(&in_folder, &out_link, &tool_path, log_name).await
     } else {
@@ -268,7 +268,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
     let files = if in_link.starts_with("s3") {
-        whip_s3::list_s3_files(&in_link).await?
+        whip_s3::list_s3_files(&in_link, log_name).await?
     } else if in_link.starts_with("https://") {
         whip_az::list_azure_files(&in_link, &tool_path, log_name, show_err).await?
     } else {

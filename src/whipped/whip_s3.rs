@@ -4,26 +4,30 @@ use super::super::ops::exe_ops;
 
 use anyhow::Ok;
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
+use serde_json::Number;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Deserialize)]
-struct Item {
-    key: String,
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+struct Payload {
+    contents: Vec<Contents>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
 struct Contents {
-    contents: Vec<Item>,
+    key: String,
+    last_modified: String,
+    size: Number
 }
 
 /// Download a file from an S3 bucket.
 /// # Arguments
 /// * `s3_url` - The S3 URL of the file
 /// * `folder` - The path to download to
-pub async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse: bool) -> Result<PathBuf> {
+pub async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse: bool, log_name: &Path) -> Result<PathBuf> {
     // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
 
     if !output.exists() {
         // make the output folder
@@ -49,9 +53,8 @@ pub async fn get_s3_file(s3_url: &str, output: &PathBuf, file: &String, recurse:
 /// # Arguments
 /// * `input` - the path to where the file will be uploaded
 /// * `s3_url` - The S3 URL of the file
-pub async fn put_s3_file(input: &PathBuf, s3_url: &str) {
+pub async fn put_s3_file(input: &PathBuf, s3_url: &str, log_name: &Path) {
     // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
 
     if !input.exists() {
         // make the output folder
@@ -66,10 +69,9 @@ pub async fn put_s3_file(input: &PathBuf, s3_url: &str) {
 /// List files in an S3 bucket.
 /// # Arguments
 /// * `s3_url` - The S3 URL to list files from.
-pub async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
+pub async fn list_s3_files(s3_url: &str, log_name: &Path) -> Result<Vec<String>> {
     let bucket = s3_url.trim_start_matches("s3://");
     // let region = "eu-central-1";
-    let log_name = Path::new("whipped.log");
     
     // aws s3api list-objects-v2 --bucket ir-evidence-falcon --region eu-central-1 --output=json
     // let args = format!("s3api list-objects-v2 --bucket {bucket} --region {region} --output=json");
@@ -77,12 +79,12 @@ pub async fn list_s3_files(s3_url: &str) -> Result<Vec<String>> {
     let json_data = exe_ops::run_wisker(&"aws".to_string(), &args, log_name);
 
     // Deserialize the JSON string to the Contents struct
-    println!("[ ] JSON from AWS S3 list: {:?}", json_data.stdout);
-    let contents: Contents = serde_json::from_str(&String::from_utf8(json_data.stdout)?)?;
-    println!("[ ] Contents from AWS S3 list: {:?}", contents);
+    let json_data_str = &String::from_utf8(json_data.stdout)?;
+    let payload: Payload = serde_json::from_str(json_data_str)?;
+    println!("[ ] Contents from AWS S3 list: {:?}", payload);
     
     // Collect all Key values into a vector
-    let files = contents.contents.into_iter().map(|item| item.key).collect();
+    let files = payload.contents.into_iter().map(|item| item.key).collect();
     
     println!("[ ] Files from AWS S3 list: {:?}", files);
     Ok(files)
