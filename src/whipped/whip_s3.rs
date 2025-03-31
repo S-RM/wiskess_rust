@@ -70,7 +70,7 @@ pub async fn put_s3_file(input: &PathBuf, s3_url: &str, log_name: &Path) {
 /// # Arguments
 /// * `s3_url` - The S3 URL to list files from.
 pub async fn list_s3_files(s3_url: &str, log_name: &Path, show_err: bool) -> Result<Vec<String>> {
-    if show_err {
+    if !show_err {
         return Ok(vec!["".to_string()])
     }
     let bucket = s3_url.trim_start_matches("s3://");
