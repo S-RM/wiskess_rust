@@ -178,7 +178,7 @@ fn check_elevation() -> Result<(), anyhow::Error>{
     }
     #[cfg (target_os = "linux")] {
         use sudo;
-        if sudo::check() == sudo::User {
+        if sudo::check() == sudo::RunningAs::User {
             bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
         }
     }
