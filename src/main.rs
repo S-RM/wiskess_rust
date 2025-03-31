@@ -177,8 +177,8 @@ fn check_elevation() -> Result<(), anyhow::Error>{
         }
     }
     #[cfg (target_os = "linux")] {
-        use nix::unistd::Uid;
-        if !Uid::effective.is_root() {
+        use sudo;
+        if sudo::check() == sudo::User {
             bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
         }
     }
