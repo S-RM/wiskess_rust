@@ -166,6 +166,7 @@ wiskers:
     outfolder: Network
     outfile: '*SumECmd*.csv'
     input: sum
+    para: false
     github: https://github.com/EricZimmerman/SumECmd.git
     script: true
     script_posh: '$sum = ("{input}" -replace "^\\\\\?\\");

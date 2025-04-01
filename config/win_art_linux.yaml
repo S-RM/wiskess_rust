@@ -3,6 +3,13 @@
 # wiskess on a Linux-based device.
 
 wiskers:
+  - name: MFTECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileSystem
+    outfile: MFTECmd.csv
+    input: mft
+    github: https://github.com/EricZimmerman/MFTECmd.git
   - name: mft
     binary: '{tool_path}/mft/mft.exe'
     args: "-o csv -f {outfolder}/{outfile} '{input}'"
@@ -18,6 +25,34 @@ wiskers:
     input: j_file
     input_other: mft
     github: https://github.com/forensicmatt/RustyUsn
+  - name: usnjrnl-j
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileSystem
+    outfile: usnjrnl-j-file.csv
+    input: j_file
+    github: https://github.com/EricZimmerman/MFTECmd.git
+  - name: rbcmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RBCmd.dll -d {input} --csv {outfolder} -q'
+    outfolder: FileSystem
+    outfile: '*RBCmd_Output.csv'
+    input: recycle_bin
+    github: https://github.com/EricZimmerman/RBCmd.git
+  - name: lnk
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/LECmd.dll -d {input} --csv {outfolder} --csvf {outfile} -q'
+    outfolder: FileSystem
+    outfile: lnk-files.csv
+    input: user_dir
+    github: https://github.com/EricZimmerman/LECmd.git
+  - name: EvtxECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/EvtxECmd/EvtxECmd.dll -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: EventLogs
+    outfile: EvtxECmd-All.csv
+    input: winevt
+    github: https://github.com/EricZimmerman/evtx.git
   - name: evtx_dump
     binary: fdfind
     args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -o jsonl > {outfolder}/{outfile}'
@@ -33,6 +68,13 @@ wiskers:
     input: winevt
     github:
     para: false
+  - name: AmcacheParser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/AmcacheParser.dll -f {input} --csv {outfolder} -i'
+    outfolder: FileExecution
+    outfile: '*_Amcache_*'
+    input: amcache
+    github: https://github.com/EricZimmerman/AmcacheParser.git
   - name: regripper_amcache
     binary: regripper
     args: '-aT -r {input} 1> {outfolder}/{outfile}'
@@ -49,6 +91,36 @@ wiskers:
     outfolder: FileExecution
     outfile: chainsaw_shim.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: AppCompatCache
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/AppCompatCacheParser.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileExecution
+    outfile: appcompatcache.csv
+    input: system
+    github: https://github.com/EricZimmerman/AppCompatCacheParser.git
+  - name: RecentFileCacheParser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RecentFileCacheParser.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileExecution
+    outfile: RecentFileCache.csv
+    input: recentFileCache
+    github: https://github.com/EricZimmerman/RecentFileCacheParser.git    
+  - name: Prefetch
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/PECmd.dll -d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
+    outfolder: FileExecution
+    outfile: prefetch.csv
+    input: prefetch
+    github: https://github.com/EricZimmerman/Prefetch.git
+  - name: SrumECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SrumECmd.dll -f {input} -r {input_other} --csv {outfolder}'
+    outfolder: Network
+    outfile: '*_SrumECmd_*.csv'
+    input: srum
+    input_other: software
+    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+    github: https://github.com/EricZimmerman/SrumECmd.git
   - name: chainsaw_srum
     binary: '{tool_path}/chainsaw/chainsaw.exe'
     args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
@@ -57,6 +129,14 @@ wiskers:
     outfolder: Network
     outfile: chainsaw_srum.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: SumECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SumECmd.dll -d {input} --csv {outfolder}'
+    outfolder: Network
+    outfile: '*SumECmd*.csv'
+    input: sum
+    para: false
+    github: https://github.com/EricZimmerman/SumECmd.git
   - name: KStrike
     binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/KStrike/KStrike.py {input}/Current.mdb > {outfolder}/{outfile}'
@@ -65,6 +145,34 @@ wiskers:
     outfolder: Network
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
+  - name: RegSystem
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RECmd/RECmd.dll --bn {tool_path}/Get-ZimmermanTools/net9/RECmd/BatchExamples/Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: Registry
+    outfile: reg-System.csv
+    input: system_config
+    github:
+  - name: RegUser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RECmd/RECmd.dll --bn {tool_path}/Get-ZimmermanTools/net9/RECmd/BatchExamples/Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: Registry
+    outfile: reg-User.csv
+    input: user_dir
+    github:
+  - name: SBE
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SBECmd.dll -d {input} --csv {outfolder}'
+    outfolder: UserActivity
+    outfile: '*SBECmd_Messages.txt'
+    input: user_dir
+    github:
+  - name: JLECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/JLECmd.dll -d {input} --csv {outfolder} -q'
+    outfolder: UserActivity
+    outfile: '*Destinations.csv'
+    input: user_dir
+    github:
   - name: SCCM_RecentlyUsedApplication
     binary: python2.7
     args: '{tool_path}/CCM_RUA_Finder.py -i {input} -o {outfolder}/{outfile}'

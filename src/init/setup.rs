@@ -280,9 +280,10 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     prog_spin_msg(&pb2, "Installing dotnet9...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
+        toolpath=$1
         wget -nv https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
         chmod +x dotnet-install.sh
-        ./dotnet-install.sh --channel 9.0
+        ./dotnet-install.sh --channel 9.0 --install-dir "$toolpath/.dotnet"
          "#,
          &vec![tool_path_str.to_string()],
          &options
