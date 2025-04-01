@@ -1,3 +1,7 @@
+# This is a configuration file of wiskess that will run tools to process
+# collections or mounted disks of Windows devices. It is built to run with 
+# wiskess on a Linux-based device.
+
 wiskers:
   - name: mft
     binary: '{tool_path}/mft/mft.exe'
@@ -28,14 +32,6 @@ wiskers:
     outfile: hayabusa.csv
     input: winevt
     github:
-    para: false
-  - name: chainsaw_evtx
-    binary: '{tool_path}/chainsaw/chainsaw.exe'
-    args: 'hunt {input} -s {tool_path}/chainsaw/chainsaw/sigma -r {tool_path}/chainsaw/chainsaw/rules --mapping {tool_path}/chainsaw/chainsaw/mappings/sigma-event-logs-all.yml --csv -o {outfolder} --full --skip-errors'
-    outfolder: EventLogs/chainsaw
-    outfile: sigma.csv
-    input: winevt
-    github: https://github.com/WithSecureLabs/chainsaw.git
     para: false
   - name: regripper_amcache
     binary: regripper
