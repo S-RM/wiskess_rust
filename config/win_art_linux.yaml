@@ -58,7 +58,7 @@ wiskers:
     outfile: chainsaw_srum.csv
     github: https://github.com/WithSecureLabs/chainsaw.git
   - name: KStrike
-    binary: python3
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/KStrike/KStrike.py {input}/Current.mdb > {outfolder}/{outfile}'
     input: sum
     valid_path: '{root}/Windows/System32/LogFiles/Sum/Current.mdb'
@@ -73,7 +73,7 @@ wiskers:
     input: objects
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
-    binary: python3
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
@@ -157,7 +157,7 @@ wiskers:
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: rdp_bitmap
-    binary: python3
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/bmc_run.py "{input}" {outfolder}'
     outfolder: Network
     outfile: '*.bmp'
@@ -166,7 +166,7 @@ wiskers:
 
 reporters:
   - name: polars timeline
-    binary: python3
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
     outfolder: Timeline
     outfile: mft.json
@@ -181,7 +181,7 @@ reporters:
 
 enrichers:
   - name: polars enrich
-    binary: python3
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/polars_enrich.py {out_path} {outfile} {tool_path}'
     outfolder: IOC_Findings
     outfile: enriched_indicators.xlsx
@@ -208,13 +208,13 @@ enrichers:
     input: base
     github: https://github.com/BurntSushi/ripgrep.git
   - name: loki_analysis
-    binary: 'python3'
+    binary: '{tool_path}/venv/bin/python3''
     args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {out_path} --logfolder {outfolder}'
     outfolder: IOC_Findings/loki_analysis
     outfile: '*.log'
     input: none
   - name: loki_datasource
-    binary: 'python3'
+    binary: '{tool_path}/venv/bin/python3''
     args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {input} --logfolder {outfolder}'
     outfolder: IOC_Findings/loki_datasource
     outfile: '*.log'
