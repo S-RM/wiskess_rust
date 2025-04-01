@@ -70,7 +70,7 @@ fn output_script(verbose: bool, code: i32, output: String, error: String) -> Str
       outmsg = format!("Output: {}\n", output);
     }
     if error != "" {
-      outmsg = format!("{}\nError: {}", outmsg, error);
+      outmsg = format!("{}\n{}", outmsg, error);
     }
     if code != 0 {
       outmsg = format!("{}\nExit code: {}", outmsg, code);
@@ -252,7 +252,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     let (code, output, error) = run_script::run_script!(
         r#"
          tool_dir="$1"
-         wget "https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt" -O "$tool_dir/shimcache_patterns.txt"
+         wget -nv "https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt" -O "$tool_dir/shimcache_patterns.txt"
          "#,
          &vec![tool_path_str.to_string()],
          &options
@@ -264,7 +264,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         r#"
          tool_dir="$1"
          curl --proto '=https' --tlsv1.2 -sSfL https://sh.vector.dev | bash -s -- -y
-         wget -q https://aka.ms/downloadazcopy-v10-linux
+         wget -nv https://aka.ms/downloadazcopy-v10-linux
          tar -xvf downloadazcopy-v10-linux
          mv "$tool_dir"/azcopy_linux_amd64_* "$tool_dir"/azcopy
          ln -s "$tool_dir"/azcopy/azcopy "$tool_dir"/azcopy/azcopy.exe
@@ -280,7 +280,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     prog_spin_msg(&pb2, "Installing dotnet9...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
-        wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+        wget -nv https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
         chmod +x dotnet-install.sh
         ./dotnet-install.sh --channel 9.0
          "#,
@@ -288,6 +288,51 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
          &options
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
+
+    prog_spin_msg(&pb2, "Installing eztools...".to_string());
+    let eztools = vec![
+        "AmcacheParser",
+        "AppCompatCacheParser",
+        "bstrings",
+        "EvtxECmd",
+        "EZViewer",
+        "JLECmd",
+        "JumpListExplorer",
+        "LECmd",
+        "MFTECmd",
+        "MFTExplorer",
+        "PECmd",
+        "RBCmd",
+        "RecentFileCacheParser",
+        "RECmd",
+        "RegistryExplorer",
+        "RLA",
+        "SDBExplorer",
+        "SBECmd",
+        "ShellBagsExplorer",
+        "SQLECmd",
+        "SrumECmd",
+        "SumECmd",
+        "TimelineExplorer",
+        "VSCMount",
+        "WxTCmd"
+    ];
+    for eztool in eztools.iter() {
+        let msg = format!("Downloading EZTool: {}", eztool);
+        prog_spin_msg(&pb3, msg.to_string());    
+    	let (code, output, error) = run_script::run_script!(
+            r#"
+             toolpath="$1"
+             eztool="$2"
+             wget -nv "https://download.ericzimmermanstools.com/net9/$eztool.zip" -O "$toolpath/Get-ZimmermanTools/net9/$eztool.zip"
+             7z x -r -aoa "$toolpath/Get-ZimmermanTools/net9/$eztool.zip" -o"$toolpath/Get-ZimmermanTools/net9/"
+             rm "$toolpath/Get-ZimmermanTools/net9/$eztool.zip"
+             "#,
+             &vec![tool_path_str.to_string(), eztool.to_string()],
+             &options
+        ).unwrap();
+        outmsg.push_str(&output_script(v, code, output, error));
+    }
 
     // Change directory back to what it was before setup
     env::set_current_dir(main_path)?;
