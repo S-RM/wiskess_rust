@@ -169,7 +169,9 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "python-magic",
         "PyQt6",
         "libesedb-python",
-        "awscli"
+        "awscli",
+        "pyhindsight",
+        "git+https://github.com/cclgroupltd/ccl_chromium_reader.git"
     ];
     for pip in pips.iter() {
         let msg = format!("Python installing: {}", pip);

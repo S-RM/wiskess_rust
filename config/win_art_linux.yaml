@@ -1,11 +1,13 @@
 # This is a configuration file of wiskess that will run tools to process
 # collections or mounted disks of Windows devices. It is built to run with 
-# wiskess on a Linux-based device.
+# wiskess on a Linux-based device. 
+# This includes the DLLs of EZTools which are executed with dotnet. Some 
+# aren't supported in Linux such as SumECmd due to needing "ESI specific Windows libraries" 
 
 wiskers:
   - name: MFTECmd
     binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    args: "{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f '{input}' --csv {outfolder} --csvf {outfile}"
     outfolder: FileSystem
     outfile: MFTECmd.csv
     input: mft
@@ -27,14 +29,14 @@ wiskers:
     github: https://github.com/forensicmatt/RustyUsn
   - name: usnjrnl-j
     binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    args: "{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f '{input}' --csv {outfolder} --csvf {outfile}"
     outfolder: FileSystem
     outfile: usnjrnl-j-file.csv
     input: j_file
     github: https://github.com/EricZimmerman/MFTECmd.git
   - name: rbcmd
     binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/RBCmd.dll -d {input} --csv {outfolder} -q'
+    args: "{tool_path}/Get-ZimmermanTools/net9/RBCmd.dll -d '{input}' --csv {outfolder} -q"
     outfolder: FileSystem
     outfile: '*RBCmd_Output.csv'
     input: recycle_bin
@@ -145,6 +147,14 @@ wiskers:
     outfolder: Network
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
+  - name: hindsight
+    binary: '{tool_path}/venv/bin/hindsight.py'
+    args: '-i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
+    outfolder: Network
+    outfile: hindsight
+    input: chrome
+    valid_path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
+    github: https://github.com/obsidianforensics/hindsight.git
   - name: RegSystem
     binary: '{tool_path}/.dotnet/dotnet'
     args: '{tool_path}/Get-ZimmermanTools/net9/RECmd/RECmd.dll --bn {tool_path}/Get-ZimmermanTools/net9/RECmd/BatchExamples/Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
