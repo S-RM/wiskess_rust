@@ -50,7 +50,7 @@ wiskers:
     github: https://github.com/EricZimmerman/LECmd.git
   - name: EvtxECmd
     binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/EvtxECmd/EvtxECmd.dll -d {input} --csv {outfolder} --csvf {outfile}'
+    args: '{tool_path}/Get-ZimmermanTools/net9/EvtxeCmd/EvtxECmd.dll -d {input} --csv {outfolder} --csvf {outfile}'
     outfolder: EventLogs
     outfile: EvtxECmd-All.csv
     input: winevt
