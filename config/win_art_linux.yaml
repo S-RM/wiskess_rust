@@ -148,8 +148,8 @@ wiskers:
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
   - name: hindsight
-    binary: '{tool_path}/venv/bin/hindsight.py'
-    args: '-i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
     outfolder: Network
     outfile: hindsight
     input: chrome
