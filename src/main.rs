@@ -154,7 +154,7 @@ enum Commands {
 }
 
 fn show_banner() {
-    let font = vec!["3-D", "3D Diagonal", "3D-ASCII", "ANSI Shadow", "Alligator", "Alpha", "Banner3-D", "Big Money-ne", "Caligraphy2", "Doh", "Henry 3D", "Larry 3D", "Train"];
+    let font = vec!["3D-ASCII", "ANSI Shadow", "Alligator", "Banner3-D", "Big Money-ne", "DOS Rebel", "Larry 3D"];
     let font_str = font.choose(&mut rand::thread_rng()).unwrap();
     let opt = FigletOptions {
         font: font_str.to_string(), // Default font is "Standard"
@@ -179,7 +179,7 @@ fn check_elevation() -> Result<(), anyhow::Error>{
     #[cfg (target_os = "linux")] {
         use sudo;
         if sudo::check() == sudo::RunningAs::User {
-            bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
+            bail!("[!] Not running as root. Please either use sudo or the root account")
         }
     }
     Ok(())
@@ -200,7 +200,7 @@ fn main() {
 
     // check we are running as administrator or as root
     match check_elevation() {
-        Ok(()) => println!("[+] Running with elated permissions"),
+        Ok(()) => println!("[+] Running with elevated permissions"),
         Err(e) => {
             println!("[!] Please use an elevated terminal. Error: {}", e);
             exit(0)
@@ -272,7 +272,10 @@ fn main() {
                 keep_evidence,
             };
 
-            let _ = whip_main::whip_main(args, &tool_path);
+            match whip_main::whip_main(args, &tool_path) {
+                Ok(()) => println!("[+] Wiskess has Whipped"),
+                Err(e) => println!("[!] There was an issue getting the data whipped. Error: {e}")
+            }
         },
         Commands::Wiskess { 
             config, 

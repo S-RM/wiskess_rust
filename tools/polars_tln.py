@@ -145,10 +145,12 @@ def get_all_tln(dict_tln, time_from, time_to, host):
           print(file)
           try:
             if re.search(r'regripper', file):
-              # remove lines that aren't timestamped at start
-              for line in fileinput.input(file, inplace = True):
-                if re.search(r'^\d{9,11}\|', line):
-                  print(line, end='')
+              # remove lines that aren't timestamped at start, ref: https://stackoverflow.com/a/17222971
+              matched = re.compile(r'^\d{9,11}\|.*').search
+              with fileinput.FileInput(file, inplace=1, backup='.bak') as file:
+                for line in file:
+                  if not matched(line):
+                    print(line, end='')
               df = pl.scan_csv(file, separator='|', encoding='utf8-lossy', truncate_ragged_lines=True, new_columns=['time','source','system','user','description'])
             elif re.search(r'psv$', file):
               conv_file_to_utf8(file)

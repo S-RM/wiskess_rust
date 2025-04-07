@@ -213,7 +213,7 @@ wiskers:
     input: user_dir
     github:
   - name: regripper_amcache
-    binary: '{tool_path}\RegRipper4.0\rip.exe'
+    binary: '{tool_path}\regripper3.0\rip.exe'
     args: '-aT -r {input} 1>> {outfolder}\{outfile}'
     input: amcache
     outfolder: FileExecution
@@ -221,70 +221,70 @@ wiskers:
     github: https://www.kali.org/tools/regripper/
   - name: regripper_user_tln
     binary: fd
-    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r {} 2>nul >> {outfolder}\{outfile}
+    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\regripper3.0\rip.exe -aT -r {} 2>nul >> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_user.psv
     input: user_dir
     github: https://www.kali.org/tools/regripper/
   - name: regripper_sam_tln
     binary: fd
-    args: -i SAM {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i SAM {input} -x {tool_path}\regripper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_sam.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_security_tln
     binary: fd
-    args: -i Security {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i Security {input} -x {tool_path}\regripper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_security.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_software_tln
     binary: fd
-    args: -i Software {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i Software {input} -x {tool_path}\regripper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_software.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_system_tln
     binary: fd
-    args: -i System {input} -x {tool_path}\RegRipper4.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
+    args: -i System {input} -x {tool_path}\regripper3.0\rip.exe -aT -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper_tln
     outfile: regripper_system.psv
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_user
     binary: fd
-    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r {} 2>nul >> {outfolder}\{outfile}
+    args: -i -e dat [UN][ST][RU][CS] {input} -x {tool_path}\regripper3.0\rip.exe -a -r {} 2>nul >> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_user.txt
     input: user_dir
     github: https://www.kali.org/tools/regripper/
   - name: regripper_sam
     binary: fd
-    args: -i SAM {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i SAM {input} -x {tool_path}\regripper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_sam.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_security
     binary: fd
-    args: -i Security {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i Security {input} -x {tool_path}\regripper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_security.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_software
     binary: fd
-    args: -i Software {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i Software {input} -x {tool_path}\regripper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_software.txt
     input: system_config
     github: https://www.kali.org/tools/regripper/
   - name: regripper_system
     binary: fd
-    args: -i System {input} -x {tool_path}\RegRipper4.0\rip.exe -a -r 1>> {outfolder}\{outfile}
+    args: -i System {input} -x {tool_path}\regripper3.0\rip.exe -a -r 1>> {outfolder}\{outfile}
     outfolder: Registry\regripper
     outfile: regripper_system.txt
     input: system_config

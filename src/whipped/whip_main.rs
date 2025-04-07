@@ -149,9 +149,9 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                     // this is a velociraptor collection, find data in folders `auto` and `ntfs`
                     let files_dir = data_file.join("files");
                     if files_dir.is_dir() {
-                    println!("[ ] files folder already created, so not moving over files");
-                    // add `files` folder to process_vector
-                    return process_vector.push(files_dir)
+                        println!("[ ] files folder already created, so not moving over files");
+                        // add `files` folder to process_vector
+                        return process_vector.push(files_dir)
                     }
                     let files_entries: Vec<PathBuf> = WalkDir::new(data_file)
                         .min_depth(3)
@@ -416,7 +416,11 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
             let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?;
             match data_file.exists() {
                 true => file_ops::log_msg(log_name, "Download complete".to_string()),
-                false => bail!("Unable to get file. Something wrong with downloading the file.")
+                false => {
+                    let msg = format!("[!] Unable to get file. Something wrong with downloading the file: {data_item}.");
+                    println!("{msg}");
+                    file_ops::log_msg(log_name, msg);
+                }
             };
             // pre-process data into process_vector
             let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path)?;

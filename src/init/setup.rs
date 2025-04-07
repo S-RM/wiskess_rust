@@ -3,7 +3,7 @@ use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
 
-use crate::ops::file_ops;
+use crate::ops::file_ops::{self, make_folders};
 // extern crate git2;
 // use git2::Repository;
 
@@ -196,7 +196,8 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "https://github.com/omerbenamram/evtx.git",
         "https://github.com/omerbenamram/mft",
 	    "https://github.com/forensicmatt/RustyUsn",
-        "https://github.com/williballenthin/shellbags"
+        "https://github.com/williballenthin/shellbags",
+        "https://github.com/Velocidex/velociraptor"
     ];
     for url in urls.iter() {
         let msg = format!("Getting: {}", url);
@@ -293,6 +294,9 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Installing eztools...".to_string());
+    let ez_path = &tool_path.join("Get-ZimmermanTools").join("net9");
+    let ez_path_str = &ez_path.clone().into_os_string().into_string().unwrap();
+    make_folders(&ez_path);
     let eztools = vec![
         "AmcacheParser",
         "AppCompatCacheParser",
@@ -325,13 +329,13 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         prog_spin_msg(&pb3, msg.to_string());    
     	let (code, output, error) = run_script::run_script!(
             r#"
-             toolpath="$1"
+             ezpath="$1"
              eztool="$2"
-             wget -nv "https://download.ericzimmermanstools.com/net9/$eztool.zip" -O "$toolpath/Get-ZimmermanTools/net9/$eztool.zip"
-             7z x -r -aoa "$toolpath/Get-ZimmermanTools/net9/$eztool.zip" -o"$toolpath/Get-ZimmermanTools/net9/"
-             rm "$toolpath/Get-ZimmermanTools/net9/$eztool.zip"
+             wget -nv "https://download.ericzimmermanstools.com/net9/$eztool.zip" -O "$ezpath/$eztool.zip"
+             7z x -r -aoa "$ezpath/$eztool.zip" -o"$ezpath/"
+             rm "$ezpath/$eztool.zip"
              "#,
-             &vec![tool_path_str.to_string(), eztool.to_string()],
+             &vec![ez_path_str.to_string(), eztool.to_string()],
              &options
         ).unwrap();
         outmsg.push_str(&output_script(v, code, output, error));
@@ -459,7 +463,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
          "https://github.com/EricZimmerman/Get-ZimmermanTools.git",
          "https://github.com/williballenthin/python-registry.git",
          "https://github.com/williballenthin/shellbags",
-         "https://github.com/keydet89/RegRipper4.0.git",
+         "https://github.com/keydet89/RegRipper3.0.git",
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
