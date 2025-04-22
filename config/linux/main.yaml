@@ -1,0 +1,349 @@
+# This is a configuration file of wiskess that will run tools to process
+# collections or mounted disks of Windows devices. It is built to run with 
+# wiskess on a Linux-based device. 
+# This includes the DLLs of EZTools which are executed with dotnet. Some 
+# aren't supported in Linux such as SumECmd due to needing "ESI specific Windows libraries" 
+
+wiskers:
+  - name: MFTECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: "{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f '{input}' --csv {outfolder} --csvf {outfile}"
+    outfolder: FileSystem
+    outfile: MFTECmd.csv
+    input: mft
+    github: https://github.com/EricZimmerman/MFTECmd.git
+  - name: mft
+    binary: '{tool_path}/mft/mft.exe'
+    args: "-o csv -f {outfolder}/{outfile} '{input}'"
+    outfolder: FileSystem
+    outfile: mft.csv
+    input: mft
+    github: https://github.com/omerbenamram/mft
+  - name: j_file
+    binary: '{tool_path}/RustyUsn/RustyUsn.exe'
+    args: "-s '{input}' --mft '{input_other}' > {outfolder}/{outfile}"
+    outfolder: FileSystem
+    outfile: usnjrnl_j.json
+    input: j_file
+    input_other: mft
+    github: https://github.com/forensicmatt/RustyUsn
+  - name: usnjrnl-j
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: "{tool_path}/Get-ZimmermanTools/net9/MFTECmd.dll -f '{input}' --csv {outfolder} --csvf {outfile}"
+    outfolder: FileSystem
+    outfile: usnjrnl-j-file.csv
+    input: j_file
+    github: https://github.com/EricZimmerman/MFTECmd.git
+  - name: rbcmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: "{tool_path}/Get-ZimmermanTools/net9/RBCmd.dll -d '{input}' --csv {outfolder} -q"
+    outfolder: FileSystem
+    outfile: '*RBCmd_Output.csv'
+    input: recycle_bin
+    github: https://github.com/EricZimmerman/RBCmd.git
+  - name: lnk
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/LECmd.dll -d {input} --csv {outfolder} --csvf {outfile} -q'
+    outfolder: FileSystem
+    outfile: lnk-files.csv
+    input: user_dir
+    github: https://github.com/EricZimmerman/LECmd.git
+  - name: EvtxECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/EvtxeCmd/EvtxECmd.dll -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: EventLogs
+    outfile: EvtxECmd-All.csv
+    input: winevt
+    github: https://github.com/EricZimmerman/evtx.git
+  - name: evtx_dump
+    binary: fdfind
+    args: '.* -e evtx -p {input} -x {tool_path}/evtx/evtx.exe -o jsonl > {outfolder}/{outfile}'
+    outfolder: EventLogs
+    outfile: evtx_dump.json
+    input: winevt
+    github: https://github.com/omerbenamram/evtx.git
+  - name: hayabusa
+    binary: '{tool_path}/hayabusa/hayabusa.exe'
+    args: 'csv-timeline -d {input} -o {outfolder}/{outfile} -p timesketch-verbose --ISO-8601 -w'
+    outfolder: EventLogs
+    outfile: hayabusa.csv
+    input: winevt
+    github:
+    para: false
+  - name: AmcacheParser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/AmcacheParser.dll -f {input} --csv {outfolder} -i'
+    outfolder: FileExecution
+    outfile: '*_Amcache_*'
+    input: amcache
+    github: https://github.com/EricZimmerman/AmcacheParser.git
+  - name: regripper_amcache
+    binary: regripper
+    args: '-aT -r {input} 1> {outfolder}/{outfile}'
+    input: amcache
+    outfolder: FileExecution
+    outfile: regripper_amcache.psv
+    github: https://www.kali.org/tools/regripper/
+  - name: chainsaw_shim
+    binary: '{tool_path}/chainsaw/chainsaw.exe'
+    args: 'analyse shimcache {input} --regexfile {tool_path}/shimcache_patterns.txt --amcache {input_other} --tspair --output {outfolder}/{outfile}'
+    input: system
+    input_other: amcache
+    valid_path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    outfolder: FileExecution
+    outfile: chainsaw_shim.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: AppCompatCache
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/AppCompatCacheParser.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileExecution
+    outfile: appcompatcache.csv
+    input: system
+    github: https://github.com/EricZimmerman/AppCompatCacheParser.git
+  - name: RecentFileCacheParser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RecentFileCacheParser.dll -f {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: FileExecution
+    outfile: RecentFileCache.csv
+    input: recentFileCache
+    github: https://github.com/EricZimmerman/RecentFileCacheParser.git    
+  - name: Prefetch
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/PECmd.dll -d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
+    outfolder: FileExecution
+    outfile: prefetch.csv
+    input: prefetch
+    github: https://github.com/EricZimmerman/Prefetch.git
+  - name: SrumECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SrumECmd.dll -f {input} -r {input_other} --csv {outfolder}'
+    outfolder: Network
+    outfile: '*_SrumECmd_*.csv'
+    input: srum
+    input_other: software
+    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+    github: https://github.com/EricZimmerman/SrumECmd.git
+  - name: chainsaw_srum
+    binary: '{tool_path}/chainsaw/chainsaw.exe'
+    args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
+    input: system32
+    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+    outfolder: Network
+    outfile: chainsaw_srum.csv
+    github: https://github.com/WithSecureLabs/chainsaw.git
+  - name: SumECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SumECmd.dll -d {input} --csv {outfolder}'
+    outfolder: Network
+    outfile: '*SumECmd*.csv'
+    input: sum
+    para: false
+    github: https://github.com/EricZimmerman/SumECmd.git
+  - name: KStrike
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/KStrike/KStrike.py {input}/Current.mdb > {outfolder}/{outfile}'
+    input: sum
+    valid_path: '{root}/Windows/System32/LogFiles/Sum/Current.mdb'
+    outfolder: Network
+    outfile: UAL_Kstrike.psv
+    github: https://github.com/brimorlabs/KStrike
+  - name: hindsight
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
+    outfolder: Network
+    outfile: hindsight
+    input: chrome
+    valid_path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
+    github: https://github.com/obsidianforensics/hindsight.git
+  - name: RegSystem
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RECmd/RECmd.dll --bn {tool_path}/Get-ZimmermanTools/net9/RECmd/BatchExamples/Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: Registry
+    outfile: reg-System.csv
+    input: system_config
+    github:
+  - name: RegUser
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/RECmd/RECmd.dll --bn {tool_path}/Get-ZimmermanTools/net9/RECmd/BatchExamples/Kroll_Batch.reb --nl=false -d {input} --csv {outfolder} --csvf {outfile}'
+    outfolder: Registry
+    outfile: reg-User.csv
+    input: user_dir
+    github:
+  - name: SBE
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/SBECmd.dll -d {input} --csv {outfolder}'
+    outfolder: UserActivity
+    outfile: '*SBECmd_Messages.txt'
+    input: user_dir
+    github:
+  - name: JLECmd
+    binary: '{tool_path}/.dotnet/dotnet'
+    args: '{tool_path}/Get-ZimmermanTools/net9/JLECmd.dll -d {input} --csv {outfolder} -q'
+    outfolder: UserActivity
+    outfile: '*Destinations.csv'
+    input: user_dir
+    github:
+  - name: SCCM_RecentlyUsedApplication
+    binary: python2.7
+    args: '{tool_path}/CCM_RUA_Finder.py -i {input} -o {outfolder}/{outfile}'
+    outfolder: FileExecution
+    outfile: SCCM_RecentlyUsedApplication.psv
+    input: objects
+    github: https://github.com/davidpany/WMI_Forensics.git
+  - name: WMIPersistenceFinder
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
+    outfolder: FileExecution
+    outfile: PyWMIPersistenceFinder.txt
+    input: objects
+    github: https://github.com/davidpany/WMI_Forensics.git
+  - name: shellbags
+    binary: fdfind
+    args: '-i "USRCLASS|NTUSER" {input} -x python2 {tool_path}/shellbags/shellbags.py -o csv > {outfolder}/{outfile}'
+    outfolder: UserActivity
+    outfile: shellbags.csv
+    input: user_dir
+    github: https://github.com/williballenthin/shellbags
+  - name: regripper_user_tln
+    binary: fdfind
+    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_user.psv
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_sam_tln
+    binary: fdfind
+    args: '-i "SAM" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_sam.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security_tln
+    binary: fdfind
+    args: '-i "Security" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_security.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software_tln
+    binary: fdfind
+    args: '-i "Software" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_software.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system_tln
+    binary: fdfind
+    args: '-i "System" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper_tln
+    outfile: regripper_system.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_user
+    binary: fdfind
+    args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_user.psv
+    input: user_dir
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_sam
+    binary: fdfind
+    args: '-i "SAM" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_sam.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_security
+    binary: fdfind
+    args: '-i "Security" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_security.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_software
+    binary: fdfind
+    args: '-i "Software" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_software.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: regripper_system
+    binary: fdfind
+    args: '-i "System" {input} -x regripper -a -r 1>> {outfolder}/{outfile}'
+    outfolder: Registry/regripper
+    outfile: regripper_system.psv
+    input: system_config
+    github: https://www.kali.org/tools/regripper/
+  - name: rdp_bitmap
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/bmc_run.py "{input}" {outfolder}'
+    outfolder: Network
+    outfile: '*.bmp'
+    input: rdp_bitmap
+    github: https://github.com/ANSSI-FR/bmc-tools
+
+reporters:
+  - name: polars timeline
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/polars_tln.py {out_path} {start_date} {end_date}'
+    outfolder: Timeline
+    outfile: mft.json
+    input: none
+  - name: iocs_summary
+    binary: rg
+    args: '-aiwFf {ioc_file} {outfolder} --json > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: IOCs_summary.json
+    input: none
+    github: https://github.com/BurntSushi/ripgrep.git
+
+enrichers:
+  - name: iocs_analysis
+    binary: rg
+    args: '--hidden --trim -zUiFf {ioc_file} {out_path} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_analysis.txt
+    input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_pagefile
+    binary: rg
+    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_pagefile.txt
+    input: pagefile
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: iocs_datasource
+    binary: rg
+    args: --hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
+    outfolder: IOC_Findings
+    outfile: iocs_datasource.txt
+    input: base
+    github: https://github.com/BurntSushi/ripgrep.git
+  - name: loki_analysis
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {out_path} --logfolder {outfolder}'
+    outfolder: IOC_Findings/loki_analysis
+    outfile: '*.log'
+    input: none
+  - name: loki_datasource
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/loki/loki.py --intense --noprocscan --nolevcheck --nopesieve --nolisten --dontwait -s 15000 -p {input} --logfolder {outfolder}'
+    outfolder: IOC_Findings/loki_datasource
+    outfile: '*.log'
+    input: base
+    para: false
+
+intense:
+  - name: thor_analysis
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {out_path} -e {outfolder}'
+    outfolder: IOC_Findings/thor_analysis
+    outfile: '*.txt'
+    input: none
+  - name: thor_datasource
+    binary: '{tool_path}/thor-lite/thor64-lite.exe'
+    args: '-a Filescan --norescontrol --nosoft --cross-platform --alldrives -p {input} -e {outfolder}'
+    outfolder: IOC_Findings/thor_datasource
+    outfile: '*.txt'
+    input: base
+    para: false

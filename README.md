@@ -50,8 +50,6 @@ EZTools:
 - SumECmd
 
 S-RM:
-- enrich
-- polars_enrich.py
 - polars_hostinfo.py
 - polars_tln.py
 - Executablelist.ps1
@@ -93,7 +91,6 @@ There are multiple configurations that can be used to process data. The default 
 * williballenthin Shellbags
 * KStrike
 * RDP Bitmap
-* Polars Enrich
 * IOCs over pagefile
 * Executablelist
 * Loki over the datasource

@@ -1,0 +1,21 @@
+# Git stuff
+.git
+.gitignore
+
+# Build artifacts (important!)
+target/
+Cargo.lock # Usually copied explicitly, prevents accidental inclusion via COPY . .
+
+# Local secrets / config / environment
+.env*
+*.env
+*.local
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.iml
+
+# OS specific
+.DS_Store
+Thumbs.db

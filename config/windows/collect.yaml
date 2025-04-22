@@ -1,0 +1,24 @@
+wiskers:
+  - name: velociraptor
+    binary: '{tool_path}\velociraptor-v0.72.0-windows-amd64.exe'
+    args: -v artifacts collect Windows.KapeFiles.Targets --output {outfolder}\{outfile} --args Device='{input}' --args _KapeTriage=Y --args LogFiles=Y --args _SANS_Triage=Y --args Notepad=Y --args ServerTriage=Y --args Exchange=Y
+    outfolder: Artefacts
+    outfile: velo_collection.zip
+    input: base
+    github: 
+
+reporters:
+  - name: none
+    binary: pwsh.exe
+    args: -c 'Write-Host "Nothing"'
+    outfolder: Artefacts
+    outfile: velo_collection.zip
+    input: none
+
+enrichers:
+  - name: none
+    binary: pwsh.exe
+    args: -c 'Write-Host "Nothing"'
+    outfolder: Artefacts
+    outfile: velo_collection.zip
+    input: none

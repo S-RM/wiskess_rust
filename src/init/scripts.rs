@@ -14,7 +14,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
     * GitHub token is incorrect or lacks basic permissions - please generated one to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
     * Missing file under the tools directory - please re-download the release version"#)
             };
-	},
+	    },
         "linux" => {
             let _ = setup::setup_linux(verbose, github_token, tool_path);
         },

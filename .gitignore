@@ -8,10 +8,7 @@
 !/tools/PyWMIPersistenceFinder.py
 !/tools/polars_tln.py
 !/tools/polars_hostinfo.py
-!/tools/polars_enrich.py
 !/tools/hindsight.exe
-!/tools/enrich.exe
-!/tools/enrich_config.yaml
 !/tools/CCM_RUA_Finder.py
 !/tools/CCM_RUA_Finder.exe
 !/tools/BrowsingHistoryView.exe
