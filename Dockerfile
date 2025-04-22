@@ -1,7 +1,6 @@
 # Dockerfile for wiskess_rust
 
 # ----------- Stage 1: Builder -----------
-# ... (Builder stage remains the same) ...
 FROM rust:1.83-slim-bookworm AS builder
 WORKDIR /usr/src/app
 ARG BINARY_NAME=wiskess_rust
@@ -36,9 +35,7 @@ ENV DOTNET_ROOT="${TOOL_PATH}/.dotnet"
 ENV PATH="${DOTNET_ROOT}:${PATH}"
 
 # --- Install System Dependencies (APT) ---
-# ADDED build-essential and potentially other -dev libs needed for C extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Core dependencies
     ca-certificates \
     git \
     wget \
@@ -57,7 +54,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic-dev \
     jq \
     tar \
-    # --- ADDED FOR BUILDING PYTHON C EXTENSIONS ---
     build-essential \
     pkg-config \
     # --- ADDED FOR dotnet Globalization ---
@@ -68,7 +64,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m venv ${VENV_PATH}
 
 # --- Install Python Packages (pip for Python 3) ---
-# Now build tools should be available
 RUN . ${VENV_PATH}/bin/activate && \
     pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
@@ -94,18 +89,15 @@ RUN mkdir -p ${TOOL_PATH} && \
     mkdir -p ${TOOL_PATH}/Get-ZimmermanTools/net9
 
 # --- Download/Clone Tools ---
-# Set working directory
 WORKDIR ${TOOL_PATH} 
 
-# Git clone repositories FIRST (as requested)
-# Clone shellbags specifically into 'shellbags' directory
+# Git clone repositories
 RUN git clone --depth 1 https://github.com/brimorlabs/KStrike KStrike && \
     git clone --depth 1 https://github.com/ANSSI-FR/bmc-tools.git bmc-tools && \
     git clone --depth 1 https://github.com/Neo23x0/loki.git loki && \
     git clone --depth 1 https://github.com/williballenthin/shellbags shellbags
 
 # Run setup_get_git.py AFTER clones
-# Ensure it can handle existing directories (e.g., for shellbags)
 COPY --from=builder /usr/src/app/setup_get_git.py /setup_get_git.py
 RUN chmod +x /setup_get_git.py && \
     . ${VENV_PATH}/bin/activate && \
@@ -115,7 +107,6 @@ RUN chmod +x /setup_get_git.py && \
     python /setup_get_git.py "${GITHUB_TOKEN}" "https://github.com/omerbenamram/evtx.git" linux && \
     python /setup_get_git.py "${GITHUB_TOKEN}" "https://github.com/omerbenamram/mft.git" linux && \
     python /setup_get_git.py "${GITHUB_TOKEN}" "https://github.com/forensicmatt/RustyUsn.git" linux && \
-    # Add others back if needed
     rm /setup_get_git.py
 
 # Install Loki dependencies
