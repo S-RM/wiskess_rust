@@ -32,3 +32,4 @@
 /wiskess_rust.exe
 /wiskess_setup.log
 /Cargo.lock
+.github_token

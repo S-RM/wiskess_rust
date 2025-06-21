@@ -135,50 +135,63 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
         .collect();
 
     entries.iter().for_each(|data_file| {
-        if let Some(ext) = data_file.extension() {
-            match ext.to_str().unwrap_or("") {
-                "vmdk"|"vhdx"|"vhd"|"e01"|"vdi"|"ex01"|"raw" => {
-                    process_vector.push(data_file.to_path_buf())
-                },
-                _ => ()
+        if data_file.is_file() {
+            if let Some(ext) = data_file.extension() {
+                match ext.to_str().unwrap_or("") {
+                    "vmdk"|"vhdx"|"vhd"|"e01"|"vdi"|"ex01"|"raw" => {
+                        process_vector.push(data_file.to_path_buf())
+                    },
+                    _ => ()
+                }
             }
-        }
-        if let Some(file_path) = data_file.file_name() {
-            match file_path.to_str().unwrap_or("") {
-                "uploads" => {
-                    // this is a velociraptor collection, find data in folders `auto` and `ntfs`
-                    let files_dir = data_file.join("files");
-                    if files_dir.is_dir() {
-                        println!("[ ] files folder already created, so not moving over files");
+        } else if data_file.is_dir() {
+            if let Some(file_path) = data_file.file_name() {
+                match file_path.to_str().unwrap_or("") {
+                    "uploads" => {
+                        // this is a velociraptor collection, find data in folders `auto` and `ntfs`
+                        let files_dir = data_file.join("files");
+                        if files_dir.is_dir() {
+                            println!("[ ] files folder already created, so not moving over files");
+                            // add `files` folder to process_vector
+                            return process_vector.push(files_dir)
+                        }
+                        let files_entries: Vec<PathBuf> = WalkDir::new(data_file)
+                            .min_depth(3)
+                            .max_depth(3)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                            .filter(|entry| {
+                                entry.path().components().any(|component|{
+                                    component.as_os_str().to_str().map_or(false, |comp_str| {
+                                        match comp_str.to_uppercase().as_str() {
+                                            "C%3A"|"%5C%5C.%5CC%3A" => true,
+                                            &_ => false
+                                        }
+                                    })
+                                })
+                            })
+                            .map(|e| e.into_path())
+                            .collect();
+                        // create folder `files`
+                        _ = create(&files_dir, false);
+                        // move the data into `files`
+                        files_entries.iter().for_each(|files_entry| {
+                            match files_entry.is_dir() {
+                                true => {
+                                    let options = CopyOptions::new();
+                                    move_dir(files_entry, &files_dir, &options).unwrap()
+                                },
+                                false => {
+                                    let options = FileCopyOptions::new();
+                                    move_file(files_entry, &files_dir.join(files_entry.file_name().unwrap()), &options).unwrap()
+                                },
+                            };
+                        });
                         // add `files` folder to process_vector
-                        return process_vector.push(files_dir)
-                    }
-                    let files_entries: Vec<PathBuf> = WalkDir::new(data_file)
-                        .min_depth(3)
-                        .max_depth(3)
-                        .into_iter()
-                        .filter_map(|e| e.ok())
-                        .map(|e| e.into_path())
-                        .collect();
-                    // create folder `files`
-                    _ = create(&files_dir, false);
-                    // move the data into `files`
-                    files_entries.iter().for_each(|files_entry| {
-                        match files_entry.is_dir() {
-                            true => {
-                                let options = CopyOptions::new();
-                                move_dir(files_entry, &files_dir, &options).unwrap()
-                            },
-                            false => {
-                                let options = FileCopyOptions::new();
-                                move_file(files_entry, &files_dir.join(files_entry.file_name().unwrap()), &options).unwrap()
-                            },
-                        };
-                    });
-                    // add `files` folder to process_vector
-                    process_vector.push(files_dir)
-                },
-                _ => ()
+                        process_vector.push(files_dir)
+                    },
+                    _ => ()
+                }
             }
         }
     });
@@ -232,7 +245,7 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
         whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else {
         println!("[!] Unknown URL format. {in_link}");
-        panic!("Unknown URL format.");
+        Ok(PathBuf::new())
     }
 }
 
@@ -272,7 +285,8 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show
     } else if in_link.starts_with("https://") {
         whip_az::list_azure_files(&in_link, &tool_path, log_name, show_err).await?
     } else {
-        panic!("Unknown URL format.");
+        println!("[!] Unknown URL format.");
+        vec!["".to_string()]
     };
 
     Ok(files)
