@@ -1,5 +1,7 @@
 use crate::configs::config::{self, MainArgs, WhippedArgs};
+use crate::init::scripts;
 use crate::ops::exe_ops::{installed_binary_check, run_wisker, run_posh};
+use crate::ops::file_ops::make_folders;
 use crate::ops::{file_ops, wiskess};
 
 use super::whip_s3;
@@ -118,9 +120,9 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
 /// `process_vector` - the vector of files that need processing, is updated in this function
 fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, process_vector: &mut Vec<PathBuf>) {
     // if data is an archive, extract it to the extracted folder 
-    let data_str = data_file.clone().into_os_string();
-    let extract_flag = format!("-o{}", data_folder.display());
-    let unzip_cmd = ["x", "-aos", data_str.to_str().unwrap(), extract_flag.as_str()].to_vec();
+    let data_str = format!("'{}'", data_file.clone().display());
+    let extract_flag = format!("-o'{}'", data_folder.display());
+    let unzip_cmd = ["x", "-aos", data_str.as_str(), extract_flag.as_str()].to_vec();
                         
     let bin_path = Path::new("7z.exe").to_path_buf();
     let _json_data = run_cmd(bin_path, unzip_cmd, log_name, true).unwrap();
@@ -211,7 +213,7 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
     let cmd = cmd.join(" ");
     
     let output = match env::consts::OS {
-        "windows" => run_posh("-c", &format!("{binary} {cmd}"), log_name, &String::new(), show_err),
+        "windows" => run_posh("-c", &format!("& {binary} {cmd}"), log_name, &String::new(), show_err),
         "linux" => run_wisker(&binary, &cmd, log_name),
         &_ => todo!()
     };
@@ -228,7 +230,7 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
 async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let out_file = output.join(&file);
     let out_file_parent = output.parent().unwrap().join(&file);
-    for data_path in [out_file, out_file_parent] {
+    for data_path in [out_file.clone(), out_file_parent] {
         if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
             file_ops::log_msg(
                 log_name, 
@@ -236,6 +238,13 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
             );
             return Ok(data_path);
         }
+    }
+
+    // if file is an item in a folder, make the folder
+    if file.contains("/") || file.contains("\\") {
+        let folder_path = out_file.parent().unwrap();
+        make_folders(folder_path);
+        println!("[ ] File has folder in path, making folder: {}", folder_path.display());
     }
     
     println!("[ ] Downloading: {}", file);
@@ -299,44 +308,73 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show
 /// no Windows folder is found, all the drives are processed.
 /// # Arguments
 /// * `args` - the arguments needed to pass to the start_wiskess function
-fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, _config: PathBuf, _artefacts_config: PathBuf) {
-    // TODO: set free_drives as the drive letters that are available and have no disk mounted
-    // Loop through three mounting tools: arsenal image mounter, osf_mount, and qemu-nbd
-    let aim_ds_path = format!("--filename=\"{}\"", data_source.display());
-    let osf_ds_path = format!("'{}'", data_source.display());
-    let tool_map = HashMap::from([
-        ("{tool_path}/aim_cli.exe", vec!["--mount", "--readonly", &aim_ds_path, "--fakesig", "--background"]),
-        ("C:/Program Files/OSFMount/OSFMount.com", vec!["-a", "-t", "file", "-f", &osf_ds_path, "-v", "all"]), 
-        // ("qemu-nbd", vec!["-c", "/dev/ndb1", &osf_ds_path])
-    ]);
-    let mut any_tool = false;
-    for (tool, cmd) in tool_map {
-        let bin_path_str = &tool.replace(
-                "{tool_path}",
-                args.tool_path.clone().into_os_string().to_str().unwrap());
-        let bin_path = Path::new(bin_path_str).to_path_buf();
-        // if tool exists, attempt to mount it
-        if installed_binary_check(true, bin_path_str) != "" 
-        || bin_path.exists() {
-            any_tool = true;
-            println!("[+] Running {} {}", bin_path.display(), cmd.join(" "));
-            let output = run_cmd(bin_path, cmd, &log_name, true);
-            println!("{}", String::from_utf8(output.unwrap().stdout).unwrap());
-            // let status = Confirm::new("Has it been mounted?").with_default(false).prompt();
-            // if successfully mounted break the loop
-            // if status. {
-            //     Ok(true) => break,
-            //     &_ => continue,
-            // }
-        }
-        // get the drive letter and loop through mounted drives
-        // if drive letter not found, loop through free_drives to find any that have mounted drives
-        break;
-    }
-    if !any_tool {
-        println!("[-] No tool found to mount images, if on Windows please install osfmount at
-            file path `C:/Program Files/OSFMount/OSFMount.com`, if on Linux install `qemu-nbd`")
-    }
+fn process_image(data_source: &PathBuf, _log_name: &Path, args: MainArgs, config: PathBuf, _artefacts_config: PathBuf) {
+    // // ensure the paths has the slashes in the right way
+    let data_source_ok = data_source.canonicalize().unwrap();
+
+    // TEMP: This is  temporary workaround until the code commented below is operational
+    // put the args into a whipped structure
+    let whip_args = config::WhippedImageArgs {
+        tool_path: args.tool_path,
+        config,
+        start_date: args.start_date,
+        end_date: args.end_date,
+        ioc_file: args.ioc_file,
+        update: false,
+        keep_evidence: true,
+        image_path: data_source_ok.to_owned(),
+        wiskess_folder: args.out_path
+    };
+
+    println!("[ ] Running whipped with args: image path: {}, wiskess folder: {}", whip_args.image_path.display(), &whip_args.wiskess_folder);
+    scripts::run_whipped_image(whip_args);
+
+    return;
+
+    // TEMP: end
+
+    // // TODO: set free_drives as the drive letters that are available and have no disk mounted
+    // // Loop through three mounting tools: arsenal image mounter, osf_mount, and qemu-nbd
+    // let aim_ds_path = format!("--filename=\"{}\"", data_source_ok.display());
+    // let osf_ds_path = format!("'{}'", data_source_ok.display());
+    // // TODO: in setup create a symlink for osfmount: New-Item -ItemType SymbolicLink -Path .\tools\ -name osfmount.lnk -Target 'C:\Program Files\OSFMount\OSFMount.com'
+    // let tool_map = HashMap::from([
+    //     ("{tool_path}\\aim_cli.exe", vec!["--mount", "--readonly", &aim_ds_path, "--fakesig", "--background"]),
+    //     ("{tool_path}\\osfmount.lnk", vec!["-a", "-t", "file", "-f", &osf_ds_path, "-v", "all"]), 
+    //     // ("qemu-nbd", vec!["-c", "/dev/ndb1", &osf_ds_path])
+    // ]);
+    // let mut any_tool = false;
+    // for (tool, cmd) in tool_map {
+    //     let bin_path_str = tool.replace(
+    //             "{tool_path}",
+    //             args.tool_path.clone().into_os_string().to_str().unwrap());
+    //     let bin_path = PathBuf::from(&bin_path_str);
+    //     // if tool exists, attempt to mount it
+    //     println!("[?] Trying to run  {} {}", bin_path.display(), cmd.join(" "));
+    //     if installed_binary_check(true, &bin_path_str) == "" {
+    //         // && bin_path.exists() {
+    //         any_tool = true;
+    //         println!("[+] Running {} {}", bin_path.display(), cmd.join(" "));
+    //         let output = run_wisker(&bin_path.into_os_string().into_string().unwrap(), &cmd.join(" "), &log_name);
+    //         // let stdout = output.as_ref().unwrap().clone().stdout;
+    //         // let stderr = output.unwrap().stderr;
+    //         println!("{}", String::from_utf8(output.stdout).unwrap());
+    //         println!("{}", String::from_utf8(output.stderr).unwrap());
+    //         // let status = Confirm::new("Has it been mounted?").with_default(false).prompt();
+    //         // if successfully mounted break the loop
+    //         // if status. {
+    //         //     Ok(true) => break,
+    //         //     &_ => continue,
+    //         // }
+    //         break;
+    //     }
+    //     // get the drive letter and loop through mounted drives
+    //     // if drive letter not found, loop through free_drives to find any that have mounted drives
+    // }
+    // if !any_tool {
+    //     println!("[-] No tool found to mount images, if on Windows please install osfmount at
+    //         file path `C:/Program Files/OSFMount/OSFMount.com`, if on Linux install `qemu-nbd`")
+    // }
 }
 
 

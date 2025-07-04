@@ -43,6 +43,34 @@ pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     }
 }
 
+pub fn run_whipped_image_script(script: &String, args: config::WhippedImageArgs) {
+    let mut pwsh = "pwsh".to_string();
+    if !check_binary(&pwsh, "-h") {
+        pwsh = "powershell".to_string();
+    }
+    let mut command = Command::new(pwsh);
+    
+    command.args(["-ExecutionPolicy", "Bypass"]);
+    command.args(["-f", script]);
+    command.args(["-config", &args.config.into_os_string().into_string().unwrap()]);
+    command.args(["-image_path", &args.image_path.into_os_string().into_string().unwrap()]);
+    command.args(["-wiskess_folder", &args.wiskess_folder]);
+    command.args(["-start_date", &args.start_date]);
+    command.args(["-end_date", &args.end_date]);
+    command.args(["-ioc_file", &args.ioc_file]);
+    command.args(["-tool_path", &args.tool_path.parent().unwrap().to_str().unwrap()]);
+
+    let output = command.execute_output().unwrap();
+
+    if let Some(exit_code) = output.status.code() {
+        if exit_code != 0 {
+            eprintln!("Failed to run whipped script at path {}.", script);
+        }
+    } else {
+        eprintln!("Interrupted!");
+    }
+}
+
 /// run powershell, checking filepaths for powershell or pwsh
 /// 
 /// Args:

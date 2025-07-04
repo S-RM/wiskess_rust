@@ -184,7 +184,7 @@ wiskers:
     input: user_dir
     github:
   - name: SCCM_RecentlyUsedApplication
-    binary: python2.7
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/CCM_RUA_Finder.py -i {input} -o {outfolder}/{outfile}'
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
@@ -197,13 +197,6 @@ wiskers:
     outfile: PyWMIPersistenceFinder.txt
     input: objects
     github: https://github.com/davidpany/WMI_Forensics.git
-  - name: shellbags
-    binary: fdfind
-    args: '-i "USRCLASS|NTUSER" {input} -x python2 {tool_path}/shellbags/shellbags.py -o csv > {outfolder}/{outfile}'
-    outfolder: UserActivity
-    outfile: shellbags.csv
-    input: user_dir
-    github: https://github.com/williballenthin/shellbags
   - name: regripper_user_tln
     binary: fdfind
     args: '-i "NTUSER.DAT|USRCLASS.DAT" {input} -x regripper -aT -r 1>> {outfolder}/{outfile}'
