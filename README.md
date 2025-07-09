@@ -11,7 +11,7 @@ Wiskess automates the processing of disk images and triage collection artefacts 
 6. Store the results – results can be uploaded to cloud-based storage
 
 # The way of Wiskess
-![Alt text](S-RM-IR-Wiskess-Graphics3.webp)
+![Alt text](web/static/S-RM-IR-Wiskess-Graphics3.webp)
 
 # Tools integrated to Wiskess
 This is the Rust version of Wiskess, which uses parallel processing of multiple tools and more can be added. It includes enrichment tools that scan the data source using your IOC list, yara rules, and open source intelligence. 
