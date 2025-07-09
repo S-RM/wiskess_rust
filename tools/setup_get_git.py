@@ -94,23 +94,27 @@ def get_release(token: str, url: str, script_os: str):
     }
 
     response = requests.get(f'https://api.github.com/repos{repo}/releases/latest', headers=headers)
+    
+    target_dir = os.path.join(os.getcwd(), program)
 
     if response.status_code == 200:
       # make dir from file stub and copy file there
-      target_dir = os.path.join(os.getcwd(), program)
       if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         # download the files to target dir
         get_files(response, target_dir)
       else:
         print(f'[ ] Target directory {target_dir} exists, remove the folder if wanting to redownload.')
-      # symlink the main .exe to program.exe
-      make_symlink(target_dir, program, script_os)
     else:
       print(f'[!] Unable to get the repo from link: {url}')
       print('[ ] Please check the link exists')
       print(response)
-
+      
+    if os.path.exists(target_dir):
+      # symlink the main .exe to program.exe
+      make_symlink(target_dir, program, script_os)
+    else:
+      print(f'[!] Unable to make symlink. Non-existant target directory: {target_dir}, for {program}')
 
 def main():
     parser = argparse.ArgumentParser()

@@ -13,11 +13,11 @@ use std::path::{Path, PathBuf};
 /// * `tool_path` - the path to the tools, such as where azcopy.exe would be
 pub async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let output_file = output.join(file);
-    let output_str = output_file.into_os_string();
+    let output_str = format!("'{}'", output_file.display());
     let wr_azure_url = format!("'{azure_url}'");
     let az_cmd = match recurse {
-        true => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap(), "--recursive"].to_vec(),
-        false => ["copy", wr_azure_url.as_str(), output_str.to_str().unwrap()].to_vec(),
+        true => ["copy", wr_azure_url.as_str(), output_str.as_str(), "--recursive"].to_vec(),
+        false => ["copy", wr_azure_url.as_str(), output_str.as_str()].to_vec(),
     };
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");

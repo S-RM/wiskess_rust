@@ -20,7 +20,7 @@ use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
-use anyhow::bail;
+use anyhow::{bail, Ok};
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -55,10 +55,10 @@ enum Commands {
     /// whipped pipeline process commands
     Whipped {
         /// config file of the binaries to run as processors
-        #[arg(short, long, default_value = "config/main_win.yaml")]
+        #[arg(short, long, default_value = "main.yaml")]
         config: PathBuf,
         /// config file of the artefact file paths
-        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        #[arg(short, long, default_value = "artefacts.yaml")]
         artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long, default_value = "")]
@@ -93,10 +93,10 @@ enum Commands {
     /// process the data with wiskess
     Wiskess {
         /// config file of the binaries to run as processors
-        #[arg(short, long, default_value = "config/main_win.yaml")]
+        #[arg(short, long, default_value = "main.yaml")]
         config: PathBuf,
         /// config file of the artefact file paths
-        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        #[arg(short, long, default_value = "artefacts.yaml")]
         artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long)]
@@ -116,10 +116,10 @@ enum Commands {
     },
     OldWhip {
         /// config file of the binaries to run as processors
-        #[arg(short, long, default_value = "config/main_win.yaml")]
+        #[arg(short, long, default_value = "main.yaml")]
         config: PathBuf,
         /// config file of the artefact file paths
-        #[arg(short, long, default_value = "config/artefacts.yaml")]
+        #[arg(short, long, default_value = "artefacts.yaml")]
         artefacts_config: PathBuf,
         /// file path to the data source; either mounted or the root folder
         #[arg(short, long)]
@@ -176,14 +176,42 @@ fn check_elevation() -> Result<(), anyhow::Error>{
             bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
         }
     }
-    #[cfg (target_os = "linux")] {
-        use sudo;
-        if sudo::check() == sudo::RunningAs::User {
-            bail!("[!] Not running as root. Please either use sudo or the root account")
-        }
-    }
+    // #[cfg (target_os = "linux")] {
+    //     use sudo;
+    //     if sudo::check() == sudo::RunningAs::User {
+    //         bail!("[!] Not running as root. Please either use sudo or the root account")
+    //     }
+    // }
     Ok(())
 }
+
+fn get_config_type(config: PathBuf, tool_path: &Path) -> Result<PathBuf, anyhow::Error> {
+    if !config.exists() || !config.is_file() {
+        let config_os = match env::consts::OS {
+            "windows" => {
+                Path::new(tool_path).parent().unwrap().join("config").join("windows").join(config.file_name().unwrap())
+            },
+            "linux" => {
+                Path::new(tool_path).parent().unwrap().join("config").join("linux").join(config.file_name().unwrap())
+            },
+            &_ => bail!(format!("[!] Unknown OS type. Not yet supporting OS: {}.", env::consts::OS))
+        };
+        Ok(config_os)
+    } else {
+        Ok(config)
+    }
+}
+
+
+fn check_configs(config: PathBuf, tool_path: &PathBuf, artefacts_config: PathBuf) -> (PathBuf, PathBuf) {
+    let config = get_config_type(config, tool_path).unwrap();
+    let artefacts_config = get_config_type(artefacts_config, tool_path).unwrap();
+    // check if config paths exist
+    let config = file_ops::check_path(config);
+    let artefacts_config = file_ops::check_path(artefacts_config);
+    (config, artefacts_config)
+}
+
 
 fn main() {
     // Set exit handler
@@ -200,7 +228,7 @@ fn main() {
 
     // check we are running as administrator or as root
     match check_elevation() {
-        Ok(()) => println!("[+] Running with elevated permissions"),
+        std::result::Result::Ok(()) => println!("[+] Running with the right permissions"),
         Err(e) => {
             println!("[!] Please use an elevated terminal. Error: {}", e);
             exit(0)
@@ -232,7 +260,7 @@ fn main() {
         },
         Commands::Gui {  } => {
             match web::main(tool_path) {
-                Ok(_) => println!("GUI closed"),
+                std::result::Result::Ok(_) => println!("GUI closed"),
                 Err(e) => println!("[!] Something went wrong. Error: {e}"),
             };
         },
@@ -253,9 +281,7 @@ fn main() {
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
 
-            // check if config paths exist
-            let config = file_ops::check_path(config);
-            let artefacts_config = file_ops::check_path(artefacts_config);
+            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
 
             // put the args into a whipped structure
             let args = config::WhippedArgs {
@@ -273,7 +299,7 @@ fn main() {
             };
 
             match whip_main::whip_main(args, &tool_path) {
-                Ok(()) => println!("[+] Wiskess has Whipped"),
+                std::result::Result::Ok(()) => println!("[+] Wiskess has Whipped"),
                 Err(e) => println!("[!] There was an issue getting the data whipped. Error: {e}")
             }
         },
@@ -286,6 +312,8 @@ fn main() {
             end_date, 
             ioc_file 
         } => {
+            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
+            
             let args = config::MainArgs {
                 out_path,
                 start_date,
@@ -297,11 +325,6 @@ fn main() {
                 out_log: PathBuf::new(),
                 multi_pb: MultiProgress::new()
             };
-
-            // check if config paths exist
-            let config = file_ops::check_path(config);
-            let artefacts_config = file_ops::check_path(artefacts_config);
-
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },
         Commands::OldWhip {
@@ -321,9 +344,7 @@ fn main() {
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
 
-            // check if config paths exist
-            let config = file_ops::check_path(config);
-            let artefacts_config = file_ops::check_path(artefacts_config);
+            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
 
             // put the args into a whipped structure
             let args = config::WhippedArgs {

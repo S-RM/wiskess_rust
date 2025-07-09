@@ -105,4 +105,21 @@ use struct_iterable::Iterable;
     pub update: bool,
     pub keep_evidence: bool
   }
+
+  // Set struct for whipped image args
+  #[derive(Debug, Serialize, Deserialize, Clone, Iterable)]
+  pub struct WhippedImageArgs {
+    pub tool_path: PathBuf,
+    pub config: PathBuf,
+    pub start_date: String,
+    pub end_date: String,
+    pub ioc_file: String,
+    pub image_path: PathBuf,
+    pub wiskess_folder: String,
+    pub update: bool,
+    pub keep_evidence: bool
+  }
 }
+
+
+

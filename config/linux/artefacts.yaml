@@ -1,0 +1,76 @@
+artefacts:
+  - name: none
+    path: ''
+  - name: base
+    path: '{root}'
+  - name: j_file
+    path: '{root}/$Extend/$UsnJrnl:$J'
+    legacy: '{root}/$Extend/$UsnJrnl$J'
+  - name: mft
+    path: '{root}/$MFT'
+  - name: recycle_bin
+    path: '{root}/$Recycle.Bin'
+    legacy: '{root}/RECYCLER'
+  - name: pagefile
+    path: '{root}/pagefile.sys'
+  - name: user_dir
+    path: '{root}/Users'
+    legacy: "'{root}/Documents and Settings'"
+  - name: consolehost_history
+    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
+  - name: amcache
+    path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
+    legacy: '{root}/Windows/appcompat/Programs/Amcache.hve'
+  - name: recentFileCache
+    path: '{root}/Windows/AppCompat/Programs/RecentFileCache.bcf'
+  - name: prefetch
+    path: '{root}/Windows/Prefetch'
+  - name: system32
+    path: '{root}/Windows/System32'
+  - name: system
+    path: '{root}/Windows/System32/config/SYSTEM'
+  - name: system_config
+    path: '{root}/Windows/System32/config'
+  - name: sum
+    path: '{root}/Windows/System32/LogFiles/Sum'
+  - name: objects
+    path: '{root}/Windows/System32/wbem/Repository/OBJECTS.DATA'
+  - name: winevt
+    path: '{root}/Windows/System32/winevt/Logs'
+    legacy: '{root}/Windows/System32/config'
+  - name: temp
+    path: '{root}/Windows/Temp'
+  - name: chrome
+    path: '{root}/Users'
+    legacy: '{root}/Documents and Settings'
+  - name: actCache
+    path: '{root}/Users/*/AppData/Local/ConnectedDevicesPlatform/*/ActivitiesCache.db'
+  - name: rdp_bitmap
+    path: '{root}/Users/*/AppData/Local/Microsoft/Terminal Server Client/Cache/'
+    legacy: '{root}/Documents and Settings/*/Local Settings/Application Data/Microsoft/Terminal Server Client/Cache/'
+  - name: srum
+    path: '{root}/Windows/System32/sru/SRUDB.dat'
+  - name: system
+    path: '{root}/Windows/System32/config/SYSTEM'
+  - name: software
+    path: '{root}/Windows/System32/config/SOFTWARE'
+  - name: sam
+    path: '{root}/Windows/System32/config/SAM'
+  - name: security
+    path: '{root}/Windows/System32/config/SECURITY'
+  - name: system_log1
+    path: '{root}/Windows/System32/config/SYSTEM.LOG1'
+  - name: software_log1
+    path: '{root}/Windows/System32/config/SOFTWARE.LOG1'
+  - name: sam_log1
+    path: '{root}/Windows/System32/config/SAM.LOG1'
+  - name: security_log1
+    path: '{root}/Windows/System32/config/SECURITY.LOG1'
+  - name: system_log2
+    path: '{root}/Windows/System32/config/SYSTEM.LOG2'
+  - name: software_log2
+    path: '{root}/Windows/System32/config/SOFTWARE.LOG2'
+  - name: sam_log2
+    path: '{root}/Windows/System32/config/SAM.LOG2'
+  - name: security_log2
+    path: '{root}/Windows/System32/config/SECURITY.LOG2'

@@ -117,7 +117,6 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "fd-find",
         "git",
         "ripgrep",
-        "python2.7",
         "python-pip",
         "regripper",
         "python3-pip",
@@ -378,11 +377,11 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
     
-    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, python2, fdfind, osfmount, awscli, jq and ripgrep...".to_string());
+    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, fdfind, osfmount, arsenalimagemounter, awscli, jq and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        choco install -y git 7zip python2 fd osfmount awscli jq
+        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd

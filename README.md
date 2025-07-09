@@ -1,71 +1,45 @@
 # wiskess_rust
-WISKESS automates the Windows evidence processing for Incident Response investigations. Rust version is a program that has been developed with enhanced parallel processing and reliability.
+Wiskess automates the Windows evidence processing for incident response and forensic investigations. The overall goal of the tool is to process evidence in the form of logical or physcial collections, i.e. a velociraptor collection or a disk image, then upload the results to Azure or AWS storage. 
 
-This is the Rust version of WISKESS, which uses parallel processing of multiple tools and more can be added. The list of tools used after setup are:
+Wiskess automates the processing of disk images and triage collection artefacts from Windows systems. It does this with a pipeline involving six steps:
 
-ANSSI-FR: bmc_tools
+1. Get the data – transfers data from cloud-based storage (i.e. AWS S3, Azure Storage), network drive, etc.
+2. Pre-process the data – structures the data into a suitable format for processing
+3. Process the data – covers the main artefacts of Windows system with parallel processing
+4. Enrich the findings – scans the data and findings with IOCs, yara rules and threat intel feeds
+5. Generate reports – timelines all results of the processing in a format compatible with visualisation tools (Elastic, Splunk, Timesketch)
+6. Store the results – results can be uploaded to cloud-based storage
 
-Nir Soft: BrowsingHistoryView
+# The way of Wiskess
+![Alt text](web/static/S-RM-IR-Wiskess-Graphics3.webp)
 
-Yamato-Security: hayabusa
-
-obsidianforensics: hindsight
-
-brimorlabs: KStrike
-
-Neo23x0: loki
-
-BurntSushi: RipGrep
-
-keydet89: RegRipper
-
-williballenthin: shellbags
-
-davidpany: 
-- CCM_RUA_Finder
-- PyWMIPersistenceFinder
-
-omerbenamram:
-- evtx
-- mft
-
-WithSecureLabs chainsaw:
-- evtx
-- Shimcache
-- SRUM (System Resource Usage Monitor)
-
-EZTools:
-- AmcacheParser
-- AppCompatCacheParser
-- EvtxECmd
-- JLECmd
-- LECmd
-- MFTECmd
-- PECmd
-- RBCmd
-- RecentFileCacheParser
-- RECmd
-- SBECmd
-- SrumECmd
-- SumECmd
-
-S-RM:
-- enrich
-- polars_enrich.py
-- polars_hostinfo.py
-- polars_tln.py
-- Executablelist.ps1
-
-Whipped Tools:
-- AzCopy
-- 7zip
-- OSFMount
-
-It includes enrichment tools that scan the data source using your IOC list, yara rules, and open source intelligence. 
+# Tools integrated to Wiskess
+This is the Rust version of Wiskess, which uses parallel processing of multiple tools and more can be added. It includes enrichment tools that scan the data source using your IOC list, yara rules, and open source intelligence. 
 
 The results are structured into folders in CSV files that can be opened with text editors and searched across using tools like grep. The tool produces a report of the system info and files that have produced results in the Analysis folder.
 
 The output is generated into reports of a timeline that is compatible with ingesting into visualisation tools including, timesketch, elastic and splunk.
+
+The list of tools used after setup are:
+
+| Developer/Organization      | Tools                                                      |
+|-----------------------------|------------------------------------------------------------|
+| ANSSI-FR                    | bmc_tools                                                  |
+| Nir Soft                    | BrowsingHistoryView                                        |
+| Yamato-Security             | hayabusa                                                   |
+| obsidianforensics           | hindsight                                                  |
+| brimorlabs                  | KStrike                                                    |
+| Neo23x0                     | loki                                                       |
+| BurntSushi                  | RipGrep                                                    |
+| keydet89                    | RegRipper                                                  |
+| williballenthin             | shellbags                                                  |
+| davidpany                   | CCM_RUA_Finder, PyWMIPersistenceFinder                     |
+| omerbenamram                | evtx, mft                                                  |
+| WithSecureLabs chainsaw     | evtx, Shimcache, SRUM (System Resource Usage Monitor)      |
+| EZTools                     | AmcacheParser, AppCompatCacheParser, EvtxECmd, JLECmd, LECmd, MFTECmd, PECmd, RBCmd, RecentFileCacheParser, RECmd, SBECmd, SrumECmd, SumECmd |
+| S-RM                        | polars_hostinfo.py, polars_tln.py, Executablelist.ps1      |
+| Whipped Tools               | AzCopy, 7zip, OSFMount                                     |
+
 
 ![271793948-27e9b4b3-0a7f-4efb-a844-2eda7a8a6385](https://github.com/vividDuck/wiskess_rust/assets/122105925/46cacffc-a0d0-4ec7-b1cb-60bca314d2bb)
 
@@ -74,7 +48,7 @@ run `wiskess_rust.exe setup -g <your github token>` using a terminal with Admini
 
 The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
 
-# WISKESS Web UI `wiskess_rust.exe gui`
+# Wiskess Web UI `wiskess_rust.exe gui`
 This command will launch the Web user interface. This is still WIP, where currently you can submit two commands to wiskess, including:
 * a single data source - using the main wiskess module
 * multiple data sources hosted locally, or in the cloud (Azure storage or AWS S3) - using the whipped module
@@ -93,14 +67,13 @@ There are multiple configurations that can be used to process data. The default 
 * williballenthin Shellbags
 * KStrike
 * RDP Bitmap
-* Polars Enrich
 * IOCs over pagefile
 * Executablelist
 * Loki over the datasource
 
 You can set the process config using the argument `--config my_fav_tools.yaml` in both wiskess and whipped by wiskess commands.
 
-# Whipped by WISKESS `wiskess_rust.exe whipped`
+# Whipped by Wiskess `wiskess_rust.exe whipped`
 This command will pull data from an AWS or Azure store, process it with wiskess and upload the output to a store.
 
 ## Usage
@@ -170,8 +143,8 @@ wiskess_rust.exe whipped --config ./config/win_all.yml `
         Caution: make sure you have enough disk space for all the data source list.
 </details>
     
-# WISKESS `wiskess_rust.exe wiskess`
-This is the Rust version of WISKESS, which uses parallel processing of multiple processors, enriches the data and creates reports. It is invoked by the command `wiskess_rust.exe whipped`, but can also be used independently with the command `wiskess_rust.exe wiskess`.
+# Wiskess `wiskess_rust.exe wiskess`
+This is the Rust version of Wiskess, which uses parallel processing of multiple processors, enriches the data and creates reports. It is invoked by the command `wiskess_rust.exe whipped`, but can also be used independently with the command `wiskess_rust.exe wiskess`.
 
 ## Usage
 * Mount the image to a drive, i.e. using Arsenal Image Mounter. Can be skipped if using a folder of artefacts.

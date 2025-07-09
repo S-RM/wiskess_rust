@@ -14,7 +14,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
     * GitHub token is incorrect or lacks basic permissions - please generated one to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
     * Missing file under the tools directory - please re-download the release version"#)
             };
-	},
+	    },
         "linux" => {
             let _ = setup::setup_linux(verbose, github_token, tool_path);
         },
@@ -33,6 +33,26 @@ pub fn run_whipped(tool_path: &Path, args: config::WhippedArgs) {
        "windows" => {
            let script = tool_path.join("whipped.ps1").to_str().unwrap().to_string();
            exe_ops::run_whipped_script(&script, args);
+        }
+        "linux" => {
+	    // TODO: setup linux
+            todo!();
+        },
+        &_ => todo!()
+    }
+}
+    
+pub fn run_whipped_image(args: config::WhippedImageArgs) {
+    println!("[+] Running whipped image process...");
+    
+    // check local_storage exists, if drive exists make the folder
+    println!("[-] Making dir: {}", args.wiskess_folder);
+    file_ops::make_folders(Path::new(&args.wiskess_folder));
+    
+    match env::consts::OS {
+       "windows" => {
+           let script = args.tool_path.join("whipped_imageprocess.ps1").to_str().unwrap().to_string();
+           exe_ops::run_whipped_image_script(&script, args);
         }
         "linux" => {
 	    // TODO: setup linux
