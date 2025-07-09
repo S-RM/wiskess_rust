@@ -62,7 +62,7 @@ pub mod web {
         log::info!("creating temporary upload directory: {}", tmp_path.display());
         std::fs::create_dir_all(&tmp_path)?;
 
-        let address = "0.0.0.0";
+        let address = "127.0.0.1";
         let port = 8080;
         log::info!("Starting WebUI on http://{address}:{port}");
         HttpServer::new(move || {

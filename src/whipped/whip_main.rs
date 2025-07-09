@@ -1,6 +1,6 @@
 use crate::configs::config::{self, MainArgs, WhippedArgs};
 use crate::init::scripts;
-use crate::ops::exe_ops::{installed_binary_check, run_wisker, run_posh};
+use crate::ops::exe_ops::{run_wisker, run_posh};
 use crate::ops::file_ops::make_folders;
 use crate::ops::{file_ops, wiskess};
 
@@ -10,7 +10,6 @@ use super::whip_az;
 use anyhow::{bail, Ok};
 use indicatif::MultiProgress;
 use anyhow::Result;
-use std::collections::HashMap;
 use std::fs::metadata;
 use std::path::{Path, PathBuf};
 use std::env;
