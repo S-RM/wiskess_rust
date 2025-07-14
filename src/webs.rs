@@ -260,6 +260,7 @@ pub mod web {
             out_link: params.out_link.to_string(),
             update,
             keep_evidence,
+            verbose: false,
         };
 
         let items = struct_to_vec_whip(&args);

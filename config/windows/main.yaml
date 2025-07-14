@@ -120,10 +120,10 @@ wiskers:
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: srumdump
-    binary: '{tool_path}\srum-dump\srum_dump2.6.exe'
-    args: '-i {input} -r {input_other} -t {tool_path}\srum-dump\SRUM_TEMPLATE3.xlsx -o {outfolder}\{outfile}'
-    outfolder: Network
-    outfile: srum-dump.xlsx
+    binary: '{tool_path}\srum-dump\srum_dump.exe'
+    args: '--SRUM_INFILE {input} --REG_HIVE {input_other} --OUT_DIR {outfolder} --DEBUG --NO_CONFIRM'
+    outfolder: Network\srum-dump
+    outfile: srum-dump*.xlsx
     input: srum
     input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'

@@ -103,7 +103,9 @@ use struct_iterable::Iterable;
     pub in_link: String,
     pub out_link: String,
     pub update: bool,
-    pub keep_evidence: bool
+    pub keep_evidence: bool,
+    #[serde(default = "serde_false")]
+    pub verbose: bool
   }
 
   // Set struct for whipped image args

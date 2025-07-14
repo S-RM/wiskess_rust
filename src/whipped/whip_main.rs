@@ -39,6 +39,13 @@ fn set_link(link: &str, folder: &str) -> String {
     url
 }
 
+fn log_msg(log_name: &Path, msg: String, verbose: bool) {
+    file_ops::log_msg(log_name, msg.clone());
+    if verbose {
+        println!("wiskess_rust: {}", msg)
+    }
+}
+
 /// Splits a given string by either a comma or a newline and trims each resulting substring.
 /// # Arguments
 /// * `data_source_list` - A string containing the source data to be split and trimmed.
@@ -63,16 +70,16 @@ fn split_and_trim(data_source_list: &str) -> Vec<String> {
 /// * `file_path` - The file to pre-process, could be a file or folder
 /// * `log_name` - The file where logs are stored
 /// * `data_folder` - the path to where the data extracted/copied to, i.e. collection.zip is extracted to collection-extracted
-fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) -> Result<Vec<PathBuf>> {
+fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf, verbose: bool) -> Result<Vec<PathBuf>> {
     
     // log the data downloaded and its size
     let data_meta = metadata(&file_path)?;
-    file_ops::log_msg(log_name, format!(
+    log_msg(log_name, format!(
         "Downloaded file: {} with size: {} and type: {:?}.", 
         file_path.display(),
         data_meta.len(),
         data_meta.file_type(),
-    ));
+    ), verbose);
 
     
     // get the type of data downloaded, i.e. image, folder or archive
@@ -226,14 +233,15 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
 /// * `in_link` - A string slice of the initial input link that may point to an AWS S3 bucket or Azure Blob Storage.
 /// * `output` - The path to where the data will be downloaded to
 /// * `file` - the name of the file to download
-async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
+async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path, verbose: bool) -> Result<PathBuf> {
     let out_file = output.join(&file);
     let out_file_parent = output.parent().unwrap().join(&file);
     for data_path in [out_file.clone(), out_file_parent] {
         if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
-            file_ops::log_msg(
+            log_msg(
                 log_name, 
-                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display())
+                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display()),
+                verbose
             );
             return Ok(data_path);
         }
@@ -409,12 +417,19 @@ fn process_data(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: 
 
 /// update_processed_data downloads the process folder, expands any collected files, 
 /// then removes any empty or files that need reprocessing after any change to the results
-async fn update_processed_data(out_link: &String, process_folder: &Path, tool_path: &PathBuf, log_name: &Path) {
+async fn update_processed_data(out_link: &String, process_folder: &Path, tool_path: &PathBuf, log_name: &Path, verbose: bool) {
     // download wiskess folder
     let process_folder_name = process_folder.file_name().unwrap().to_str().unwrap().to_string();
     let output_path =  process_folder.parent().unwrap().to_path_buf();
-    file_ops::log_msg(log_name, format!("[ ] Updating data... link: {} at path: {}",out_link, output_path.display()));
-    _ = get_file(out_link, &output_path, &process_folder_name, true, tool_path, log_name).await;
+    log_msg(log_name, format!("[ ] Updating data... link: {} at path: {}",out_link, output_path.display()), verbose);
+    _ = get_file(out_link,
+            &output_path,
+            &process_folder_name,
+            true,
+            tool_path,
+            log_name,
+            verbose
+        ).await;
     // if artefacts/collection.zip exists, expand it
     let zip_path = output_path.join("Artefacts").join("collection.zip");
     if zip_path.exists() {
@@ -431,6 +446,7 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
 #[tokio::main]
 pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {    
     let log_name = Path::new("whipped_main.log");
+    let verbose = args.verbose;
 
     let data_list = if args.data_source_list == "" {
         // if no data source list provided, list the files/blobs/objects in the in_link
@@ -446,7 +462,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
     // loop through the data_list
     for data_item in data_list {
         println!("[ ] processing {data_item}");
-        file_ops::log_msg(log_name, format!("[ ] processing {data_item}"));
+        log_msg(log_name, format!("[ ] processing {data_item}"), verbose);
         // set vars for `data_folder`, `process_folder`
         let out_folder = format!("{}-extracted", 
             Path::new(&data_item).file_stem().unwrap().to_os_string().into_string().unwrap()
@@ -464,18 +480,18 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
         // if the process folder doens't exist in the out_link or the update flag is set
         if !is_processed || args.update {
             // download the data
-            let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?;
+            let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name, verbose).await?;
             match data_file.exists() {
-                true => file_ops::log_msg(log_name, "Download complete".to_string()),
+                true => log_msg(log_name, "Download complete".to_string(), verbose),
                 false => {
                     let msg = format!("[!] Unable to get file. Something wrong with downloading the file: {data_item}.");
                     println!("{msg}");
-                    file_ops::log_msg(log_name, msg);
+                    log_msg(log_name, msg, verbose);
                 }
             };
             // pre-process data into process_vector
-            let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path)?;
-            file_ops::log_msg(log_name, format!("Pre-processed data: {:?}", process_vector));
+            let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path, verbose)?;
+            log_msg(log_name, format!("Pre-processed data: {:?}", process_vector), true);
             // update the data
             if args.update {
                 println!("[ ] Updating the processed data...");
@@ -483,7 +499,8 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                     &out_link_url,
                     &wiskess_folder,
                     tool_path,
-                    log_name
+                    log_name,
+                    verbose
                 ).await;
             }
             // process the data with a loop through the process_vector, set the process folder path
@@ -507,9 +524,11 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                 upload_file(&wiskess_folder, &args.out_link, &tool_path, log_name).await;
             }
         } else {
-            file_ops::log_msg(
+            log_msg(
                 log_name, 
-                format!("Already processed {data_item}. If wanting to process again either delete the folder here and online or use the `--update` flag"));
+                format!("Already processed {data_item}. If wanting to process again either delete the folder here and online or use the `--update` flag"),
+                verbose
+            );
         }
         // remove the data source files and extracted folder
         if !args.keep_evidence {

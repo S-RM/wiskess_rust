@@ -21,6 +21,7 @@
 !/tools/Executablelist.ps1
 !/tools/jq_filters/*
 !/tools/polars_vector_tln.py
+!/tools/whipped_imageprocess.ps1
 /output_test
 /testing_wr
 /logs

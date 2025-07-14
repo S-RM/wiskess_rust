@@ -89,6 +89,9 @@ enum Commands {
         /// Caution: make sure you have enough disk space for all the data source list.
         #[arg(short, long)]
         keep_evidence: bool,
+        /// Set this flag to output to the command line messages related to whipped, this is also saved to the whipped_main.log
+        #[arg(short, long)]
+        verbose: bool,
     },
     /// process the data with wiskess
     Wiskess {
@@ -150,6 +153,9 @@ enum Commands {
         /// Caution: make sure you have enough disk space for all the data source list.
         #[arg(short, long)]
         keep_evidence: bool,
+        /// Set this flag to output to the command line messages related to whipped, this is also saved to the whipped_main.log
+        #[arg(short, long)]
+        verbose: bool,
     },
 }
 
@@ -276,6 +282,7 @@ fn main() {
             out_link,
             update,
             keep_evidence,
+            verbose
         } => {            
             // Confirm date is valid
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
@@ -296,6 +303,7 @@ fn main() {
                 out_link,
                 update,
                 keep_evidence,
+                verbose
             };
 
             match whip_main::whip_main(args, &tool_path) {
@@ -339,6 +347,7 @@ fn main() {
             out_link,
             update,
             keep_evidence,
+            verbose
         } => {          
             // Confirm date is valid
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
@@ -359,6 +368,7 @@ fn main() {
                 out_link,
                 update,
                 keep_evidence,
+                verbose
             };
 
             scripts::run_whipped(&tool_path, args)
