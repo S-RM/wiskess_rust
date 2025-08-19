@@ -168,8 +168,15 @@ function Start-VeloProcess ($velo_collection, $wiskess_folder, $start_date, $end
     if ($(Test-Path -PathType Container -Path "$velo_collection\files") -eq $False) {
         New-Item -ItemType Directory "$velo_collection\files" -ErrorAction SilentlyContinue
         Get-ChildItem "$velo_collection\*\*" -Exclude "%5C%5C.%5CD%3A","$velo_collection\files*" | ForEach-Object {
-            Move-Item $_ -Destination "$velo_collection\files" -ErrorAction SilentlyContinue
-            Remove-Item -Force -Recurse $_ -ErrorAction SilentlyContinue     
+            $copy_item = $_
+            Write-Host "[DEBUG] Moving $copy_item to $velo_collection\files"
+            try {
+                Move-Item $copy_item -Destination "$velo_collection\files" -ErrorAction Stop
+            } catch {
+                Write-Host "[DEBUG] Copying $copy_item to $velo_collection\files"
+                Copy-Item $copy_item -Destination "$velo_collection\files" -ErrorAction SilentlyContinue -Force -Recurse
+            }
+            Remove-Item -Force -Recurse $copy_item -ErrorAction SilentlyContinue     
         }
     }
     Start-Wiskess "$velo_collection\files" $wiskess_folder $start_date $end_date $ioc_file
