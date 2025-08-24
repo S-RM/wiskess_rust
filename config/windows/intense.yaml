@@ -143,9 +143,9 @@ wiskers:
     github: https://github.com/MarkBaggett/srum-dump.git
   - name: hindsight
     binary: '{tool_path}\hindsight\hindsight.exe'
-    args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
+    args: ' -i {input} -f jsonl -o {outfolder}\hindsight'
     outfolder: Network
-    outfile: hindsight
+    outfile: hindsight.jsonl
     input: chrome
     valid_path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     github: https://github.com/obsidianforensics/hindsight.git

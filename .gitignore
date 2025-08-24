@@ -32,6 +32,7 @@
 /hindsight-temp
 /tmp/
 /whipped_main.log
+/whipped_main*.log
 /wiskess_rust
 /wiskess_rust.exe
 /wiskess_setup.log

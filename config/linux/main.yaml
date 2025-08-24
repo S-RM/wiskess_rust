@@ -149,9 +149,9 @@ wiskers:
     github: https://github.com/brimorlabs/KStrike
   - name: hindsight
     binary: '{tool_path}/venv/bin/python3'
-    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
+    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/hindsight -l {outfolder}/hindsight.log -t UTC'
     outfolder: Network
-    outfile: hindsight
+    outfile: hindsight.jsonl
     input: chrome
     valid_path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
     github: https://github.com/obsidianforensics/hindsight.git

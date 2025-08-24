@@ -393,7 +393,6 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        py -2 -m pip install python-cim python-registry six
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
         7z e ".\AzCopy.zip" -o"azcopy\" azcopy.exe -r -aoa
         del ".\AzCopy.zip"

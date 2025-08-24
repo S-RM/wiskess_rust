@@ -8,6 +8,7 @@ use super::whip_s3;
 use super::whip_az;
 
 use anyhow::{bail, Ok};
+use chrono::Utc;
 use indicatif::MultiProgress;
 use anyhow::Result;
 use std::fs::metadata;
@@ -34,7 +35,7 @@ fn set_link(link: &str, folder: &str) -> String {
         let parts: Vec<&str> = link.split('?').collect();
         format!("{}/{}?{}", parts[0], folder, parts[1])
     } else {
-        String::new()
+        String::from("local")
     };
     url
 }
@@ -229,7 +230,7 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
 async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let out_file = output.join(&file);
     let out_file_parent = output.parent().unwrap().join(&file);
-    for data_path in [out_file.clone(), out_file_parent] {
+    for data_path in [out_file.clone(), out_file_parent.clone()] {
         if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
             file_ops::log_msg(
                 log_name, 
@@ -251,6 +252,9 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
         whip_s3::get_s3_file(&in_link, &output, &file, recurse, log_name).await
     } else if in_link.starts_with("https://") {
         whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
+    } else if in_link.starts_with("local") {
+        println!("[!] You have set the --in-link as local, but the data was not found at {}", out_file_parent.display());
+        Ok(PathBuf::new())
     } else {
         println!("[!] Unknown URL format. {in_link}");
         Ok(PathBuf::new())
@@ -277,6 +281,8 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
         whip_s3::put_s3_file(&in_folder, &out_link, log_name).await
     } else if out_link.starts_with("https://") {
         whip_az::put_azure_file(&in_folder, &out_link, &tool_path, log_name).await
+    } else if out_link.starts_with("local") {
+        println!("[ ] Not uploading as set to local");
     } else {
         println!("[!] Unknown URL format. {out_link}");
         panic!("Unknown URL format.");
@@ -292,6 +298,8 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show
         whip_s3::list_s3_files(&in_link, log_name, show_err).await?
     } else if in_link.starts_with("https://") {
         whip_az::list_azure_files(&in_link, &tool_path, log_name, show_err).await?
+    } else if in_link.starts_with("local") {
+        vec!["".to_string()]
     } else {
         println!("[!] Unknown URL format.");
         vec!["".to_string()]
@@ -430,7 +438,12 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
 
 #[tokio::main]
 pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {    
-    let log_name = Path::new("whipped_main.log");
+    // change to whipped_main-date.log
+    // Set the start time
+    let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
+    let whipped_start = Utc::now();
+    let whipped_logname = format!("whipped_main-{}.log", whipped_start.format(&date_time_fmt).to_string());
+    let log_name = Path::new(&whipped_logname);
 
     let data_list = if args.data_source_list == "" {
         // if no data source list provided, list the files/blobs/objects in the in_link
