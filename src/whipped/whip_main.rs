@@ -58,6 +58,14 @@ fn split_and_trim(data_source_list: &str) -> Vec<String> {
         .collect()
 }
 
+/// print and log messages
+fn print_log(msg: &str, out_log:&Path, verbose: bool) {
+    if verbose {
+        println!("{msg}")
+    }
+    file_ops::log_msg(out_log, msg.to_string());
+}
+
 /// Pre-process some data, get its type and put it into an extracted folder
 /// return the process_vector - a list of paths needing processing
 /// # Arguments
@@ -68,12 +76,14 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
     
     // log the data downloaded and its size
     let data_meta = metadata(&file_path)?;
-    file_ops::log_msg(log_name, format!(
-        "Downloaded file: {} with size: {} and type: {:?}.", 
+    print_log(
+        format!("Downloaded file: {} with size: {} and type: {:?}.", 
         file_path.display(),
         data_meta.len(),
-        data_meta.file_type(),
-    ));
+        data_meta.file_type()).as_str(),
+        log_name,
+        false
+    );
 
     
     // get the type of data downloaded, i.e. image, folder or archive
@@ -98,7 +108,7 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
                     "zip"|"7z" => {
                         pre_process_zip(entry, data_folder, log_name, &mut process_vector);
                     }
-                    _ => println!("[ ] File in folder is not a valid artefact type")
+                    _ => print_log("[ ] File in folder is not a valid artefact type", log_name, true)
                 }
             }
         });
@@ -153,7 +163,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         // this is a velociraptor collection, find data in folders `auto` and `ntfs`
                         let files_dir = data_file.join("files");
                         if files_dir.is_dir() {
-                            println!("[ ] files folder already created, so not moving over files");
+                            print_log("[ ] files folder already created, so not moving over files", log_name, true);
                             // add `files` folder to process_vector
                             return process_vector.push(files_dir)
                         }
@@ -232,9 +242,10 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
     let out_file_parent = output.parent().unwrap().join(&file);
     for data_path in [out_file.clone(), out_file_parent.clone()] {
         if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
-            file_ops::log_msg(
+            print_log(
+                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display()).as_str(),
                 log_name, 
-                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display())
+                false
             );
             return Ok(data_path);
         }
@@ -244,19 +255,35 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
     if file.contains("/") || file.contains("\\") {
         let folder_path = out_file.parent().unwrap();
         make_folders(folder_path);
-        println!("[ ] File has folder in path, making folder: {}", folder_path.display());
+        print_log(
+            format!("[ ] File has folder in path, making folder: {}", folder_path.display()).as_str(),
+            log_name,
+            true
+        );
     }
     
-    println!("[ ] Downloading: {}", file);
+    print_log(
+        format!("[ ] Downloading: {file}").as_str(),
+        log_name,
+        true
+    );
     if in_link.starts_with("s3") {
         whip_s3::get_s3_file(&in_link, &output, &file, recurse, log_name).await
     } else if in_link.starts_with("https://") {
         whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else if in_link.starts_with("local") {
-        println!("[!] You have set the --in-link as local, but the data was not found at {}", out_file_parent.display());
+        print_log(
+            format!("[!] You have set the --in-link as local, but the data was not found at {}", out_file_parent.display()).as_str(),
+            log_name,
+            true
+        );
         Ok(PathBuf::new())
     } else {
-        println!("[!] Unknown URL format. {in_link}");
+        print_log(
+            format!("[!] Unknown URL format. {in_link}").as_str(),
+            log_name,
+            true
+        );
         Ok(PathBuf::new())
     }
 }
@@ -276,15 +303,23 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
         let _json_data = run_cmd(bin_path, zip_cmd, log_name, true).unwrap();
     }
     // upload the process folder
-    println!("[ ] Uploading: {}", in_folder.display());
+    print_log(
+        format!("[ ] Uploading: {}", in_folder.display()).as_str(),
+        log_name,
+        true
+    );
     if out_link.starts_with("s3") {
         whip_s3::put_s3_file(&in_folder, &out_link, log_name).await
     } else if out_link.starts_with("https://") {
         whip_az::put_azure_file(&in_folder, &out_link, &tool_path, log_name).await
     } else if out_link.starts_with("local") {
-        println!("[ ] Not uploading as set to local");
+        print_log("[ ] Not uploading as set to local", log_name, true);
     } else {
-        println!("[!] Unknown URL format. {out_link}");
+        print_log(
+            format!("[!] Unknown URL format. {out_link}").as_str(),
+            log_name,
+            true
+        );
         panic!("Unknown URL format.");
     }
 }
@@ -301,7 +336,7 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show
     } else if in_link.starts_with("local") {
         vec!["".to_string()]
     } else {
-        println!("[!] Unknown URL format.");
+        print_log("[!] Unknown URL format.", log_name, true);
         vec!["".to_string()]
     };
 
@@ -315,7 +350,7 @@ async fn list_files(in_link: &String, tool_path: &PathBuf, log_name: &Path, show
 /// no Windows folder is found, all the drives are processed.
 /// # Arguments
 /// * `args` - the arguments needed to pass to the start_wiskess function
-fn process_image(data_source: &PathBuf, _log_name: &Path, args: MainArgs, config: PathBuf, _artefacts_config: PathBuf) {
+fn process_image(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: PathBuf, _artefacts_config: PathBuf) {
     // // ensure the paths has the slashes in the right way
     let data_source_ok = data_source.canonicalize().unwrap();
 
@@ -333,7 +368,11 @@ fn process_image(data_source: &PathBuf, _log_name: &Path, args: MainArgs, config
         wiskess_folder: args.out_path
     };
 
-    println!("[ ] Running whipped with args: image path: {}, wiskess folder: {}", whip_args.image_path.display(), &whip_args.wiskess_folder);
+    print_log(
+        format!("[ ] Running whipped with args: image path: {}, wiskess folder: {}", whip_args.image_path.display(), &whip_args.wiskess_folder).as_str(),
+        log_name,
+        true
+    );
     scripts::run_whipped_image(whip_args);
 
     return;
@@ -421,7 +460,11 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
     // download wiskess folder
     let process_folder_name = process_folder.file_name().unwrap().to_str().unwrap().to_string();
     let output_path =  process_folder.parent().unwrap().to_path_buf();
-    file_ops::log_msg(log_name, format!("[ ] Updating data... link: {} at path: {}",out_link, output_path.display()));
+    print_log(
+        format!("[ ] Updating data... link: {} at path: {}",out_link, output_path.display()).as_str(),
+        log_name,
+        false
+    );
     _ = get_file(out_link, &output_path, &process_folder_name, true, tool_path, log_name).await;
     // if artefacts/collection.zip exists, expand it
     let zip_path = output_path.join("Artefacts").join("collection.zip");
@@ -458,8 +501,11 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
     };
     // loop through the data_list
     for data_item in data_list {
-        println!("[ ] processing {data_item}");
-        file_ops::log_msg(log_name, format!("[ ] processing {data_item}"));
+        print_log(
+            format!("[ ] processing {data_item}").as_str(),
+            log_name,
+            true
+        );
         // set vars for `data_folder`, `process_folder`
         let out_folder = format!("{}-extracted", 
             Path::new(&data_item).file_stem().unwrap().to_os_string().into_string().unwrap()
@@ -479,19 +525,26 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
             // download the data
             let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?;
             match data_file.exists() {
-                true => file_ops::log_msg(log_name, "Download complete".to_string()),
+                true => print_log(
+                        "Download complete".to_string().as_str(),
+                        log_name,
+                        false
+                    ),
                 false => {
                     let msg = format!("[!] Unable to get file. Something wrong with downloading the file: {data_item}.");
-                    println!("{msg}");
-                    file_ops::log_msg(log_name, msg);
+                    print_log(&msg, log_name, true);
                 }
             };
             // pre-process data into process_vector
             let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path)?;
-            file_ops::log_msg(log_name, format!("Pre-processed data: {:?}", process_vector));
+            print_log(
+                format!("Pre-processed data: {:?}", process_vector).as_str(),
+                log_name,
+                false
+            );
             // update the data
             if args.update {
-                println!("[ ] Updating the processed data...");
+                print_log("[ ] Updating the processed data...", log_name, true);
                 update_processed_data(
                     &out_link_url,
                     &wiskess_folder,
@@ -520,13 +573,19 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                 upload_file(&wiskess_folder, &args.out_link, &tool_path, log_name).await;
             }
         } else {
-            file_ops::log_msg(
-                log_name, 
-                format!("Already processed {data_item}. If wanting to process again either delete the folder here and online or use the `--update` flag"));
+            print_log(
+                format!("Already processed {data_item}. If wanting to process again either delete the folder here and online or use the `--update` flag").as_str(),
+                log_name,
+                false
+            );
         }
         // remove the data source files and extracted folder
         if !args.keep_evidence {
-            println!("[ ] Removing {}", out_folder_path.display());
+            print_log(
+                format!("[ ] Removing {}", out_folder_path.display()).as_str(),
+                log_name,
+                true
+            );
             let _ = remove(out_folder_path);
         }
 
