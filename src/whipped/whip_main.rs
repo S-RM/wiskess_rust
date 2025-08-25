@@ -239,17 +239,6 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
 /// * `file` - the name of the file to download
 async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let out_file = output.join(&file);
-    let out_file_parent = output.parent().unwrap().join(&file);
-    for data_path in [out_file.clone(), out_file_parent.clone()] {
-        if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
-            print_log(
-                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display()).as_str(),
-                log_name, 
-                false
-            );
-            return Ok(data_path);
-        }
-    }
 
     // if file is an item in a folder, make the folder
     if file.contains("/") || file.contains("\\") {
@@ -273,7 +262,7 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
         whip_az::get_azure_file(&in_link, &output, &file, recurse, &tool_path, log_name).await
     } else if in_link.starts_with("local") {
         print_log(
-            format!("[!] You have set the --in-link as local, but the data was not found at {}", out_file_parent.display()).as_str(),
+            format!("[!] You have set the --in-link as local, but the data was not found at {}", out_file.display()).as_str(),
             log_name,
             true
         );
@@ -286,6 +275,21 @@ async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bo
         );
         Ok(PathBuf::new())
     }
+}
+
+fn chk_exists(output: &PathBuf, file: &String, out_file: &PathBuf, log_name: &Path) -> Option<std::result::Result<PathBuf, anyhow::Error>> {
+    let out_file_parent = output.parent().unwrap().join(&file);
+    for data_path in [out_file.clone(), out_file_parent.clone()] {
+        if data_path.exists() && metadata(&data_path).unwrap().len() > 0 {
+            print_log(
+                format!("[ ] Already downloaded {}, delete it if wanting to download again", data_path.display()).as_str(),
+                log_name, 
+                false
+            );
+            return Some(Ok(data_path));
+        }
+    }
+    None
 }
 
 /// Upload files to either S3 or Azure storage
@@ -445,6 +449,11 @@ fn process_data(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: 
         },
         "" => {
             // if there's no extension, it is likely a collection of files, send to process_collection
+            print_log(
+                format!("[ ] Running wiskess for collection path: {}, to output folder: {}", data_source.display(), args.out_path).as_str(),
+                log_name,
+                true
+            );
             let data_source_str = data_source.clone().into_os_string().into_string().unwrap();
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source_str);
         },
@@ -523,7 +532,11 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
         // if the process folder doens't exist in the out_link or the update flag is set
         if !is_processed || args.update {
             // download the data
-            let data_file = get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?;
+            let out_file = &out_folder_path.join(&data_item);
+            let data_file = match chk_exists(&out_folder_path, &data_item, &out_file, log_name) {
+                Some(value) => value?,
+                _ => get_file(&in_link_url, &out_folder_path, &data_item, false, &tool_path, log_name).await?
+            };
             match data_file.exists() {
                 true => print_log(
                         "Download complete".to_string().as_str(),

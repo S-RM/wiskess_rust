@@ -16,8 +16,8 @@ pub async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, re
     let output_str = format!("'{}'", output_file.display());
     let wr_azure_url = format!("'{azure_url}'");
     let az_cmd = match recurse {
-        true => ["copy", wr_azure_url.as_str(), output_str.as_str(), "--recursive"].to_vec(),
-        false => ["copy", wr_azure_url.as_str(), output_str.as_str()].to_vec(),
+        true => ["sync", wr_azure_url.as_str(), output_str.as_str(), "--recursive"].to_vec(),
+        false => ["sync", wr_azure_url.as_str(), output_str.as_str()].to_vec(),
     };
     
     let bin_path = tool_path.join("azcopy").join("azcopy.exe");
@@ -26,10 +26,10 @@ pub async fn get_azure_file(azure_url: &str, output: &PathBuf, file: &String, re
     Ok(output.join(file))
 }
 
-/// Download a file from an Azure Storage, returning the path to the downloaded file
+/// Upload  a file from an Azure Storage
 /// # Arguments
-/// * `input` - the path to where the file will be uploaded
-/// * `azure_url` - the url to the azure store hosting the file
+/// * `input` - the path to the file to be uploaded
+/// * `azure_url` - the url to where the file will be uploaded
 /// * `tool_path` - the path to the tools, such as where azcopy.exe would be
 pub async fn put_azure_file(input: &PathBuf, azure_url: &str, tool_path: &Path, log_name: &Path) {
     let wr_azure_url = format!("'{azure_url}'");
