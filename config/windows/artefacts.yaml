@@ -11,8 +11,6 @@ artefacts:
   - name: recycle_bin
     path: '{root}\$Recycle.Bin'
     legacy: '{root}\RECYCLER'
-  - name: pagefile
-    path: '{root}\pagefile.sys'
   - name: user_dir
     path: '{root}\Users'
     legacy: '{root}\Documents and Settings'

@@ -66,6 +66,16 @@ fn print_log(msg: &str, out_log:&Path, verbose: bool) {
     file_ops::log_msg(out_log, msg.to_string());
 }
 
+/// change any URL path to an OS path, i.e. collections/images/dc.vmdk =windows=> collections\images\dc.vmdk
+fn url_to_path(url: &String) -> String {
+    let parts = url.split("/");
+    let mut path = PathBuf::new();
+    for part in parts {
+        path.push(part)
+    }
+    path.into_os_string().into_string().unwrap()
+}
+
 /// Pre-process some data, get its type and put it into an extracted folder
 /// return the process_vector - a list of paths needing processing
 /// # Arguments
@@ -476,9 +486,9 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
     );
     _ = get_file(out_link, &output_path, &process_folder_name, true, tool_path, log_name).await;
     // if artefacts/collection.zip exists, expand it
-    let zip_path = output_path.join("Artefacts").join("collection.zip");
+    let zip_path = process_folder.join("Artefacts").join("collection.zip");
     if zip_path.exists() {
-        let zip_out_cmd = format!("-o{}", process_folder.display());
+        let zip_out_cmd = format!("-o{}", process_folder.join("Artefacts").display());
         let zip_cmd = ["x", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
         let bin_path = Path::new("7z.exe").to_path_buf();
         _ = run_cmd(bin_path, zip_cmd, log_name, true);
@@ -510,6 +520,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
     };
     // loop through the data_list
     for data_item in data_list {
+        let data_item = url_to_path(&data_item);
         print_log(
             format!("[ ] processing {data_item}").as_str(),
             log_name,

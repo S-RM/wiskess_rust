@@ -370,13 +370,6 @@ enrichers:
     outfile: iocs_analysis.txt
     input: base
     github: https://github.com/BurntSushi/ripgrep.git
-  - name: iocs_pagefile
-    binary: rg.exe
-    args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
-    outfolder: IOC_Findings
-    outfile: iocs_pagefile.txt
-    input: pagefile
-    github: https://github.com/BurntSushi/ripgrep.git
   - name: iocs_datasource
     binary: rg.exe
     args: '--hidden --trim -aziFf {ioc_file} {input} > {outfolder}/{outfile}'
@@ -415,7 +408,7 @@ enrichers:
     args: '{tool_path}\Executablelist.ps1 {outfolder}\{outfile} {tool_path}'
     outfolder: FileExecution
     outfile: MISP
-    input: pagefile
+    input: none
   - name: jq_chainsaw_srum
     binary: jq
     args: -r -f {tool_path}\jq_filters\jq_chainsaw_srum_filter.txt {out_path}\Network\chainsaw_srum.json >> {outfolder}\{outfile}
