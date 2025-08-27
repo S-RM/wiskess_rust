@@ -196,7 +196,6 @@ The WISKESS project has several areas of development including bug fixes, perfor
 The following are known issues that are being worked on for the next release:
 * Bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
 * IOC summary CSV has extra lines, isn't formatted correctly
-* network CSV in timeline has multiple entries for same event
 
 ## Feature requests
 This list includes proposed improvements to wiskess:
@@ -207,3 +206,4 @@ There are several areas where WISKESS can improve in terms of speed, usability a
 * Tests to confirm the WISKESS has been setup, and reporting any missing packages
 * Auto-update from the latest release
 * Storing the githun token in a config file
+* integrate whipped_imageprocess.ps1 to rust whipped

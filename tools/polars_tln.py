@@ -197,14 +197,14 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'regex_file': r'reg-(?:System|User)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','Registry']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','registry.csv']),
-      'msg': ['HivePath','Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment'],
+      'msg': ['Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment','HivePath'],
       'times': ['LastWriteTimestamp'],
       'fmt_time': '%F %T%.f'
     },
     'hayabusa': {
       'file': os.path.join(*[f'{out_filepath}','EventLogs','hayabusa.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','hayabusa.csv']),
-      'msg': ['Computer','Channel','EventID','Level','MitreTactics','MitreTags','OtherTags','RecordID','Details','ExtraFieldInfo','RuleFile','EvtxFile'],
+      'msg': ['Channel','EventID','Level','MitreTactics','MitreTags','Details','ExtraFieldInfo','RuleFile','Computer','OtherTags','RecordID','EvtxFile'],
       'times': ['datetime'],
       'fmt_time': '%FT%T%.f'
     },
@@ -212,7 +212,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','FileExecution']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','amcache.csv']),
-      'msg': ['SHA1','FullPath','FileExtension','ProductName'],
+      'msg': ['FullPath','ProductName','SHA1','FileExtension'],
       'times': ['FileKeyLastWriteTimestamp','FileIDLastWriteTimestamp'],
       'fmt_time': '%F %T'
     },
@@ -226,7 +226,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
     'appcompatcache': {
       'file': os.path.join(*[f'{out_filepath}','FileExecution','appcompatcache.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','appcompatcache.csv']),
-      'msg': ['ControlSet','CacheEntryPosition','Path','Executed','Duplicate','SourceFile'],
+      'msg': ['Path','Executed','Duplicate','SourceFile','ControlSet','CacheEntryPosition'],
       'times': ['LastModifiedTimeUTC'],
       'fmt_time': '%F %T'
     },
@@ -238,10 +238,10 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'fmt_time': '%F %T'
     },
     'network_sum': {
-      'regex_file': r'(?:SumECmd_DETAIL_ClientsDetailed_Output)\.csv$',
+      'regex_file': r'(?:SumECmd_DETAIL_Clients_Output)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','Network']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','network.csv']),
-      'msg': ['Count','DayNumber','RoleGuid','RoleDescription','AuthenticatedUserName','TotalAccesses','IpAddress','ClientName','TenantId','SourceFile'],
+      'msg': ['RoleDescription','TotalAccesses','AuthenticatedUserName','IpAddress','ClientName','RoleGuid','TenantId','SourceFile'],
       'times': ['InsertDate','LastAccess'],
       'fmt_time': '%F %T'
     },
@@ -273,14 +273,14 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'regex_file': r'(?:AutomaticDestinations|CustomDestinations)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','UserActivity']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','jump-lists.csv']),
-      'msg': ['SourceFile','AppIdDescription','MachineID','LocalPath','CommonPath','TargetIDAbsolutePath','FileSize','Arguments'],
+      'msg': ['LocalPath','CommonPath','TargetIDAbsolutePath','FileSize','AppIdDescription','Arguments','MachineID','SourceFile'],
       'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
       'fmt_time': '%F %T'
     },
     'lnk-files': {
       'file': os.path.join(*[f'{out_filepath}','FileSystem','lnk-files.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','lnk-files.csv']),
-      'msg': ['SourceFile','FileSize','RelativePath','WorkingDirectory','LocalPath','NetworkPath','CommonPath','Arguments','MachineID'],
+      'msg': ['RelativePath','WorkingDirectory','LocalPath','NetworkPath','CommonPath','FileSize','Arguments','MachineID','SourceFile'],
       'times': ['SourceCreated','SourceModified','SourceAccessed','TargetCreated','TargetModified','TargetAccessed','TrackerCreatedOn'],
       'fmt_time': '%F %T'
     },
@@ -302,7 +302,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
     'event-logs': {
       'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
-      'msg': ['EventId','Level','Provider','Channel','Computer','UserId','MapDescription','UserName','RemoteHost','Payload'],
+      'msg': ['EventId','MapDescription','UserId','UserName','RemoteHost','Level','Provider','Channel','Computer','Payload'],
       'times': ['TimeCreated'],
       'fmt_time': '%F %T%.f'
     },
