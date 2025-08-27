@@ -187,3 +187,23 @@ Minimum arguments required to collect artefacts from E:, with a quick triage of 
     ./wiskess_rust.exe wiskess --data-source E: -out-path "Z:\Project" --start-date 2023-01-01 --end-date 2023-02-01 --ioc-file ./iocs.txt
 
 ```
+
+# TODO
+
+The WISKESS project has several areas of development including bug fixes, performance enhancements and capability improvements. Here's a short list of those for your understanding of the known issues, potential and roadmap.
+
+## Known Issues
+The following are known issues that are being worked on for the next release:
+* Bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
+* IOC summary CSV has extra lines, isn't formatted correctly
+* network CSV in timeline has multiple entries for same event
+
+## Feature requests
+This list includes proposed improvements to wiskess:
+* Timeline file for PowerShell history files, ConsoleHost_history.txt
+
+## Performance enhancements
+There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:
+* Tests to confirm the WISKESS has been setup, and reporting any missing packages
+* Auto-update from the latest release
+* Storing the githun token in a config file
