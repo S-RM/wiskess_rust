@@ -194,16 +194,16 @@ The WISKESS project has several areas of development including bug fixes, perfor
 
 ## Known Issues
 The following are known issues that are being worked on for the next release:
-* Bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
 * IOC summary CSV has extra lines, isn't formatted correctly
 
 ## Feature requests
 This list includes proposed improvements to wiskess:
 * Timeline file for PowerShell history files, ConsoleHost_history.txt
+* Additional fields added to timeline, i.e. username from profile file path in registry, jump-lists and lnk-files
 
 ## Performance enhancements
 There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:
 * Tests to confirm the WISKESS has been setup, and reporting any missing packages
 * Auto-update from the latest release
-* Storing the githun token in a config file
+* Storing the github token in a config file
 * integrate whipped_imageprocess.ps1 to rust whipped
