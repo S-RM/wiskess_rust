@@ -3,7 +3,7 @@ use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
 
-use crate::ops::file_ops::{self, make_folders};
+use crate::ops::{exe_ops, file_ops::{self, make_folders}};
 // extern crate git2;
 // use git2::Repository;
 
@@ -525,3 +525,17 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 Ok(())
 }
 
+/// check_installed see if the packages are installed, otherwise inform user how to install
+/// will run commands using a switch like -v or -h to see if there's no error
+/// will also check if files exist under the tools folder
+fn check_installed(tool_path: &Path) {
+    // list of binaries to check on OS path
+    let exe_on_path = ["choco", "python3", "py", "7z", "git", "fd", "osfmount", "aws", "jq", "arsenalimagemounter", "rg"];
+    let err_list: Vec<&str> = exe_on_path
+        .into_iter()
+        .filter(|b| exe_ops::installed_binary_check(true, &b.to_string()) != "")
+        .collect();
+    // list of tools to check exist under the folder wiskess/tools
+    // loop through err_list and inform user of those that failed to install or are not on the path
+    // if err_list is empty tell user setup OK
+}
