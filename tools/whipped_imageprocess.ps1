@@ -146,8 +146,3 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
 }
 
 Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
-
-# Archive the Artefacts folder, if exists
-if ($(Test-Path -PathType Container "$wiskess_folder\Artefacts\")) {
-    7z a "$wiskess_folder\Artefacts\collection.7z" "$wiskess_folder\Artefacts\*" -sdel
-}
