@@ -2,7 +2,7 @@
 Polars TLN - Timeline generator based on polars
 
 Author: Gavin Hull
-Version: 0.1.0
+Version: 0.1.1
 
 This parses the files of the Analysis folder of Wiskess and creates CSV and json files 
 in a timeline that is between the start and end time specified on the CLI
