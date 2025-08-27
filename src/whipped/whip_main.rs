@@ -11,7 +11,7 @@ use anyhow::{bail, Ok};
 use chrono::Utc;
 use indicatif::MultiProgress;
 use anyhow::Result;
-use std::fs::metadata;
+use std::fs::{self, metadata};
 use std::path::{Path, PathBuf};
 use std::env;
 use walkdir::WalkDir;
@@ -311,7 +311,7 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
     if art_folder.exists() && metadata(&art_folder).unwrap().len() > 0 {
         // compress the artefacts folder to a file collection.zip
         let zip_path = art_folder.join("collection.zip");
-        let zip_cmd = ["a", zip_path.to_str().unwrap(), art_folder.to_str().unwrap()].to_vec();
+        let zip_cmd = ["a", "-sdel", "-y", zip_path.to_str().unwrap(), art_folder.to_str().unwrap()].to_vec();
                             
         let bin_path = Path::new("7z.exe").to_path_buf();
         let _json_data = run_cmd(bin_path, zip_cmd, log_name, true).unwrap();
@@ -473,6 +473,21 @@ fn process_data(data_source: &PathBuf, log_name: &Path, args: MainArgs, config: 
     }
 }
 
+/// cleanup processed results, removing zero byte files and the timeline and iocfinding folders
+fn cleanup_processed_data(folder: PathBuf) {
+    WalkDir::new(&folder)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.metadata().map_or(false, |m| m.is_file() && m.len() == 0))
+        .for_each(|f| {
+            let _ = fs::remove_file(f.path());
+        });
+    
+    for dir in ["Timeline", "IOC_Findings"] {
+        let _ = fs::remove_dir_all(folder.join(dir));
+    }
+}
+
 /// update_processed_data downloads the process folder, expands any collected files, 
 /// then removes any empty or files that need reprocessing after any change to the results
 async fn update_processed_data(out_link: &String, process_folder: &Path, tool_path: &PathBuf, log_name: &Path) {
@@ -495,6 +510,7 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
     }
     // remove any process result files that are zero size
     // remove timeline folder, ioc summary and ioc in analysis
+    cleanup_processed_data(process_folder.to_path_buf());
 }
 
 
