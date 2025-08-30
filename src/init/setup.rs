@@ -377,11 +377,11 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     ).unwrap();
     outmsg.push_str(&output_script(v, code, output, error));
     
-    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, fdfind, osfmount, arsenalimagemounter, awscli, jq and ripgrep...".to_string());
+    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, fdfind, osfmount, arsenalimagemounter, awscli, jq, python and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter
+        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
@@ -528,14 +528,21 @@ Ok(())
 /// check_installed see if the packages are installed, otherwise inform user how to install
 /// will run commands using a switch like -v or -h to see if there's no error
 /// will also check if files exist under the tools folder
-fn check_installed(tool_path: &Path) {
+pub fn check_installed(tool_path: &Path) {
+    println!("[ ] Checking wiskess setup installed binaries and packages...");
     // list of binaries to check on OS path
-    let exe_on_path = ["choco", "python3", "py", "7z", "git", "fd", "osfmount", "aws", "jq", "arsenalimagemounter", "rg"];
+    let exe_on_path = ["choco", "py", "7z", "git", "fd", "C:\\Program Files\\OSFMount\\OSFMount.com", "aws", "jq", "arsenalimagemounter", "rg", "pwsh"];
     let err_list: Vec<&str> = exe_on_path
         .into_iter()
         .filter(|b| exe_ops::installed_binary_check(true, &b.to_string()) != "")
         .collect();
     // list of tools to check exist under the folder wiskess/tools
-    // loop through err_list and inform user of those that failed to install or are not on the path
     // if err_list is empty tell user setup OK
+    if err_list.len() == 0 {
+        println!("[+] Check complete. Wiskess is setup OK.")
+    } else {
+        // loop through err_list and inform user of those that failed to install or are not on the path
+        println!("[ ] Please check the installation of: ");
+        err_list.into_iter().for_each(|b| println!("    {b}"));
+    }
 }

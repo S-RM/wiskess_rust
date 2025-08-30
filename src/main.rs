@@ -49,6 +49,9 @@ enum Commands {
         /// Print additional info to the stdout, default is true
         #[arg(short, long, action = ArgAction::SetTrue)]
         verbose: bool,
+        /// Check installation was successful
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        check_install: bool,
     },
     /// launch the webui
     Gui {},
@@ -253,10 +256,15 @@ fn main() {
     match args.command {
         Commands::Setup {
             github_token,
-            verbose
+            verbose,
+            check_install
         } => {
-            // TODO: check if setup has been run, or if any binaries are missing
-            scripts::run_setup(&tool_path, github_token, verbose);
+            if !check_install {
+                // don't run setup if user only wants to check the wiskess has installed
+                scripts::run_setup(&tool_path, github_token, verbose);
+            }
+            // check if setup has been run, or if any binaries are missing
+            init::setup::check_installed(&tool_path);
         },
         Commands::Gui {  } => {
             match web::main(tool_path) {
