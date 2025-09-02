@@ -1,4 +1,4 @@
-use std::{env, io, path::Path, time::Duration};
+use std::{env, io, path::{Path, PathBuf}, time::Duration};
 use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
 use run_script::ScriptOptions;
@@ -537,12 +537,49 @@ pub fn check_installed(tool_path: &Path) {
         .filter(|b| exe_ops::installed_binary_check(true, &b.to_string()) != "")
         .collect();
     // list of tools to check exist under the folder wiskess/tools
+    let exe_in_tools = [
+        "azcopy\\azcopy.exe",
+        "bmc-tools\\bmc-tools.py",
+        "chainsaw\\chainsaw.exe",
+        "evtx\\evtx.exe",
+        "Get-ZimmermanTools\\net9\\MFTECmd.exe",
+        "Get-ZimmermanTools\\net9\\AmcacheParser.exe",
+        "Get-ZimmermanTools\\net9\\SrumECmd.exe",
+        "Get-ZimmermanTools\\net9\\SumECmd.exe",
+        "Get-ZimmermanTools\\net9\\SBECmd.exe",
+        "Get-ZimmermanTools\\net9\\LECmd.exe",
+        "Get-ZimmermanTools\\net9\\JLECmd.exe",
+        "RustyUsn\\RustyUsn.exe",
+        "RegRipper3.0\\rip.exe",
+        "mft\\mft.exe",
+        "loki\\loki.exe",
+        "hayabusa\\hayabusa.exe",
+    ];
+    let err_list_tools: Vec<&str> = exe_in_tools
+        .into_iter()
+        .filter(|b| {
+            let file_path = tool_path.join(b);
+            file_path.exists()
+        })
+        .collect();
+
+
     // if err_list is empty tell user setup OK
-    if err_list.len() == 0 {
+    if err_list.len() == 0 && err_list_tools.len() == 0 {
         println!("[+] Check complete. Wiskess is setup OK.")
-    } else {
+    }
+    
+    if err_list.len() != 0 {
         // loop through err_list and inform user of those that failed to install or are not on the path
-        println!("[ ] Please check the installation of: ");
+        println!("[ ] Please check the installation of these programs: ");
         err_list.into_iter().for_each(|b| println!("    {b}"));
+        println!("[?] You can either try running setup again, installing them individually with `choco install <program>, or find them with a search engine, i.e. Google, Bing, DuckDuckGo, etc.");
+    }
+
+    if err_list_tools.len() != 0 {
+        // loop through err_list and inform user of those that failed to install or are not on the path
+        println!("[ ] Please check the installation of these programs: ");
+        err_list_tools.into_iter().for_each(|b| println!("    {b}"));
+        println!("[?] You can either try running setup again, or download or clone the latest release from github");
     }
 }
