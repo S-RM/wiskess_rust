@@ -200,6 +200,7 @@ The following are known issues that are being worked on for the next release:
 This list includes proposed improvements to wiskess:
 * Timeline file for PowerShell history files, ConsoleHost_history.txt
 * Additional fields added to timeline, i.e. username from profile file path in registry, jump-lists and lnk-files
+* Timeline output of iis logs, AV logs
 
 ## Performance enhancements
 There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:

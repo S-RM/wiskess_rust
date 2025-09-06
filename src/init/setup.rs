@@ -555,14 +555,20 @@ pub fn check_installed(tool_path: &Path) {
         "loki\\loki.exe",
         "hayabusa\\hayabusa.exe",
     ];
+    // check each tool in the list, if it exists on filesystem, try to run it, collecting only failed ones
     let err_list_tools: Vec<&str> = exe_in_tools
         .into_iter()
         .filter(|b| {
             let file_path = tool_path.join(b);
-            file_path.exists()
+            match file_path.exists() {
+                true => {
+                    let file_path_str = &file_path.into_os_string().into_string().unwrap();
+                    exe_ops::installed_binary_check(true, file_path_str) != ""
+                },
+                false => false,
+            }
         })
         .collect();
-
 
     // if err_list is empty tell user setup OK
     if err_list.len() == 0 && err_list_tools.len() == 0 {
