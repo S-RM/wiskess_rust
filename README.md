@@ -198,7 +198,6 @@ The following are known issues that are being worked on for the next release:
 
 ## Feature requests
 This list includes proposed improvements to wiskess:
-* Timeline file for PowerShell history files, ConsoleHost_history.txt
 * Additional fields added to timeline, i.e. username from profile file path in registry, jump-lists and lnk-files
 * Timeline output of iis logs, AV logs
 
@@ -207,3 +206,11 @@ There are several areas where WISKESS can improve in terms of speed, usability a
 * Auto-update from the latest release
 * Storing the github token in a config file
 * integrate whipped_imageprocess.ps1 to rust whipped
+
+## Completed developments for next release
+The following are a list of developments since the last release and are currently pushed to the repo:
+* Timeline file for PowerShell history files, ConsoleHost_history.txt
+* Tests to confirm the WISKESS has been setup, and reporting any missing packages
+* Removed bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
+* Fixed an issue in the network CSV in timeline, where multiple entries were shown for the same event
+* Fixed an issue with old-whip and GUI when using whipped, where some collections would not be extracted completely
