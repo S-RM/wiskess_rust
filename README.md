@@ -204,7 +204,6 @@ This list includes proposed improvements to wiskess:
 
 ## Performance enhancements
 There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:
-* Tests to confirm the WISKESS has been setup, and reporting any missing packages
 * Auto-update from the latest release
 * Storing the github token in a config file
 * integrate whipped_imageprocess.ps1 to rust whipped

@@ -76,6 +76,60 @@ def get_hostname(dict_tln):
   return "Unknown"
 
 
+
+
+def powershell_history_tln(out_filepath, out_file):
+    # create a lazy frame lf for storing all the data
+    df = pl.DataFrame({})
+    mft_lf = pl.scan_csv(os.path.join(out_filepath,'FileSystem','MFTECmd.csv'))
+    # for each file in out_filepath\PSReadLine\*_ConsoleHost_history.txt:
+    powershell_path = os.path.join(out_filepath,'PSReadLine','*_ConsoleHost_history.txt')
+    for file in glob.glob(powershell_path):
+        if os.path.isfile(file):
+            # create a lazy frame lf
+            # get the username
+            username = os.path.basename(file).replace('_ConsoleHost_history.txt', '')
+            # creation_time, last_mod_time, accessed_time = find the timestamps in the out_filepath\FileSystem\MFTECmd.csv
+            creation_time, last_mod_time, accessed_time = mft_lf.filter(
+                (pl.col("FileName") == "ConsoleHost_history.txt") &
+                (pl.col("ParentPath") == f'.\\Users\\{username}\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine')
+            ).select(
+                pl.col('Created0x10'),
+                pl.col('LastModified0x10'),
+                pl.col('LastAccess0x10')
+            ).collect()
+            # Get contents of _ConsoleHost_history
+            with open(file, 'r') as f:
+                lines = f.readlines()
+                first_line = lines[0].strip()
+                last_line = lines[-1].strip()
+            # create rows in the dataframe for creation, last mod and access
+            data_frame = pl.DataFrame({
+                'datetime' : [
+                    creation_time[0],
+                    last_mod_time[0],
+                    accessed_time[0]
+                ],
+                'timestamp_desc' : [
+                    str(pl.lit(f'PowerShell hist, user: {username} - creation time and first line')),
+                    str(pl.lit(f'PowerShell hist, user: {username} - modified time and last line')),
+                    str(pl.lit(f'PowerShell hist, user: {username} - accessed time and all lines - FOR   ONLY, TIMESTAMP NOT RELATED TO ACTIVITY!'))
+                ],
+                'message' : [
+                    first_line,
+                    last_line,
+                    ''.join(lines).replace('\n', '; ')
+                ]
+            })
+            df = pl.concat([df,data_frame])
+    
+    # output the powershell timeline
+    print(df)
+    if df.is_empty():
+        print('No powershell history in timeframe')
+    else:
+        df.write_csv(os.path.join(out_filepath, 'Timeline', 'powershell_history.csv'))
+
 def filter_tln(df, time_from, time_to):
   filtered_range_df = df.filter(
       pl.col('datetime').is_between(datetime.strptime(time_from, '%Y-%m-%d'), datetime.strptime(time_to, '%Y-%m-%d')),
@@ -390,6 +444,8 @@ def main():
   args = parser.parse_args()
 
   csv_to_tln(args.out_filepath, args.time_from, args.time_to)
+    
+  powershell_history_tln(args.out_filepath, args.out_file)
 
 if __name__ == '__main__':
   main()
