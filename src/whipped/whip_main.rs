@@ -7,7 +7,7 @@ use crate::ops::{file_ops, wiskess};
 use super::whip_s3;
 use super::whip_az;
 
-use anyhow::{bail, Ok};
+use anyhow::bail;
 use chrono::Utc;
 use indicatif::MultiProgress;
 use anyhow::Result;
@@ -17,7 +17,9 @@ use std::env;
 use walkdir::WalkDir;
 use fs_extra::dir::{create, move_dir, remove, CopyOptions};
 use fs_extra::file::{move_file, CopyOptions as FileCopyOptions};
-// use inquire::{Confirm, Text};
+use rayon::prelude::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// set_link determines whether the link is an AWS S3 or Azure Blob Storage URL using 
 /// regex patterns. It then appends the provided component to the base URL accordingly.
@@ -130,6 +132,47 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
     Ok(process_vector)
 }
 
+/// move files in parallel
+fn move_files_parallel_enhanced(files_entries: &[std::path::PathBuf], files_dir: &std::path::Path) -> Result<(), anyhow::Error> {
+    let errors = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let processed_count = Arc::new(AtomicUsize::new(0));
+    let total_files = files_entries.len();
+
+    files_entries.par_iter().for_each(|files_entry| {
+        let result = match files_entry.is_dir() {
+            true => {
+                let options = CopyOptions::new();
+                move_dir(files_entry, files_dir, &options)
+            },
+            false => {
+                let options = FileCopyOptions::new();
+                let dest_path = files_dir.join(files_entry.file_name().unwrap());
+                move_file(files_entry, &dest_path, &options)
+            },
+        };
+
+        // Handle errors
+        if let Err(error) = result {
+            let error_msg = format!("Failed to move {:?}: {}", files_entry, error);
+            let mut errors_guard = errors.lock().unwrap();
+            errors_guard.push(error_msg);
+        }
+
+        // Update progress
+        let current = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
+        if current % 10 == 0 || current == total_files {
+            println!("Processed {}/{} files", current, total_files);
+        }
+    });
+
+    let errors = Arc::try_unwrap(errors).unwrap().into_inner().unwrap();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Multiple file move errors:\n{}", errors.join("\n")))
+    }
+}
+
 
 /// pre-process an achive of type zip or 7z, extract using 7zip then add artefacts to a vector. If the contents
 /// has a folder in the root called uploads we treat it as a velociraptor collection and move the data into one folder.
@@ -145,6 +188,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
     let unzip_cmd = ["x", "-aos", data_str.as_str(), extract_flag.as_str()].to_vec();
                         
     let bin_path = Path::new("7z.exe").to_path_buf();
+    print_log(format!("Extracting the archive {data_str}...").as_str(), log_name, true);
     let _json_data = run_cmd(bin_path, unzip_cmd, log_name, true).unwrap();
     // TODO: check for archives at one level deep, adding paths to the process_vector
     // loop through the extracted archive at one level down, adding relevant data to process_vector
@@ -197,18 +241,13 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         // create folder `files`
                         _ = create(&files_dir, false);
                         // move the data into `files`
-                        files_entries.iter().for_each(|files_entry| {
-                            match files_entry.is_dir() {
-                                true => {
-                                    let options = CopyOptions::new();
-                                    move_dir(files_entry, &files_dir, &options).unwrap()
-                                },
-                                false => {
-                                    let options = FileCopyOptions::new();
-                                    move_file(files_entry, &files_dir.join(files_entry.file_name().unwrap()), &options).unwrap()
-                                },
-                            };
-                        });
+                        match move_files_parallel_enhanced(&files_entries, &files_dir) {
+                            Ok(()) => println!("All files moved successfully!"),
+                            Err(error) => {
+                                eprintln!("Errors occurred during file moving:");
+                                eprintln!("{}", error); // Print the single error message
+                            }
+                        }
                         // add `files` folder to process_vector
                         process_vector.push(files_dir)
                     },

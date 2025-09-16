@@ -21,6 +21,8 @@ use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
 use anyhow::{bail, Ok};
+use regex::Regex;
+use inquire::Text;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -44,7 +46,7 @@ enum Commands {
     /// setup the wiskess dependencies
     Setup {
         /// Personal github token to access public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "")]
         github_token: String,
         /// Print additional info to the stdout, default is true
         #[arg(short, long, action = ArgAction::SetTrue)]
@@ -260,6 +262,14 @@ fn main() {
             check_install
         } => {
             if !check_install {
+                // check the github_token is set and matches the regex
+                let github_token: String = if !Regex::new(r"^github_pat_").unwrap().is_match(&github_token) {
+                    println!("[!] GitHub Token is either missing or doesn't start with `github_pat_`. Please check and supply one with the flag`-g github_pat_...`");
+                    println!("Setup needs a github token to download from public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/");
+                    Text::new("Please enter your GitHub token (starts with github_pat_):").prompt().unwrap()
+                } else {
+                    github_token
+                };
                 // don't run setup if user only wants to check the wiskess has installed
                 scripts::run_setup(&tool_path, github_token, verbose);
             }

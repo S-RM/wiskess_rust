@@ -252,6 +252,13 @@ pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
     let mut installed = false;
     if chk_exists {
         for test_arg in ["-h", "help", "--version", "-v", "-V", "-c print('wiskess')"] {
+            if binary.starts_with("py") {
+                let python_check = run_wisker(binary, &"-V 2>&1".to_string(), Path::new(""));
+                if str::from_utf8(&python_check.stdout).unwrap().starts_with("Python") {
+                    installed = true;
+                    break;
+                }
+            }
             if check_binary(binary, test_arg) {
                 installed = true;
                 break;
@@ -262,6 +269,7 @@ pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
     }
     let mut err_msg = "".to_string();
     if !installed {
+        
         err_msg = format!("[!] The path `{}` is not a correct executable binary file.", binary); 
     }
     err_msg

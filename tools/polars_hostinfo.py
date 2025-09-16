@@ -7,11 +7,24 @@ Version: 0.0.1
 This parses the files of the Analysis folder of Wiskess and creates a summary of the host info
 """
 
+from datetime import datetime
 import polars as pl
 import os
 import argparse
 import re
 import glob
+
+
+
+def put_timeline(host_info, df, value):
+    for _time in host_info.get(value).split(', '):
+        data_frame = pl.DataFrame({
+            'datetime': _time,
+            'timestamp_desc': f'Hostinfo - {value}',
+            'message': value
+        })
+        df = pl.concat([df, data_frame])
+    return df
 
 
 
@@ -25,9 +38,8 @@ def get_reg_val(find_value, dict_tln):
                         pl.col("ValueName") == find_value
                         ).select(
                         pl.col("ValueData")
-                        )
-                    value = value.collect()
-                    value = pl.concat(value).str.concat(", ").item()
+                        ).collect()
+                    value = pl.concat(value).unique(maintain_order=True).str.concat(", ").item()
                     return value
                 except Exception as e:
                     print(f'Ran into an error when trying to get the value from the registry.')
@@ -79,7 +91,7 @@ def get_hostname(dict_tln):
 
 
 
-def get_hostinfo(out_filepath, out_file):
+def get_hostinfo(out_filepath, out_filename):
     dict_tln = {
         'registry': {
         'regex_file': r'reg-System\.csv$',
@@ -130,13 +142,32 @@ def get_hostinfo(out_filepath, out_file):
         'Security Log Retention': security_retention
     }
 
-    out_file = os.path.join(f"{out_filepath}/{out_file}")
+    out_file = os.path.join(out_filepath, out_filename)
     with open(out_file, 'w') as file:
         file.write("WISKESS\n----------------\n\nHost Information\n----------------\n\n")
+        
+    # create empty data frame fror the timeline
+    df = pl.DataFrame({})
+    
     for i in host_info:
         print(f"{i}: {host_info[i]}")
         with open(out_file, 'a') as file:
             file.write(f"{i}: {host_info[i]}\n")
+        # add the host information to a timeline with timestamp of when it was generated
+        data_frame = pl.DataFrame({
+            'datetime': datetime.today().strftime('%Y-%m-%d %H:%M:%S.%f'),
+            'timestamp_desc': f'Hostinfo - All host info. NOTE: `datetime` timestamp is when WISKESS generated the report.',
+            'message': f'{i}: {host_info[i]}'
+        })
+        df = pl.concat([df, data_frame])
+    
+    df = put_timeline(host_info, df, 'Shutdown Time')
+    df = put_timeline(host_info, df, 'Install Date')
+    df = df.unique(maintain_order=True)
+    output_csv = os.path.join(out_filepath, 'Timeline', out_filename.replace('.txt','.csv'))
+    print(f'[ ] Writing host info to CSV as a timeline entry here: {output_csv}')
+    df.write_csv(output_csv)
+    df.write_ndjson(output_csv.replace('.csv', '.json'))
 
 
 

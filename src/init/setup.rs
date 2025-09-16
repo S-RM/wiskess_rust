@@ -79,7 +79,7 @@ fn output_script(verbose: bool, code: i32, output: String, error: String) -> Str
 }
 
 /// start logging and return the path to the log file
-fn start_setup_log(setup_log_path: &Path) {
+fn start_setup_log(setup_log_path: &PathBuf) {
     // Start logging 
     let date_time_fmt = "%Y-%m-%dT%H%M%S".to_string();
     let log_time = Utc::now();
@@ -101,8 +101,8 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     let options = ScriptOptions::new();
 
     // start the log
-    let setup_log_path = Path::new("wiskess_setup.log");
-    start_setup_log(setup_log_path);
+    let setup_log_path = tool_path.parent().unwrap().join("wiskess_setup.log");
+    start_setup_log(&setup_log_path);
 
     // change director to tool_path
     let main_path = env::current_dir()?;
@@ -359,46 +359,46 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_msg(&pb2, "Installing packages...".to_string());
     
     // start the log
-    let setup_log_path = Path::new("wiskess_setup.log");
-    start_setup_log(setup_log_path);
+    let setup_log_path = tool_path.parent().unwrap().join("wiskess_setup.log");
+    start_setup_log(&setup_log_path);
     
         // change director to tool_path
     let main_path = env::current_dir()?;
     env::set_current_dir(tool_path)?;
 
-    let mut outmsg = String::new();
     let options = ScriptOptions::new();
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe' -OutFile '.\ndp48-x86-x64-allos-enu.exe' -UseBasicParsing"
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         RefreshEnv.cmd
         "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     
-    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, fdfind, osfmount, arsenalimagemounter, awscli, jq, python and ripgrep...".to_string());
+    prog_spin_msg(&pb2, "Installing from choco repo: git, 7zip, fdfind, osfmount, arsenalimagemounter, awscli, jq, python, pwsh and ripgrep...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python
+        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python pwsh
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
         "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     
-    prog_spin_msg(&pb2, "Getting Python-Cim and Azcopy...".to_string());
+    prog_spin_msg(&pb2, "Getting Azcopy...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://aka.ms/downloadazcopy-v10-windows' -OutFile '.\AzCopy.zip' -UseBasicParsing"
         7z e ".\AzCopy.zip" -o"azcopy\" azcopy.exe -r -aoa
         del ".\AzCopy.zip"
         "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
 
     let pb3 = prog_spin_init(240, &m, "white");
 
@@ -426,7 +426,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
             &vec![pip.to_string()],
             &options
         ).unwrap();
-        outmsg.push_str(&output_script(v, code, output, error));
+        file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     }
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
@@ -451,7 +451,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
             &vec![github_token.clone(), url.to_string()],
             &options
         ).unwrap();
-        outmsg.push_str(&output_script(v, code, output, error));
+        file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     }
 
     prog_spin_msg(&pb2, "Git cloning github repositories...".to_string());
@@ -475,7 +475,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
             &vec![repo.to_string()],
             &options
         ).unwrap();
-        outmsg.push_str(&output_script(v, code, output, error));
+        file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     }
  
     prog_spin_stop(&pb3, "".to_string());
@@ -489,7 +489,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
          .\loki-upgrader.exe
          "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     // change directory to tool_path
     env::set_current_dir(tool_path)?;
 
@@ -498,20 +498,20 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         r#"
         @echo off
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "& .\Get-ZimmermanTools\Get-ZimmermanTools.ps1 -NetVersion 9 -Dest .\Get-ZimmermanTools"
-        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt' -OutFile .\shimcache_patterns.txt"
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/WithSecureLabs/chainsaw/master/analysis/shimcache_patterns.txt' -OutFile .\shimcache_patterns.txt"
         "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Installing dotnet9...".to_string());
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/b0032fde-aac9-4c3e-b78c-4bd605910241/8d2aa21baac4aef9b996671cd8a48fb2/dotnet-sdk-9.0.202-win-x64.exe" -OutFile "dotnet-sdk-9.0.202-win-x64.exe" -UseBasicParsing"
+        @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; invoke-WebRequest -Uri "https://download.visualstudio.microsoft.com/download/pr/b0032fde-aac9-4c3e-b78c-4bd605910241/8d2aa21baac4aef9b996671cd8a48fb2/dotnet-sdk-9.0.202-win-x64.exe" -OutFile "dotnet-sdk-9.0.202-win-x64.exe" -UseBasicParsing"
         .\dotnet-sdk-9.0.202-win-x64.exe /install /passive
         "#
     ).unwrap();
-    outmsg.push_str(&output_script(v, code, output, error));
+    file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
 
     // Change directory back to what it was before setup
     env::set_current_dir(main_path)?;
@@ -520,7 +520,6 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 
     let msg = format!("[ ] Setup completed. Please check the setup log for any errors: {}", setup_log_path.display());
     prog_spin_stop(&pb, msg);
-    file_ops::log_msg(setup_log_path, outmsg);
 
 Ok(())
 }
@@ -539,7 +538,6 @@ pub fn check_installed(tool_path: &Path) {
     // list of tools to check exist under the folder wiskess/tools
     let exe_in_tools = [
         "azcopy\\azcopy.exe",
-        "bmc-tools\\bmc-tools.py",
         "chainsaw\\chainsaw.exe",
         "evtx\\evtx.exe",
         "Get-ZimmermanTools\\net9\\MFTECmd.exe",
@@ -579,7 +577,8 @@ pub fn check_installed(tool_path: &Path) {
         // loop through err_list and inform user of those that failed to install or are not on the path
         println!("[ ] Please check the installation of these programs: ");
         err_list.into_iter().for_each(|b| println!("    {b}"));
-        println!("[?] You can either try running setup again, installing them individually with `choco install <program>, or find them with a search engine, i.e. Google, Bing, DuckDuckGo, etc.");
+        println!("[?] Please first try closing and re-opening your terminal, then run `wiskess_rust.exe setup -c` to check the setup has worked.");
+        println!("   If that still reports missing packages: You can either try running setup again, installing them individually with `choco install <program>, or find them with a search engine, i.e. Google, Bing, DuckDuckGo, etc.");
     }
 
     if err_list_tools.len() != 0 {

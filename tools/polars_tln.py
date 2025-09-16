@@ -9,6 +9,7 @@ in a timeline that is between the start and end time specified on the CLI
 """
 
 import fileinput
+import glob
 import polars as pl
 from datetime import datetime, timedelta 
 import os
@@ -78,7 +79,7 @@ def get_hostname(dict_tln):
 
 
 
-def powershell_history_tln(out_filepath, out_file):
+def powershell_history_tln(out_filepath):
     # create a lazy frame lf for storing all the data
     df = pl.DataFrame({})
     mft_lf = pl.scan_csv(os.path.join(out_filepath,'FileSystem','MFTECmd.csv'))
@@ -111,9 +112,9 @@ def powershell_history_tln(out_filepath, out_file):
                     accessed_time[0]
                 ],
                 'timestamp_desc' : [
-                    str(pl.lit(f'PowerShell hist, user: {username} - creation time and first line')),
-                    str(pl.lit(f'PowerShell hist, user: {username} - modified time and last line')),
-                    str(pl.lit(f'PowerShell hist, user: {username} - accessed time and all lines - FOR   ONLY, TIMESTAMP NOT RELATED TO ACTIVITY!'))
+                    f'PowerShell hist, user: {username} - creation time and first line',
+                    f'PowerShell hist, user: {username} - modified time and last line',
+                    f'PowerShell hist, user: {username} - accessed time and all lines - TIMESTAMP ONLY RELATED TO LAST LINE!'
                 ],
                 'message' : [
                     first_line,
@@ -124,11 +125,11 @@ def powershell_history_tln(out_filepath, out_file):
             df = pl.concat([df,data_frame])
     
     # output the powershell timeline
-    print(df)
     if df.is_empty():
         print('No powershell history in timeframe')
     else:
         df.write_csv(os.path.join(out_filepath, 'Timeline', 'powershell_history.csv'))
+        df.write_ndjson(os.path.join(out_filepath, 'Timeline', 'powershell_history.json'))
 
 def filter_tln(df, time_from, time_to):
   filtered_range_df = df.filter(
@@ -445,7 +446,7 @@ def main():
 
   csv_to_tln(args.out_filepath, args.time_from, args.time_to)
     
-  powershell_history_tln(args.out_filepath, args.out_file)
+  powershell_history_tln(args.out_filepath)
 
 if __name__ == '__main__':
   main()

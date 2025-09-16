@@ -48,6 +48,8 @@ run `wiskess_rust.exe setup -g <your github token>` using a terminal with Admini
 
 The github token needs the minimum permissions to access public github repos. GitHub's guide is here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
 
+The setup will install tools needed by WISKESS on the operating system and under the tools folder. You will need about 5 GB of disk space for the installation to complete.
+
 # Wiskess Web UI `wiskess_rust.exe gui`
 This command will launch the Web user interface. This is still WIP, where currently you can submit two commands to wiskess, including:
 * a single data source - using the main wiskess module
@@ -200,12 +202,14 @@ The following are known issues that are being worked on for the next release:
 This list includes proposed improvements to wiskess:
 * Additional fields added to timeline, i.e. username from profile file path in registry, jump-lists and lnk-files
 * Timeline output of iis logs, AV logs
+* Timelined output of DNS logs of the Microsoft UAL logs, which allow a look up of the IP address mapped to a hostname
 
 ## Performance enhancements
 There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:
 * Auto-update from the latest release
 * Storing the github token in a config file
 * integrate whipped_imageprocess.ps1 to rust whipped
+* Move of files from collection or image is done in parallel
 
 ## Completed developments for next release
 The following are a list of developments since the last release and are currently pushed to the repo:
@@ -214,3 +218,4 @@ The following are a list of developments since the last release and are currentl
 * Removed bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
 * Fixed an issue in the network CSV in timeline, where multiple entries were shown for the same event
 * Fixed an issue with old-whip and GUI when using whipped, where some collections would not be extracted completely
+* Host information sheet in timeline

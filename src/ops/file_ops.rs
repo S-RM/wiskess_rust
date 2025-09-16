@@ -119,14 +119,16 @@ pub fn check_date(date: String, date_type: &String) -> String {
 }
 
 pub fn log_msg(out_log: &Path, msg: String) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .append(true)
-        .open(&out_log)
-        .expect("Failed to open log file");
-    
-    writeln!(file, "[{}] {}", chrono::Local::now().format("%Y%m%dT%H%M%S"), msg).unwrap();
+    if out_log != Path::new("") {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open(&out_log)
+            .expect("Failed to open log file");
+        
+        writeln!(file, "[{}] {}", chrono::Local::now().format("%Y%m%dT%H%M%S"), msg).unwrap();
+    }
 }
 
 /// check_access - get attr, try read, regex root to see if match \w:\\Windows\\

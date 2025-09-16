@@ -96,7 +96,7 @@ wiskers:
     github: https://github.com/EricZimmerman/RecentFileCacheParser.git
   - name: SCCM_RecentlyUsedApplication
     binary: py
-    args: '-2 {tool_path}\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
+    args: '-3 {tool_path}\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
     input: objects
@@ -104,7 +104,7 @@ wiskers:
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
-    args: '-2 {tool_path}\PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
+    args: '-3 {tool_path}\PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects
