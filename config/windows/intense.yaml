@@ -232,20 +232,6 @@ wiskers:
     outfolder: Network
     outfile: UAL_Kstrike.psv
     github: https://github.com/brimorlabs/KStrike
-  - name: shellbags_usrclass
-    binary: fd
-    args: '-i USRCLASS\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
-    outfolder: UserActivity
-    outfile: shellbags.csv
-    input: user_dir
-    github: https://github.com/williballenthin/shellbags
-  - name: shellbags_ntuser
-    binary: fd
-    args: '-i NTUSER\.DAT {input} -x py -2 {tool_path}\shellbags\shellbags.py -o csv 2> nul 1>> {outfolder}\{outfile}'
-    outfolder: UserActivity
-    outfile: shellbags.csv
-    input: user_dir
-    github: https://github.com/williballenthin/shellbags
   - name: rdp_bitmap
     binary: py
     args: '{tool_path}\bmc_run.py {outfolder} {input}'

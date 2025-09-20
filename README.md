@@ -203,6 +203,7 @@ This list includes proposed improvements to wiskess:
 * Additional fields added to timeline, i.e. username from profile file path in registry, jump-lists and lnk-files
 * Timeline output of iis logs, AV logs
 * Timelined output of DNS logs of the Microsoft UAL logs, which allow a look up of the IP address mapped to a hostname
+* timeline of srum-dump.exe output which is XLSX format
 
 ## Performance enhancements
 There are several areas where WISKESS can improve in terms of speed, usability and interoperability. These requests are listed here:

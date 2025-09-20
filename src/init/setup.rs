@@ -170,7 +170,9 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "libesedb-python",
         "awscli",
         "pyhindsight",
-        "git+https://github.com/cclgroupltd/ccl_chromium_reader.git"
+        "git+https://github.com/cclgroupltd/ccl_chromium_reader.git",
+        "fastexcel",
+        "pyarrow"
     ];
     for pip in pips.iter() {
         let msg = format!("Python installing: {}", pip);
@@ -414,6 +416,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         "python-magic-bin",
         "PyQt6",
         "libesedb-python",
+        "fastexcel",
+        "pyarrow"
     ];
     for pip in pips.iter() {
         let msg = format!("Python installing: {}", pip);
