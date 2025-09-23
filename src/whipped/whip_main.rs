@@ -8,10 +8,11 @@ use super::whip_s3;
 use super::whip_az;
 
 use anyhow::bail;
+use askama::filters::format;
 use chrono::Utc;
 use indicatif::MultiProgress;
 use anyhow::Result;
-use std::fs::{self, metadata};
+use std::fs::{self, metadata, remove_file};
 use std::path::{Path, PathBuf};
 use std::env;
 use walkdir::WalkDir;
@@ -350,9 +351,15 @@ async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, l
     if art_folder.exists() && metadata(&art_folder).unwrap().len() > 0 {
         // compress the artefacts folder to a file collection.zip
         let zip_path = art_folder.join("collection.zip");
-        let zip_cmd = ["a", "-sdel", "-y", zip_path.to_str().unwrap(), art_folder.to_str().unwrap()].to_vec();
-                            
+        let art_to_zip = art_folder.join("*");
+        let zip_cmd = ["a", "-sdel", "-y", zip_path.to_str().unwrap(), art_to_zip.to_str().unwrap()].to_vec();
         let bin_path = Path::new("7z.exe").to_path_buf();
+        
+        print_log(
+            format!("[ ] Archiving folder: `{}` with command: `{} {}`", art_folder.display(), bin_path.display(), zip_cmd.join(" ")).as_str(),
+            log_name,
+            true
+        );
         let _json_data = run_cmd(bin_path, zip_cmd, log_name, true).unwrap();
     }
     // upload the process folder
@@ -545,7 +552,13 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
         let zip_out_cmd = format!("-o{}", process_folder.join("Artefacts").display());
         let zip_cmd = ["x", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
         let bin_path = Path::new("7z.exe").to_path_buf();
+        print_log(
+            format!("[ ] Extracting archive: `{}` with command: `{} {}`", zip_path.display(), bin_path.display(), zip_cmd.join(" ")).as_str(),
+            log_name,
+            true
+        );
         _ = run_cmd(bin_path, zip_cmd, log_name, true);
+        _ = remove_file(zip_path);
     }
     // remove any process result files that are zero size
     // remove timeline folder, ioc summary and ioc in analysis
