@@ -125,6 +125,7 @@ wiskers:
     input: srum
     input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
+    para: false
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: srumdump
     binary: '{tool_path}\srum-dump\srum_dump2.6.exe'
