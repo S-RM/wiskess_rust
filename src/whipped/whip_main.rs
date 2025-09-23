@@ -134,7 +134,7 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
 }
 
 /// move files in parallel
-fn move_files_parallel_enhanced(files_entries: &[std::path::PathBuf], files_dir: &std::path::Path) -> Result<(), anyhow::Error> {
+fn move_files_para(files_entries: &[std::path::PathBuf], files_dir: &std::path::Path, log_name: &Path) -> Result<(), anyhow::Error> {
     let errors = Arc::new(std::sync::Mutex::new(Vec::new()));
     let processed_count = Arc::new(AtomicUsize::new(0));
     let total_files = files_entries.len();
@@ -152,7 +152,6 @@ fn move_files_parallel_enhanced(files_entries: &[std::path::PathBuf], files_dir:
             },
         };
 
-        // Handle errors
         if let Err(error) = result {
             let error_msg = format!("Failed to move {:?}: {}", files_entry, error);
             let mut errors_guard = errors.lock().unwrap();
@@ -162,7 +161,8 @@ fn move_files_parallel_enhanced(files_entries: &[std::path::PathBuf], files_dir:
         // Update progress
         let current = processed_count.fetch_add(1, Ordering::Relaxed) + 1;
         if current % 10 == 0 || current == total_files {
-            println!("Processed {}/{} files", current, total_files);
+            let msg = format!("[ ] Processed {}/{} files", current, total_files);
+            print_log(msg.as_str(), log_name, true);
         }
     });
 
@@ -242,12 +242,13 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         // create folder `files`
                         _ = create(&files_dir, false);
                         // move the data into `files`
-                        match move_files_parallel_enhanced(&files_entries, &files_dir) {
-                            Ok(()) => println!("All files moved successfully!"),
-                            Err(error) => {
-                                eprintln!("Errors occurred during file moving:");
-                                eprintln!("{}", error); // Print the single error message
-                            }
+                        match move_files_para(&files_entries, &files_dir, &log_name) {
+                            Ok(()) => print_log("[ ] All files moved.", log_name, true),
+                            Err(error) => print_log(
+                                    format!("[!] Errors occurred during file moving: {}", error).as_str(), 
+                                    log_name,
+                                    true
+                                )
                         }
                         // add `files` folder to process_vector
                         process_vector.push(files_dir)
