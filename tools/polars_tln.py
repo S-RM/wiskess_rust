@@ -80,6 +80,7 @@ def get_hostname(dict_tln):
 
 
 def powershell_history_tln(out_filepath):
+    print('Timelining the PowerShell history files with the MFT')
     # create a lazy frame lf for storing all the data
     df = pl.DataFrame({})
     mft_lf = pl.scan_csv(os.path.join(out_filepath,'FileSystem','MFTECmd.csv'))
@@ -93,7 +94,7 @@ def powershell_history_tln(out_filepath):
             # creation_time, last_mod_time, accessed_time = find the timestamps in the out_filepath\FileSystem\MFTECmd.csv
             creation_time, last_mod_time, accessed_time = mft_lf.filter(
                 (pl.col("FileName") == "ConsoleHost_history.txt") &
-                (pl.col("ParentPath") == f'.\\Users\\{username}\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine')
+                (pl.col("ParentPath")).str.contains(username)
             ).select(
                 pl.col('Created0x10'),
                 pl.col('LastModified0x10'),
@@ -124,10 +125,13 @@ def powershell_history_tln(out_filepath):
             })
             df = pl.concat([df,data_frame])
     
+    
     # output the powershell timeline
     if df.is_empty():
         print('No powershell history in timeframe')
     else:
+        # sort the timeline by datetime
+        df = df.sort('datetime')
         df.write_csv(os.path.join(out_filepath, 'Timeline', 'powershell_history.csv'))
         df.write_ndjson(os.path.join(out_filepath, 'Timeline', 'powershell_history.json'))
 
@@ -256,13 +260,6 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['LastWriteTimestamp'],
       'fmt_time': '%F %T%.f'
     },
-    'hayabusa': {
-      'file': os.path.join(*[f'{out_filepath}','EventLogs','hayabusa.csv']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','hayabusa.csv']),
-      'msg': ['Channel','EventID','Level','MitreTactics','MitreTags','Details','ExtraFieldInfo','RuleFile','Computer','OtherTags','RecordID','EvtxFile'],
-      'times': ['datetime'],
-      'fmt_time': '%FT%T%.f'
-    },
     'amcache': {
       'regex_file': r'(?:Amcache_UnassociatedFileEntries)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','FileExecution']),
@@ -347,41 +344,6 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['DeletedOn'],
       'fmt_time': '%F %T'
     },
-    'mft':{
-      'file': os.path.join(*[f'{out_filepath}','FileSystem','MFTECmd.csv']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','MFTECmd.csv']),
-      'msg':['ParentPath','FileName','Extension','FileSize'],
-      'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
-      'fmt_time': '%F %T%.f'
-    },
-    'event-logs': {
-      'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
-      'msg': ['EventId','MapDescription','UserId','UserName','RemoteHost','Level','Provider','Channel','Computer','Payload'],
-      'times': ['TimeCreated'],
-      'fmt_time': '%F %T%.f'
-    },
-    'usnjrnl-j':{
-      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl-j-file.csv']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl-j-file.csv']),
-      'msg': ['Name','Extension','EntryNumber','ParentEntryNumber','ParentPath','UpdateReasons','FileAttributes'],
-      'times': ['UpdateTimestamp'],
-      'fmt_time': '%F %T%.f'
-    },
-    'rusty_usnjrnl': {
-      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl_j.json']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl_j_rusty.csv']),
-      'msg': ['file_name','full_name','file_name_length','reason','file_attributes'],
-      'times': ['timestamp'],
-      'fmt_time': '%FT%T%.f'
-    },
-    'mft_dump': {
-      'file': os.path.join(*[f'{out_filepath}','FileSystem','mft.csv']),
-      'out': os.path.join(*[f'{out_filepath}','Timeline','mft_dump.csv']),
-      'msg': ['FullPath','TotalEntrySize','FileSize','StandardInfoFlags','FileNameFlags','IsADirectory','IsDeleted','HasAlternateDataStreams'],
-      'times': ['StandardInfoLastModified','StandardInfoLastAccess','StandardInfoCreated','FileNameLastModified','FileNameLastAccess','FileNameCreated'],
-      'fmt_time': '%FT%T%.f'
-    },
     'hindsight': {
       'file': os.path.join(*[f'{out_filepath}','Network','hindsight.jsonl']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','hindsight.csv']),
@@ -419,6 +381,48 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'msg': ['ExeInfo','ExeInfoDescription','ExeTimestamp','SidType','Sid','UserName','UserId','AppId','BackgroundBytesRead','BackgroundBytesWritten','BackgroundContextSwitches','BackgroundCycleTime','BackgroundNumberOfFlushes','BackgroundNumReadOperations','BackgroundNumWriteOperations','FaceTime','ForegroundBytesRead','ForegroundBytesWritten','ForegroundContextSwitches','ForegroundCycleTime','ForegroundNumberOfFlushes','ForegroundNumReadOperations','ForegroundNumWriteOperations'],
       'times': ['Timestamp'],
       'fmt_time': '%F %X'
+    },
+    'mft':{
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','MFTECmd.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','MFTECmd.csv']),
+      'msg':['ParentPath','FileName','Extension','FileSize'],
+      'times':['Created0x10','Created0x30','LastModified0x10','LastModified0x30','LastRecordChange0x10','LastRecordChange0x30','LastAccess0x10','LastAccess0x30'],
+      'fmt_time': '%F %T%.f'
+    },
+    'usnjrnl-j':{
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl-j-file.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl-j-file.csv']),
+      'msg': ['Name','Extension','EntryNumber','ParentEntryNumber','ParentPath','UpdateReasons','FileAttributes'],
+      'times': ['UpdateTimestamp'],
+      'fmt_time': '%F %T%.f'
+    },
+    'rusty_usnjrnl': {
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','usnjrnl_j.json']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','usnjrnl_j_rusty.csv']),
+      'msg': ['file_name','full_name','file_name_length','reason','file_attributes'],
+      'times': ['timestamp'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'mft_dump': {
+      'file': os.path.join(*[f'{out_filepath}','FileSystem','mft.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','mft_dump.csv']),
+      'msg': ['FullPath','TotalEntrySize','FileSize','StandardInfoFlags','FileNameFlags','IsADirectory','IsDeleted','HasAlternateDataStreams'],
+      'times': ['StandardInfoLastModified','StandardInfoLastAccess','StandardInfoCreated','FileNameLastModified','FileNameLastAccess','FileNameCreated'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'hayabusa': {
+      'file': os.path.join(*[f'{out_filepath}','EventLogs','hayabusa.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','hayabusa.csv']),
+      'msg': ['Channel','EventID','Level','MitreTactics','MitreTags','Details','ExtraFieldInfo','RuleFile','Computer','OtherTags','RecordID','EvtxFile'],
+      'times': ['datetime'],
+      'fmt_time': '%FT%T%.f'
+    },
+    'event-logs': {
+      'file': os.path.join(*[f'{out_filepath}','EventLogs','EvtxECmd-All.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','event-logs.csv']),
+      'msg': ['EventId','MapDescription','UserId','UserName','RemoteHost','Level','Provider','Channel','Computer','Payload'],
+      'times': ['TimeCreated'],
+      'fmt_time': '%F %T%.f'
     }
   }
 
@@ -444,7 +448,7 @@ def main():
   parser.add_argument('time_to')
   args = parser.parse_args()
 
-  csv_to_tln(args.out_filepath, args.time_from, args.time_to)
+  # csv_to_tln(args.out_filepath, args.time_from, args.time_to)
     
   powershell_history_tln(args.out_filepath)
 
