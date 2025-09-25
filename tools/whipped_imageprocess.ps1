@@ -79,13 +79,18 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
         # OSFMount doesn't support these image types, so either convert or use AIM
         $osf_mount = $False
     }
+    if ($image -Match "^\\\\\?\\") {
+        $image = $image -replace "^\\\\\?\\",""
+    }
+
 
     Write-Host "[+] Processing image: $image"
 
     if (!$osf_mount) {
         # Mount it with AIM if not supported by OSF Mount 
-        if ($(Test-Path -PathType Leaf -Path "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe") -eq $True) {
-            & "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe" --mount --readonly --filename="$image" --fakesig --background
+        if ($(Test-Path -PathType Leaf -Path "C:\ProgramData\chocolatey\bin\aim_cli.exe") -eq $True) {
+            Start-Process -FilePath "C:\ProgramData\chocolatey\bin\aim_cli.exe" -ArgumentList '--mount','--readonly',"--filename=$image",'--fakesig','--background' -NoNewWindow -PassThru
+            Start-Sleep -Seconds 5
             $dismount = 00000
         } elseif ($image -Match "\.(?:vhdx|vhd)$") {
             Mount-VHD -ReadOnly -Passthru -Path $image
@@ -127,8 +132,8 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     }
     
     if (!$osf_mount) {
-        if ($(Test-Path -PathType Leaf -Path "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe") -eq $True) {
-            & "$tool_path\tools\Arsenal-Image-Mounter\aim_cli.exe" --dismount=$dismount --force
+        if ($(Test-Path -PathType Leaf -Path "C:\ProgramData\chocolatey\bin\aim_cli.exe") -eq $True) {
+            & "C:\ProgramData\chocolatey\bin\aim_cli.exe" --dismount=$dismount --force
         } elseif ($image -Match "\.(?:vhdx|vhd)$") {
             Dismount-VHD -Path $image
         }
@@ -143,6 +148,14 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
             }
         }
     }
+    return $done
 }
 
-Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
+$wiskessed = Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $False
+if (!$wiskessed) {
+    $wiskessed = Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
+}
+if (!$wiskessed) {
+    Write-Error "[!] Wiskess tried to mount the image, $image_path, but was unable to mount and find a Windows folder using Arsenal Image Mounter or OSFMount."
+    Write-Output "[ ] Please try to mount this manually and process with wiskess_rust.exe wiskess."
+}
