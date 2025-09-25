@@ -448,7 +448,7 @@ def main():
   parser.add_argument('time_to')
   args = parser.parse_args()
 
-  # csv_to_tln(args.out_filepath, args.time_from, args.time_to)
+  csv_to_tln(args.out_filepath, args.time_from, args.time_to)
     
   powershell_history_tln(args.out_filepath)
 
