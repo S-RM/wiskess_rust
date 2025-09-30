@@ -373,6 +373,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
         r#"
         @echo off
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe' -OutFile '.\ndp48-x86-x64-allos-enu.exe' -UseBasicParsing"
+        .\ndp48-x86-x64-allos-enu.exe /passive /AcceptEULA /norestart
         @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
         RefreshEnv.cmd
         "#
@@ -383,7 +384,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python pwsh
+        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python pwsh dotnet-9.0-runtime
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
