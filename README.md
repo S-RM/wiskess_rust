@@ -220,3 +220,4 @@ The following are a list of developments since the last release and are currentl
 * Fixed an issue in the network CSV in timeline, where multiple entries were shown for the same event
 * Fixed an issue with old-whip and GUI when using whipped, where some collections would not be extracted completely
 * Host information sheet in timeline
+* artefact collection from disk images on Windows are now done in parallel

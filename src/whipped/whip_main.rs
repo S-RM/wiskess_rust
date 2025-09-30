@@ -8,7 +8,6 @@ use super::whip_s3;
 use super::whip_az;
 
 use anyhow::bail;
-use askama::filters::format;
 use chrono::Utc;
 use indicatif::MultiProgress;
 use anyhow::Result;
@@ -551,7 +550,7 @@ async fn update_processed_data(out_link: &String, process_folder: &Path, tool_pa
     let zip_path = process_folder.join("Artefacts").join("collection.zip");
     if zip_path.exists() {
         let zip_out_cmd = format!("-o{}", process_folder.join("Artefacts").display());
-        let zip_cmd = ["x", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
+        let zip_cmd = ["x", "-aos", zip_path.to_str().unwrap(), &zip_out_cmd].to_vec();
         let bin_path = Path::new("7z.exe").to_path_buf();
         print_log(
             format!("[ ] Extracting archive: `{}` with command: `{} {}`", zip_path.display(), bin_path.display(), zip_cmd.join(" ")).as_str(),

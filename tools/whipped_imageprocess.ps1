@@ -68,7 +68,7 @@ function Start-Wiskess ($dataSource, $wiskess_folder, $start_date, $end_date, $i
 
 
 function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $ioc_file, $osf_mount) {   
-    $free_drives = Get-FreeDrives 'E' 'M'
+    $free_drives = Get-FreeDrives 'D' 'M'
     if ($image -Match "-flat\.vmdk$" -and (Test-Path $($image -replace "-flat\.vmdk$",".vmdk"))) {
         # Make sure to use the vmdk that has the image descriptor, i.e. not '-flat.vmdk'
         $image = $image -replace "-flat\.vmdk$",".vmdk"
@@ -133,7 +133,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     
     if (!$osf_mount) {
         if ($(Test-Path -PathType Leaf -Path "C:\ProgramData\chocolatey\bin\aim_cli.exe") -eq $True) {
-            & "C:\ProgramData\chocolatey\bin\aim_cli.exe" --dismount=$dismount --force
+            Start-Process -FilePath  "C:\ProgramData\chocolatey\bin\aim_cli.exe" -ArgumentList "--dismount=$dismount","--force" -NoNewWindow -PassThru
         } elseif ($image -Match "\.(?:vhdx|vhd)$") {
             Dismount-VHD -Path $image
         }
@@ -151,9 +151,12 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
     return $done
 }
 
+$wiskessed = $False
 $wiskessed = Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $False
 if (!$wiskessed) {
     $wiskessed = Start-ImageProcess -image $image_path -wiskess_folder "$wiskess_folder" -start_date $start_date -end_date $end_date -ioc_file $ioc_file -osf_mount $True
+} else {
+    Write-Output "OK debug"
 }
 if (!$wiskessed) {
     Write-Error "[!] Wiskess tried to mount the image, $image_path, but was unable to mount and find a Windows folder using Arsenal Image Mounter or OSFMount."

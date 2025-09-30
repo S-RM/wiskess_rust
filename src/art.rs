@@ -3,6 +3,7 @@ pub mod paths {
     use glob::glob;
     use inquire::Text;
     use regex::Regex;
+    use rayon::prelude::*;
     use crate::{configs::config::{self, Artefacts}, ops::{get_files, file_ops::{self, log_msg}}};
 
     pub fn check_art(artefacts: Vec<Artefacts>, data_source: &String, silent: bool, main_args: &config::MainArgs) -> HashMap<String, String> {
@@ -82,41 +83,57 @@ pub mod paths {
             Ok(value) => value,
             Err(value) => return value,
         };
+        
         if env::consts::OS == "windows" && main_args.collect {
             // set the path where artefacts are copied to
             let dest_path = Path::new(&main_args.out_path).join("Artefacts");
             file_ops::make_folders(&dest_path);
             let dest_path_str = dest_path.clone().into_os_string().into_string().unwrap();
-            // loop through all artefacts
-            for (name, path) in data_paths.iter() {
-                if !check_art_access(&path, &main_args.out_log) {
+            
+            // Collect items that need processing
+            let items_to_process: Vec<(String, String)> = data_paths
+                .iter()
+                .filter(|(_, path)| !check_art_access(path, &main_args.out_log))
+                .map(|(name, path)| (name.clone(), path.clone()))
+                .collect();
+            
+            // Pre-create all necessary directories sequentially
+            for (_, path) in &items_to_process {
+                let base_path = format!("{}\\", &data_paths["base"]);
+                let filename = &path.replace(&base_path, "");
+                let dest_dir = Path::new(&dest_path_str).join(filename);
+                let path_path = Path::new(path);
+                
+                if path_path.is_file() {
+                    file_ops::make_folders(dest_dir.parent().unwrap());
+                } else {
+                    file_ops::make_folders(Path::new(&dest_dir.into_os_string()));
+                }
+            }
+            
+            // Process items in parallel and collect results with log messages
+            let results: Vec<(String, String, String)> = items_to_process
+                .par_iter()
+                .map(|(name, path)| {
                     // set the string for the filesystem, i.e. `\\\\.\\d:`
                     let filesystem = format!("\\\\.\\{}", &data_paths["base"].replace("\\",""));
                     // set the base_path to remove the root drive, i.e. `d:\\` from the filename, i.e. `d:\\pagefile.sys`
                     let base_path = format!("{}\\", &data_paths["base"]);
                     let filename = &path.replace(&base_path, "");
-                    // make dirs of the filename
-                    let dest_dir = Path::new(&dest_path_str).join(filename);
                     let path_path = Path::new(path);
-                    if path_path.is_file() {
-                        file_ops::make_folders(dest_dir.parent().unwrap());
-                    } else {
-                        file_ops::make_folders(Path::new(&dest_dir.into_os_string()));
-                    }
-                    let new_path = match get_files::get_file(&filesystem, &filename, &dest_path_str, path_path.is_file()) {
+                    
+                    let (new_path, log_message) = match get_files::get_file(&filesystem, &filename, &dest_path_str, path_path.is_file()) {
                         Ok(_) => {
                             let msg = format!("[+] Copy done for file: {path}");
-                            log_msg(&main_args.out_log, msg);
-                            // set the new path replace any colon `:` with underscore `_` as get_file() does that to data streams
                             let new_path = Path::new(&dest_path).join(filename.replace(":", "_")).to_str().unwrap().to_string();
-                            new_path
+                            (new_path, msg)
                         }   
                         Err(e) => {
                             // check if the file has already been copied from the datasource
                             let (msg, new_path) = if Regex::new(r"^Tried to open .+ for writing$")
                                 .unwrap()
                                 .is_match(e.to_string().as_str()) {
-                                let msg = format!("[ ] Alerady copied file: {path}. Error: {}\n", e);
+                                let msg = format!("[ ] Already copied file: {path}. Error: {}\n", e);
                                 let new_path = Path::new(&dest_path).join(filename.replace(":", "_")).to_str().unwrap().to_string();
                                 (msg, new_path)
                             } else {
@@ -124,12 +141,18 @@ pub mod paths {
                                 let new_path = path.to_owned();
                                 (msg, new_path)
                             };
-                            log_msg(&main_args.out_log, msg);
-                            new_path
+                            (new_path, msg)
                         }
                     };
-                    data_paths_clone.insert(name.to_owned(), new_path);
-                }
+                    
+                    (name.clone(), new_path, log_message)
+                })
+                .collect();
+            
+            // Process results sequentially 
+            for (name, new_path, log_message) in results {
+                log_msg(&main_args.out_log, log_message);
+                data_paths_clone.insert(name, new_path);
             }
         }
         data_paths_clone    
