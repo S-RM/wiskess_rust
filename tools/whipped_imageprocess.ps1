@@ -90,7 +90,7 @@ function Start-ImageProcess ($image, $wiskess_folder, $start_date, $end_date, $i
         # Mount it with AIM if not supported by OSF Mount 
         if ($(Test-Path -PathType Leaf -Path "C:\ProgramData\chocolatey\bin\aim_cli.exe") -eq $True) {
             Start-Process -FilePath "C:\ProgramData\chocolatey\bin\aim_cli.exe" -ArgumentList '--mount','--readonly',"--filename=$image",'--fakesig','--background' -NoNewWindow -PassThru
-            Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 10
             $dismount = 00000
         } elseif ($image -Match "\.(?:vhdx|vhd)$") {
             Mount-VHD -ReadOnly -Passthru -Path $image
