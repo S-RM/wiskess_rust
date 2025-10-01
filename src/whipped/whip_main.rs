@@ -348,7 +348,7 @@ fn chk_exists(output: &PathBuf, file: &String, out_file: &PathBuf, log_name: &Pa
 /// * `out_link` the URL to the S3 bucket or Azure Blob container
 async fn upload_file(in_folder: &PathBuf, out_link: &String, tool_path: &Path, log_name: &Path) {
     let art_folder = in_folder.join("Artefacts");
-    if art_folder.exists() && metadata(&art_folder).unwrap().len() > 0 {
+    if art_folder.exists() {
         // compress the artefacts folder to a file collection.zip
         let zip_path = art_folder.join("collection.zip");
         let art_to_zip = art_folder.join("*");
