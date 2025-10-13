@@ -50,6 +50,8 @@ The github token needs the minimum permissions to access public github repos. Gi
 
 The setup will install tools needed by WISKESS on the operating system and under the tools folder. You will need about 5 GB of disk space for the installation to complete.
 
+You can check if setup has completed successfully with the command: `wiskess_rust.exe setup -c`
+
 # Wiskess Web UI `wiskess_rust.exe gui`
 This command will launch the Web user interface. This is still WIP, where currently you can submit two commands to wiskess, including:
 * a single data source - using the main wiskess module
@@ -94,16 +96,25 @@ This can be used to process Windows data sources stored on either an Azure or AW
 * Copy the file path of all the data you need processed, this needs to be from the folder or bucket that you got the s3:// link.     
 * Set a start and end time, which is likely the incident timeframe
 
-## Example
+## Example - wiskess all the evidence in the in-link and upload the data to the out-link
 ```
-wiskess_rust.exe whipped --config ./config/win_all.yml `
-        --data-source-list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
+wiskess_rust.exe whipped `
         --local-storage x: `
         --in-link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
         --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
         --start-date 2023-01-01 `
+        --end-date 2023-02-01
+```
+## Example - wiskess the collections stored locally on X:\my-collections and upload the results to azure storage
+```
+wiskess_rust.exe whipped `
+        --data-source-list "image.vmdk, folder with collection, surge.zip, velociraptor_collection.7z" `
+        --local-storage x:\my-collections `
+        --in-link local `
+        --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
+        --start-date 2023-01-01 `
         --end-date 2023-02-01 `
-        --ioc-file ./iocs.txt
+        --update
 ```
 
 ## Parameters
@@ -215,10 +226,11 @@ There are several areas where WISKESS can improve in terms of speed, usability a
 
 ## Completed developments for next release
 The following are a list of developments since the last release and are currently pushed to the repo:
+* Official support for processing local collections or disk images, where multiple collections or images have been downloaded to a drive or network share. There is no new command for this, when you have already downloaded the collections/images you provide the `--in-link` with the word "local" and provide the local path `-l` as the folder where the collections are stored on disk and the `--data-source-list`, `-d` as the list of files to process, i.e. `--in-link local -l x:\ -d "Collection-DC1.zip, Collection-FTP.zip, Veeam.vmdk`. You can optionally provide the `--out-link` as "local", but you must combine that with the `--update` flag.
+* Timeline file for host information file - useful when only ingesting the timeline folder files into a SIEM
 * Timeline file for PowerShell history files, ConsoleHost_history.txt
-* Tests to confirm the WISKESS has been setup, and reporting any missing packages
-* Removed bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa
+* Tests to confirm the WISKESS has been setup, and reporting any missing packages. Use the command `setup -c` to check if the setup completed completely. 
+* Removed bloat-data in the message field of some timeline files, i.e. shellbags, hayabusa, and restructured others so the message field is easier to read in a CSV.
 * Fixed an issue in the network CSV in timeline, where multiple entries were shown for the same event
 * Fixed an issue with old-whip and GUI when using whipped, where some collections would not be extracted completely
-* Host information sheet in timeline
 * artefact collection from disk images on Windows are now done in parallel
