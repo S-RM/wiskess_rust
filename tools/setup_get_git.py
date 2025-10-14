@@ -15,28 +15,32 @@ def get_files(response: str, target_dir: str):
   for url in response.json()['assets']:
     print(url['browser_download_url'])
     filename = url['name']
-    urllib.request.urlretrieve(url['browser_download_url'], filename)
-    if os.path.exists(filename):
-      file_type = filetype.guess(filename)
-      if file_type is None:
-        print(f'[!] No file type known for file: {filename}')
+    try:
+      urllib.request.urlretrieve(url['browser_download_url'], filename)
+      if os.path.exists(filename):
+        file_type = filetype.guess(filename)
+        if file_type is None:
+          print(f'[!] No file type known for file: {filename}')
+          os.remove(filename)
+          continue
+        elif file_type.mime == 'application/zip':
+          # extract it
+          with zipfile.ZipFile(filename, 'r') as zip_ref:
+            zip_ref.extractall(target_dir)
+        elif file_type.mime == 'application/gzip':
+          # extract it
+          shutil.unpack_archive(filename, target_dir)
+        elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
+          shutil.copy(filename, target_dir)
+        else:
+          print(f'[!] Unable to extract release {filename} archive with mime type: {file_type.mime}')
+        # delete the zip
         os.remove(filename)
-        continue
-      elif file_type.mime == 'application/zip':
-        # extract it
-        with zipfile.ZipFile(filename, 'r') as zip_ref:
-          zip_ref.extractall(target_dir)
-      elif file_type.mime == 'application/gzip':
-        # extract it
-        shutil.unpack_archive(filename, target_dir)
-      elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
-        shutil.copy(filename, target_dir)
       else:
-        print(f'[!] Unable to extract release {filename} archive with mime type: {file_type.mime}')
-      # delete the zip
-      os.remove(filename)
-    else:
-      print(f'[!] File {filename} didn\'t download to the filepath.')
+        print(f'[!] File {filename} didn\'t download to the filepath.')
+    except Exception as e:
+      print(f'[!] Some error occured when trying to install {filename} from {url}')
+      print(f'[ ] Error was: {e}')
 
 
 def make_symlink(target_dir: str, program: str, script_os: str):
