@@ -568,7 +568,7 @@ pub fn check_installed(tool_path: &Path) {
                     let file_path_str = &file_path.into_os_string().into_string().unwrap();
                     exe_ops::installed_binary_check(true, file_path_str) != ""
                 },
-                false => false,
+                false => true,
             }
         })
         .collect();

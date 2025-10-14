@@ -344,6 +344,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                 if overwrite_file {
                     if wisker.script {
                         // it has a powershell script, which gets run before the binary
+                        // TODO: check OS, if windows do before, else linux run_bash...
                         _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string(), true);
                     }
 
