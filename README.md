@@ -99,7 +99,7 @@ This can be used to process Windows data sources stored on either an Azure or AW
 ## Example - wiskess all the evidence in the in-link and upload the data to the out-link
 ```
 wiskess_rust.exe whipped `
-        --local-storage x: `
+        --local-storage x:\ `
         --in-link "https://myaccount.file.core.windows.net/myclient/?sp=rl&st=...VWjgWTY8uc%3D&sr=s" `
         --out-link "https://myaccount.file.core.windows.net/internal-cache/myclient/?sp=rcwl&st=2023-04-21T20...2FZWEA%3D&sr=s" `
         --start-date 2023-01-01 `
