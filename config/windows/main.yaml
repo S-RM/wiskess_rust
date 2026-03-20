@@ -1,14 +1,12 @@
 wiskers:
   - name: PyrsistenceSniper
-    binary: 'pwsh.exe'
-    args: -c Write-Host "script was ran"
+    binary: '{tool_path}\pyrsistencesniper.exe'
+    args: '{input} --format csv --output {outfolder}\{outfile}'
     outfolder: Persistence
     outfile: PyrsistenceSniper.csv
     input: base
     para: true
-    script: true
     github: https://github.com/Hexastrike/PyrsistenceSniper
-    script_posh: '$inp = ("{input}" -replace "^\\\\\?\\"); python -m pyrsistencesniper $inp --format csv --output "{outfolder}\{outfile}"'
   - name: MFTECmd
     binary: '{tool_path}\Get-ZimmermanTools\net9\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
