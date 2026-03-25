@@ -1,4 +1,11 @@
 wiskers:
+  - name: PyrsistenceSniper
+    binary: '{tool_path}\pyrsistencesniper.exe'
+    args: '{input} --format csv --output {outfolder}\{outfile}'
+    outfolder: Registry
+    outfile: PyrsistenceSniper.csv
+    input: base
+    github: https://github.com/Hexastrike/PyrsistenceSniper
   - name: MFTECmd
     binary: '{tool_path}\Get-ZimmermanTools\net9\MFTECmd.exe'
     args: '-f {input} --csv {outfolder} --csvf {outfile}'
@@ -41,13 +48,6 @@ wiskers:
     outfile: EvtxECmd-All.csv
     input: winevt
     github: https://github.com/EricZimmerman/evtx.git
-  - name: evtx_dump
-    binary: 'fd'
-    args: '.* -e evtx -p {input} -x {tool_path}\evtx\evtx.exe -o jsonl > {outfolder}\{outfile}'
-    outfolder: EventLogs
-    outfile: evtx_dump.json
-    input: winevt
-    github: https://github.com/omerbenamram/evtx.git
   - name: hayabusa
     binary: '{tool_path}\hayabusa\hayabusa.exe'
     args: 'csv-timeline -d {input} -o {outfolder}\{outfile} -p timesketch-verbose --ISO-8601 -w'
@@ -96,7 +96,7 @@ wiskers:
     github: https://github.com/EricZimmerman/RecentFileCacheParser.git
   - name: SCCM_RecentlyUsedApplication
     binary: py
-    args: '-3 {tool_path}\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
+    args: '-2 {tool_path}\CCM_RUA_Finder.py -i {input} -o {outfolder}\{outfile}'
     outfolder: FileExecution
     outfile: SCCM_RecentlyUsedApplication.psv
     input: objects
@@ -104,7 +104,7 @@ wiskers:
     github: https://github.com/davidpany/WMI_Forensics.git
   - name: WMIPersistenceFinder
     binary: py
-    args: '-3 {tool_path}\PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
+    args: '-2 {tool_path}\PyWMIPersistenceFinder.py {input} {outfolder}/{outfile}'
     outfolder: FileExecution
     outfile: PyWMIPersistenceFinder.txt
     input: objects
@@ -125,7 +125,6 @@ wiskers:
     input: srum
     input_other: software
     valid_path: '{root}\Windows\System32\SRU\SRUDB.dat'
-    para: false
     github: https://github.com/EricZimmerman/SrumECmd.git
   - name: srumdump
     binary: '{tool_path}\srum-dump\srum_dump2.6.exe'
@@ -138,9 +137,9 @@ wiskers:
     github: https://github.com/MarkBaggett/srum-dump.git
   - name: hindsight
     binary: '{tool_path}\hindsight\hindsight.exe'
-    args: ' -i {input} -f jsonl -o {outfolder}\hindsight'
+    args: ' -i {input} -f jsonl -o {outfolder}\{outfile}'
     outfolder: Network
-    outfile: hindsight.jsonl
+    outfile: hindsight
     input: chrome
     valid_path: '{root}\Users\*\AppData\Local\Google\Chrome\User Data\Default'
     github: https://github.com/obsidianforensics/hindsight.git
