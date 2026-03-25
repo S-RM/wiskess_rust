@@ -2,10 +2,9 @@ wiskers:
   - name: PyrsistenceSniper
     binary: '{tool_path}\pyrsistencesniper.exe'
     args: '{input} --format csv --output {outfolder}\{outfile}'
-    outfolder: Persistence
+    outfolder: Registry
     outfile: PyrsistenceSniper.csv
     input: base
-    para: true
     github: https://github.com/Hexastrike/PyrsistenceSniper
   - name: MFTECmd
     binary: '{tool_path}\Get-ZimmermanTools\net9\MFTECmd.exe'
