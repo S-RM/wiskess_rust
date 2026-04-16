@@ -123,14 +123,14 @@ wiskers:
     input_other: software
     valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
     github: https://github.com/EricZimmerman/SrumECmd.git
-  - name: chainsaw_srum
-    binary: '{tool_path}/chainsaw/chainsaw.exe'
-    args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
-    input: system32
-    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
-    outfolder: Network
-    outfile: chainsaw_srum.csv
-    github: https://github.com/WithSecureLabs/chainsaw.git
+  # - name: chainsaw_srum
+  #   binary: '{tool_path}/chainsaw/chainsaw.exe'
+  #   args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
+  #   input: system32
+  #   valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+  #   outfolder: Network
+  #   outfile: chainsaw_srum.csv
+  #   github: https://github.com/WithSecureLabs/chainsaw.git
   - name: SumECmd
     binary: '{tool_path}/.dotnet/dotnet'
     args: '{tool_path}/Get-ZimmermanTools/net9/SumECmd.dll -d {input} --csv {outfolder}'
@@ -149,9 +149,9 @@ wiskers:
     github: https://github.com/brimorlabs/KStrike
   - name: hindsight
     binary: '{tool_path}/venv/bin/python3'
-    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/hindsight -l {outfolder}/hindsight.log -t UTC'
+    args: '{tool_path}/venv/bin/hindsight.py -i {input} -f jsonl -o {outfolder}/{outfile} -l {outfolder}/hindsight.log -t UTC'
     outfolder: Network
-    outfile: hindsight.jsonl
+    outfile: hindsight
     input: chrome
     valid_path: '{root}/Users/*/AppData/Local/Google/Chrome/User Data/Default'
     github: https://github.com/obsidianforensics/hindsight.git
@@ -170,10 +170,10 @@ wiskers:
     input: user_dir
     github:
   - name: SBE
-    binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/SBECmd.dll -d {input} --csv {outfolder}'
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/sbecmd_linux.py --tool {tool_path} --users {input} --out {outfolder}'
     outfolder: UserActivity
-    outfile: '*SBECmd_Messages.txt'
+    outfile: '*UsrClass.csv'
     input: user_dir
     github:
   - name: JLECmd
@@ -283,7 +283,7 @@ reporters:
     outfile: mft.json
     input: none
   - name: polars hostinfo
-    binary: py
+    binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/polars_hostinfo.py {out_path} {outfile}'
     outfolder: Timeline
     outfile: 'Host_Information.txt'
