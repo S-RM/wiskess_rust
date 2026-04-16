@@ -209,6 +209,7 @@ The WISKESS project has several areas of development including bug fixes, perfor
 The following are known issues that are being worked on for the next release:
 * No timeout for processes. Some of the wiskess processes may not ever stop, which prevents the pipeline (whipped) from moving on. To resolve this manually, find the name of the process (not wiskess_rust.exe) i.e. in TaskMan or resmon.exe and kill it. Such as SumECmd running for >30 mins, find SumECmd.exe and terminate the process.
 * IOC summary CSV has extra lines, isn't formatted correctly
+* Linux version of wiskess is missing processors for prefetch and srum, as SrumECmd is incompatible and chainsaw srum is unreliable. WIP: implement srum_dump that is compatible on linux
 
 ## Feature requests
 This list includes proposed improvements to wiskess:
