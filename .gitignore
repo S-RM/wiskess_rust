@@ -2,6 +2,7 @@
 /tools/*
 !/tools/setup.ps1
 !/tools/setup_get_git.py
+!/tools/sbecmd_linux.py
 !/tools/whipped.ps1
 !/tools/timeline-wiskess.conf
 !/tools/velociraptor-v0.6.0-windows-amd64.exe

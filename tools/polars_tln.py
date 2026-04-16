@@ -136,8 +136,10 @@ def powershell_history_tln(out_filepath):
         df.write_ndjson(os.path.join(out_filepath, 'Timeline', 'powershell_history.json'))
 
 def filter_tln(df, time_from, time_to):
+  # Add one day to time_to to include the entire end date (otherwise 2024-11-24 becomes 2024-11-24 00:00:00)
+  end_date = datetime.strptime(time_to, '%Y-%m-%d') + timedelta(days=1)
   filtered_range_df = df.filter(
-      pl.col('datetime').is_between(datetime.strptime(time_from, '%Y-%m-%d'), datetime.strptime(time_to, '%Y-%m-%d')),
+      pl.col('datetime').is_between(datetime.strptime(time_from, '%Y-%m-%d'), end_date),
   )
   return filtered_range_df
 
@@ -219,8 +221,8 @@ def get_all_tln(dict_tln, time_from, time_to, host):
                 schema_overrides={'time':str}
               )
             elif re.search(r'psv$', file):
-              conv_file_to_utf8(file)
-              df = pl.scan_csv(file, separator='|')
+              # conv_file_to_utf8(file)
+              df = pl.scan_csv(file, separator='|', encoding='utf8-lossy', missing_utf8_is_empty_string=True, null_values='-')
             elif re.search(r'json(?:l|)$', file):
               df = pl.scan_ndjson(file)
             else:
@@ -239,6 +241,14 @@ def get_all_tln(dict_tln, time_from, time_to, host):
     if len(files_tln) > 0:
       # Sort the whole timeline by datetime
       files_tln = files_tln.sort('datetime')
+      # Format datetime to Opensearch format
+      files_tln = files_tln.with_columns(
+        pl.col("datetime").dt.strftime("%Y-%m-%dT%H:%M:%S.%3fZ")
+      )
+      # Add a timestamp column in milliseconds
+      files_tln = files_tln.with_columns(
+        (pl.col("datetime").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S.%3fZ").dt.timestamp("ms")).alias("timestamp")
+      )  
       files_tln.write_csv(dict_tln[art]['out'])
       json_outfile = f'{os.path.splitext(dict_tln[art]["out"])[0]}.json'
       files_tln.write_ndjson(json_outfile)
@@ -297,6 +307,13 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['InsertDate','LastAccess'],
       'fmt_time': '%F %T'
     },
+    'network_sum_kstrike': {
+      'file': os.path.join(*[f'{out_filepath}','Network','UAL_Kstrike.psv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','network-kstrike.csv']),
+      'msg': ['AuthenticatedUserName','ConvertedAddress (Correlated_HostName(s))','TotalAccesses','RoleGuid (RoleName)','DatesAndAccesses','RawAddress'],
+      'times': ['InsertDate','LastAccess'],
+      'fmt_time': '%F %T%.f'
+    },
     'browser-hist_uk': {
       # for browsing history processed on machines with timestamps in UK format
       'file': os.path.join(*[f'{out_filepath}','Network','BrowsingHistory.csv']),
@@ -317,7 +334,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'regex_file': r'(?:UsrClass|NTUSER)\.csv$',
       'file': os.path.join(*[f'{out_filepath}','UserActivity']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','shellbags.csv']),
-      'msg': ['AbsolutePath','ShellType','Value'],
+      'msg': ['AbsolutePath','Username','ShellType','Value'],
       'times': ['CreatedOn','ModifiedOn','AccessedOn','LastWriteTime','FirstInteracted','LastInteracted'],
       'fmt_time': '%F %T'
     },
@@ -413,7 +430,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
     'hayabusa': {
       'file': os.path.join(*[f'{out_filepath}','EventLogs','hayabusa.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','hayabusa.csv']),
-      'msg': ['Channel','EventID','Level','MitreTactics','MitreTags','Details','ExtraFieldInfo','RuleFile','Computer','OtherTags','RecordID','EvtxFile'],
+      'msg': ['message','Channel','EventID','Level','MitreTactics','MitreTags','Details','ExtraFieldInfo','RuleFile','Computer','OtherTags','RecordID','EvtxFile','timestamp_desc'],
       'times': ['datetime'],
       'fmt_time': '%FT%T%.f'
     },

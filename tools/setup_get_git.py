@@ -1,5 +1,6 @@
 import requests
 import urllib.request
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 import zipfile
 import argparse
@@ -9,13 +10,15 @@ import filetype
 import re
 import shutil
 import magic
+from time import sleep
 
-def get_files(response: str, target_dir: str):
+
+def get_files(response: str, target_dir: str, backoff=1, max_retries=3):
   # download each url, and extract, then delete the zip
   for url in response.json()['assets']:
-    print(url['browser_download_url'])
-    filename = url['name']
-    try:
+    try: 
+      print(url['browser_download_url'])
+      filename = url['name']
       urllib.request.urlretrieve(url['browser_download_url'], filename)
       if os.path.exists(filename):
         file_type = filetype.guess(filename)
@@ -38,9 +41,22 @@ def get_files(response: str, target_dir: str):
         os.remove(filename)
       else:
         print(f'[!] File {filename} didn\'t download to the filepath.')
+    except HTTPError as e:
+      if e.code == 504:
+        print(f'[!] HTTP 504 Error downloading files, back off and retry: {e.code} - {e.reason}')
+        if backoff <= max_retries:
+          backoff += 1
+          sleep(backoff * 5)
+          try:
+            urllib.request.urlretrieve(url['browser_download_url'], filename, bacjkoff=backoff)
+          except HTTPError as e:
+            print(f'[!] HTTPError downloading files on retry: {e.code} - {e.reason}')
+            print(f'[!] URL: {url["browser_download_url"]}')
+            raise 
     except Exception as e:
-      print(f'[!] Some error occured when trying to install {filename} from {url}')
-      print(f'[ ] Error was: {e}')
+      print(f'[!] Exception downloading files: {e}')
+      print(f'[!] URL: {url["browser_download_url"]}')
+      raise
 
 
 def make_symlink(target_dir: str, program: str, script_os: str):
