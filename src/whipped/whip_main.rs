@@ -252,6 +252,10 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         // add `files` folder to process_vector
                         process_vector.push(files_dir)
                     },
+                    "C" => {
+                        // this might be a Cylr-like collection, folder `C` is the C-drive
+                        process_vector.push(data_file.to_path_buf())
+                    }
                     _ => ()
                 }
             }
