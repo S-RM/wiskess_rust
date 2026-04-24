@@ -223,7 +223,6 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
          "https://github.com/ANSSI-FR/bmc-tools.git",
          "https://github.com/Neo23x0/loki.git",
          "https://github.com/williballenthin/shellbags",
-         "https://github.com/vividDuck/srum-dump"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
