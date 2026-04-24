@@ -198,8 +198,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "https://github.com/omerbenamram/mft",
 	    "https://github.com/forensicmatt/RustyUsn",
         "https://github.com/williballenthin/shellbags",
-        "https://github.com/Velocidex/velociraptor",
-        "https://github.com/vividDuck/srum-dump"
+        "https://github.com/Velocidex/velociraptor"
     ];
     for url in urls.iter() {
         let msg = format!("Getting: {}", url);
@@ -223,7 +222,8 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
          "https://github.com/brimorlabs/KStrike",
          "https://github.com/ANSSI-FR/bmc-tools.git",
          "https://github.com/Neo23x0/loki.git",
-         "https://github.com/williballenthin/shellbags"
+         "https://github.com/williballenthin/shellbags",
+        "https://github.com/vividDuck/srum-dump"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
