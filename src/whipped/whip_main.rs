@@ -21,14 +21,14 @@ use rayon::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-/// set_link determines whether the link is an AWS S3 or Azure Blob Storage URL using 
+/// set_link determines whether the link is an AWS S3 or Azure Blob Storage URL using
 /// regex patterns. It then appends the provided component to the base URL accordingly.
 /// # Arguments
 /// * `link` - A string slice of the initial link that may point to an AWS S3 bucket or Azure Blob Storage.
 /// * `component` - A string slice representing the specific component (data source or folder) to be appended to the URL.
 /// * `aws_pattern` - A reference to a compiled regex pattern used to match AWS S3 URLs.
 /// * `azure_pattern` - A reference to a compiled regex pattern used to match Azure Blob Storage URLs.
-fn set_link(link: &str, folder: &str) -> String {
+pub fn set_link(link: &str, folder: &str) -> String {
     let url = if link.starts_with("s3") {
         // If the cloud storage is AWS
         format!("{}/{}", link.trim_end_matches("/*"), folder)
@@ -45,7 +45,7 @@ fn set_link(link: &str, folder: &str) -> String {
 /// Splits a given string by either a comma or a newline and trims each resulting substring.
 /// # Arguments
 /// * `data_source_list` - A string containing the source data to be split and trimmed.
-fn split_and_trim(data_source_list: &str) -> Vec<String> {
+pub fn split_and_trim(data_source_list: &str) -> Vec<String> {
     // Determine the split character
     let split_char = if data_source_list.contains(",") {
         ','
@@ -61,7 +61,7 @@ fn split_and_trim(data_source_list: &str) -> Vec<String> {
 }
 
 /// print and log messages
-fn print_log(msg: &str, out_log:&Path, verbose: bool) {
+pub fn print_log(msg: &str, out_log:&Path, verbose: bool) {
     if verbose {
         println!("{msg}")
     }
@@ -69,7 +69,7 @@ fn print_log(msg: &str, out_log:&Path, verbose: bool) {
 }
 
 /// change any URL path to an OS path, i.e. collections/images/dc.vmdk =windows=> collections\images\dc.vmdk
-fn url_to_path(url: &String) -> String {
+pub fn url_to_path(url: &String) -> String {
     let parts = url.split("/");
     let mut path = PathBuf::new();
     for part in parts {
