@@ -39,3 +39,4 @@ fs_extra = "1.3.0"
 windows-elevate = "0.1.0"
 askama = { version = "0.12.1", features = ["with-actix-web"] }
 sudo = "0.6.0"
+tempfile = "3.8.0"

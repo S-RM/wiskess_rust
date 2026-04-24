@@ -1,15 +1,9 @@
-mod configs;
-mod ops;
-mod art;
-mod init;
-mod webs;
-mod whipped;
-
-use crate::configs::config;
-use crate::ops::{file_ops, wiskess};
-use crate::init::scripts;
-use crate::webs::web;
-use crate::whipped::whip_main;
+use wiskess_rust::configs::config;
+use wiskess_rust::ops::{file_ops, wiskess};
+use wiskess_rust::init::{scripts, setup};
+use wiskess_rust::webs::web;
+use wiskess_rust::whipped::whip_main;
+use wiskess_rust::utils;
 
 use std::path::PathBuf;
 use std::process::exit;
@@ -20,7 +14,6 @@ use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
-use anyhow::{bail, Ok};
 use regex::Regex;
 use inquire::Text;
 
@@ -158,7 +151,7 @@ enum Commands {
     },
 }
 
-fn show_banner() {
+pub fn show_banner() {
     let font = vec!["3D-ASCII", "ANSI Shadow", "Alligator", "Banner3-D", "Big Money-ne", "DOS Rebel", "Larry 3D"];
     let font_str = font.choose(&mut rand::thread_rng()).unwrap();
     let opt = FigletOptions {
@@ -173,49 +166,6 @@ fn show_banner() {
     println!("{}", style(msg_version).yellow());
 }
 
-fn check_elevation() -> Result<(), anyhow::Error>{
-    #[cfg (target_os = "windows")] {
-        use windows_elevate::check_elevated;
-        let is_elevated = check_elevated().expect("Failed to call check_elevated");
-        if !is_elevated {
-            bail!("[!] Not running as Administrator. Please use a terminal with local Administrator rights")
-        }
-    }
-    // #[cfg (target_os = "linux")] {
-    //     use sudo;
-    //     if sudo::check() == sudo::RunningAs::User {
-    //         bail!("[!] Not running as root. Please either use sudo or the root account")
-    //     }
-    // }
-    Ok(())
-}
-
-fn get_config_type(config: PathBuf, tool_path: &Path) -> Result<PathBuf, anyhow::Error> {
-    if !config.exists() || !config.is_file() {
-        let config_os = match env::consts::OS {
-            "windows" => {
-                Path::new(tool_path).parent().unwrap().join("config").join("windows").join(config.file_name().unwrap())
-            },
-            "linux" => {
-                Path::new(tool_path).parent().unwrap().join("config").join("linux").join(config.file_name().unwrap())
-            },
-            &_ => bail!(format!("[!] Unknown OS type. Not yet supporting OS: {}.", env::consts::OS))
-        };
-        Ok(config_os)
-    } else {
-        Ok(config)
-    }
-}
-
-
-fn check_configs(config: PathBuf, tool_path: &PathBuf, artefacts_config: PathBuf) -> (PathBuf, PathBuf) {
-    let config = get_config_type(config, tool_path).unwrap();
-    let artefacts_config = get_config_type(artefacts_config, tool_path).unwrap();
-    // check if config paths exist
-    let config = file_ops::check_path(config);
-    let artefacts_config = file_ops::check_path(artefacts_config);
-    (config, artefacts_config)
-}
 
 
 fn main() {
@@ -232,7 +182,7 @@ fn main() {
     show_banner();
 
     // check we are running as administrator or as root
-    match check_elevation() {
+    match utils::check_elevation() {
         std::result::Result::Ok(()) => println!("[+] Running with the right permissions"),
         Err(e) => {
             println!("[!] Please use an elevated terminal. Error: {}", e);
@@ -274,7 +224,7 @@ fn main() {
                 scripts::run_setup(&tool_path, github_token, verbose);
             }
             // check if setup has been run, or if any binaries are missing
-            init::setup::check_installed(&tool_path);
+            setup::check_installed(&tool_path);
         },
         Commands::Gui {  } => {
             match web::main(tool_path) {
@@ -299,7 +249,7 @@ fn main() {
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
 
-            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
+            let (config, artefacts_config) = utils::check_configs(config, &tool_path, artefacts_config);
 
             // put the args into a whipped structure
             let args = config::WhippedArgs {
@@ -321,16 +271,16 @@ fn main() {
                 Err(e) => println!("[!] There was an issue getting the data whipped. Error: {e}")
             }
         },
-        Commands::Wiskess { 
-            config, 
+        Commands::Wiskess {
+            config,
             artefacts_config,
-            data_source, 
-            out_path, 
-            start_date, 
-            end_date, 
-            ioc_file 
+            data_source,
+            out_path,
+            start_date,
+            end_date,
+            ioc_file
         } => {
-            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
+            let (config, artefacts_config) = utils::check_configs(config, &tool_path, artefacts_config);
             
             let args = config::MainArgs {
                 out_path,
@@ -362,7 +312,7 @@ fn main() {
             let start_date = file_ops::check_date(start_date, &"start date".to_string());
             let end_date = file_ops::check_date(end_date, &"end date".to_string());
 
-            let (config, artefacts_config) = check_configs(config, &tool_path, artefacts_config);
+            let (config, artefacts_config) = utils::check_configs(config, &tool_path, artefacts_config);
 
             // put the args into a whipped structure
             let args = config::WhippedArgs {

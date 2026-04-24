@@ -1,5 +1,16 @@
 # TESTING the wiskess commands
-These are several commands to run wiskess with to confirm it is working.
+
+## Automated Tests
+Unit tests verify core functionality including CLI parsing, config loading (both Windows and Linux), file operations, date validation, cloud URL handling, and archive detection. Tests run on current OS and verify both OS-specific configs parse correctly. Run before every commit.
+```
+cargo test
+```
+Expected: 96 tests pass in ~0.1 seconds.
+
+## Manual Tests
+The scenarios below require running the compiled binary with real data and verifying behaviour. Run these before each release to confirm end-to-end functionality on both Windows and Linux where applicable.
+
+---
 
 ## Build
 Confirm it builds without any error.
@@ -8,6 +19,7 @@ cargo build --release
 ```
 
 ## Setup
+
 Run setup without any flags. Confirm it asks for a github token, and continues to run setup.
 ```
 .\wiskess_rust.exe setup
@@ -32,6 +44,7 @@ Confirm it reports `[+] Check complete. Wiskess is setup OK.`
 ```
 
 ## Wiskess
+
 Run wiskess with an invalid start or end date. Confirm it asks for a valid start and end data:
 ```
 .\wiskess_rust.exe wiskess --start-date 01-05-2023 --end-date 20025-07-16 -d C: --out-path C:\C-Wiskess --ioc-file .\iocs.txt
@@ -58,6 +71,7 @@ Run wiskess to process a velociraptor collection, which has been extracted and w
 ```
 
 ## Whipped
+
 Run whipped with a valid azure SAS token as the in and out links. Confirm all the data is processed and uploaded to the out link.
 ```
 .\wiskess_rust.exe whipped -l C:\test-wiskess\ --in-link "https://myaccount.blob.core.windows.net/gavin-hull-temp/test_wiskess?sp=racwl&st=2025-08-25T11:00:31Z&se=2025-09-22T19:15:31Z&spr=https&sv=2024-11-04&sr=c&sig=..." --out-link "https://myaccount.blob.core.windows.net/gavin-hull-temp/test-wiskess-output?sp=racwl&st=2025-08-25T11:00:31Z&se=2025-09-22T19:15:31Z&spr=https&sv=2024-11-04&sr=c&sig=..." --start-date 2025-01-01 --end-date 2025-08-15 
@@ -104,10 +118,12 @@ Run whipped with the keep-evidence to one evidence item. Confirm the evidence is
 ```
 
 ## Gui
+
 Run the gui. Confirm it creates the webserver locally and both wiskess and whipped pages function.
 ```
 .\wiskess_rust.exe gui
 ```
 
 ## OldWhip
+
 Run oldwhip and confirm it functions with whipped using the whipped.ps1 script.
