@@ -139,6 +139,14 @@ wiskers:
     input: sum
     para: false
     github: https://github.com/EricZimmerman/SumECmd.git
+  - name: srum-dump
+    binary: '{tool_path}/venv/bin/python3'
+    args: '{tool_path}/srum-dump/srum_dump.py -i {input} -o {outfolder} -r {input_other} -e dissect -f csv --NO_CONFIRM'
+    outfolder: Network
+    outfile: 'SRUM-DUMP-*/*.csv'
+    input: srum
+    input_other: software
+    github: https://github.com/vividDuck/srum-dump.git
   - name: KStrike
     binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/KStrike/KStrike.py {input}/Current.mdb > {outfolder}/{outfile}'

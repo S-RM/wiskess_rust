@@ -198,7 +198,8 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "https://github.com/omerbenamram/mft",
 	    "https://github.com/forensicmatt/RustyUsn",
         "https://github.com/williballenthin/shellbags",
-        "https://github.com/Velocidex/velociraptor"
+        "https://github.com/Velocidex/velociraptor",
+        "https://github.com/vividDuck/srum-dump"
     ];
     for url in urls.iter() {
         let msg = format!("Getting: {}", url);
