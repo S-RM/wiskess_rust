@@ -223,7 +223,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
          "https://github.com/ANSSI-FR/bmc-tools.git",
          "https://github.com/Neo23x0/loki.git",
          "https://github.com/williballenthin/shellbags",
-        "https://github.com/vividDuck/srum-dump"
+         "https://github.com/vividDuck/srum-dump"
     ];
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
@@ -238,6 +238,20 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         ).unwrap();
         outmsg.push_str(&output_script(v, code, output, error));
     }
+
+    prog_spin_msg(&pb2, "Git cloning srum-dump and installing requirements...".to_string());
+    let (code, output, error) = run_script::run_script!(
+        r#" 
+            tool_dir="$1"
+            rm -rf "$tool_dir/srum-dump"
+            git clone https://github.com/vividDuck/srum-dump
+            cd "$tool_dir/srum-dump"
+            $tool_dir/venv/bin/python3 -m pip install -r requirements.txt
+            "#,
+            &vec![tool_path_str.to_string()],
+            &options
+    ).unwrap();
+    outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_stop(&pb3, "".to_string());
 
