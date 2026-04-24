@@ -1,0 +1,13 @@
+artefacts:
+  - name: prefetch
+    path: C:\Windows\Prefetch\*.pf
+    legacy: ""
+  - name: event_logs
+    path: C:\Windows\System32\winevt\Logs\*.evtx
+    legacy: ""
+  - name: registry_system
+    path: C:\Windows\System32\config\SYSTEM
+    legacy: ""
+  - name: user_ntuser
+    path: C:\Users\*\NTUSER.DAT
+    legacy: ""

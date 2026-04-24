@@ -1,0 +1,5 @@
+192.168.1.100
+malicious.example.com
+evil.exe
+C:\Windows\Temp\suspicious.dll
+bad_hash_12345abcdef

@@ -1,0 +1,32 @@
+wiskers:
+  - name: test_wisker
+    binary: test_binary.exe
+    args: --test-arg
+    outfolder: test_output
+    input: test_input
+    outfile: test_output.txt
+    para: true
+    script: false
+    chk_exists: true
+
+enrichers:
+  - name: test_enricher
+    binary: enricher.exe
+    args: --enrich
+    outfolder: enriched
+    input: test_input
+    outfile: enriched.csv
+    para: true
+    script: false
+    chk_exists: true
+
+reporters:
+  - name: test_reporter
+    binary: reporter.exe
+    args: --report
+    outfolder: reports
+    input: enriched
+    outfile: final_report.html
+    para: false
+    script: false
+    chk_exists: true
