@@ -224,7 +224,14 @@ pub mod paths {
                 path_arg.display().to_string()
             );
         } else {
-            if is_glob_path(path_str) {
+            // On Linux paths are case-sensitive; try a case-insensitive lookup
+            // by listing the parent directory and matching on lowercased names
+            if let Some(resolved) = find_case_insensitive(path_arg) {
+                art_paths.insert(
+                    art_name.to_string(),
+                    resolved.display().to_string()
+                );
+            } else if is_glob_path(path_str) {
                 // add path to hash
                 art_paths.insert(
                     art_name.to_string(),
@@ -232,6 +239,23 @@ pub mod paths {
                 );
             }
         }
+    }
+
+    /// Resolve a path case-insensitively by listing the parent directory,
+    /// lowercasing both the target filename and each entry name, and returning
+    /// the actual filesystem path when they match.
+    pub fn find_case_insensitive(path: &Path) -> Option<std::path::PathBuf> {
+        let parent = path.parent()?;
+        let target = path.file_name()?.to_string_lossy().to_lowercase();
+
+        std::fs::read_dir(parent).ok()?.flatten().find_map(|entry| {
+            let entry_name = entry.file_name();
+            if entry_name.to_string_lossy().to_lowercase() == target {
+                Some(entry.path())
+            } else {
+                None
+            }
+        })
     }
 
     fn is_glob_path(path_str: &String) -> bool {

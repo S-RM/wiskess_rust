@@ -3,6 +3,7 @@ mod tests {
     use std::path::Path;
     use tempfile::TempDir;
     use std::fs;
+    use crate::art::paths::find_case_insensitive;
 
     /// Test path exists check returns true for existing path
     #[test]
@@ -140,6 +141,57 @@ mod tests {
         assert!(collection.components().count() >= 1);
         // collection should have more components than just a drive letter
         assert!(collection.to_str().unwrap().contains("uploads"));
+    }
+
+    /// Test that find_case_insensitive resolves a path when the requested casing
+    /// differs from the actual filename casing on the filesystem.
+    /// On Linux this exercises the real case-insensitive lookup; on Windows the
+    /// standard exists() check would already succeed, but the function should
+    /// still return the correct resolved path.
+    #[test]
+    fn test_case_insensitive_path_match() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a file with mixed-case name on disk
+        let actual_name = "TestArtefact.evtx";
+        let actual_path = temp_dir.path().join(actual_name);
+        fs::write(&actual_path, b"dummy").unwrap();
+
+        // Build a path using a different casing for the filename
+        let wrong_case = temp_dir.path().join("testArtefact.EVTX");
+
+        // The wrong-cased path should NOT exist as-is on a case-sensitive FS
+        // find_case_insensitive should resolve it to the real path
+        let resolved = find_case_insensitive(&wrong_case);
+
+        assert!(
+            resolved.is_some(),
+            "find_case_insensitive should find '{}' even when requested as '{}'",
+            actual_name,
+            wrong_case.display()
+        );
+        // The resolved path should point to the actual file that exists
+        assert!(
+            resolved.unwrap().exists(),
+            "resolved path must exist on the filesystem"
+        );
+    }
+
+    /// Test that find_case_insensitive returns None for a file that does not
+    /// exist under any casing in the parent directory.
+    #[test]
+    fn test_case_insensitive_path_no_match() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // No file created – nothing to match
+        let missing = temp_dir.path().join("ghost_artefact.evtx");
+
+        let resolved = find_case_insensitive(&missing);
+
+        assert!(
+            resolved.is_none(),
+            "find_case_insensitive should return None when no matching entry exists"
+        );
     }
 
     /// Test path with spaces handling
