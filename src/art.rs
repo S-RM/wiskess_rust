@@ -1,6 +1,6 @@
 pub mod paths {
-    use std::{env, path::Path, collections::HashMap};
-    use glob::glob;
+    use std::{env, fs, path::Path, collections::HashMap};
+    use glob::{glob, glob_with, MatchOptions};
     use inquire::Text;
     use regex::Regex;
     use rayon::prelude::*;
@@ -51,6 +51,66 @@ pub mod paths {
         }
         // Return a hashmap of artefact paths
         art_paths
+    }
+
+    /// Natively collect PowerShell PSReadLine ConsoleHost_history.txt files from each
+    /// user's profile into `{out_path}/PSReadLine/<username>_ConsoleHost_history.txt`.
+    ///
+    /// This is the native-Rust equivalent of the Windows `consolehost_history` pwsh
+    /// wisker, so the history is collected on Linux (and Windows) without PowerShell.
+    /// Globbing is case-insensitive so it works regardless of NTFS path casing.
+    pub fn collect_consolehost(data_paths: &HashMap<String, String>, main_args: &config::MainArgs) {
+        // The glob pattern is resolved by check_art, with {root} already substituted.
+        let pattern = match data_paths.get("consolehost_history") {
+            Some(p) if p != "wiskess_none" => p.clone(),
+            _ => return,
+        };
+
+        let dest_dir = Path::new(&main_args.out_path).join("PSReadLine");
+        let opts = MatchOptions { case_sensitive: false, ..Default::default() };
+
+        let entries = match glob_with(&pattern, opts) {
+            Ok(e) => e,
+            Err(e) => {
+                file_ops::log_msg(&main_args.out_log, format!("[!] Bad consolehost glob {pattern}: {e}"));
+                return;
+            }
+        };
+
+        let mut made_dir = false;
+        for entry in entries.flatten() {
+            if !entry.is_file() {
+                continue;
+            }
+            let user = extract_user(&entry).unwrap_or_else(|| "unknown".to_string());
+            if !made_dir {
+                file_ops::make_folders(&dest_dir);
+                made_dir = true;
+            }
+            let dest = dest_dir.join(format!("{user}_ConsoleHost_history.txt"));
+            match fs::copy(&entry, &dest) {
+                Ok(_) => file_ops::log_msg(
+                    &main_args.out_log,
+                    format!("[+] Collected consolehost history: {} -> {}", entry.display(), dest.display()),
+                ),
+                Err(e) => file_ops::log_msg(
+                    &main_args.out_log,
+                    format!("[!] Unable to collect consolehost history {}: {}", entry.display(), e),
+                ),
+            }
+        }
+    }
+
+    /// Extract the username from a path that contains a `Users/<name>/...` segment,
+    /// matched case-insensitively. Works for names containing spaces
+    /// (e.g. `Users/Gavin Hull/...`), since each path component is taken whole.
+    fn extract_user(path: &Path) -> Option<String> {
+        let comps: Vec<String> = path
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .collect();
+        let idx = comps.iter().position(|c| c.eq_ignore_ascii_case("Users"))?;
+        comps.get(idx + 1).cloned()
     }
 
     fn get_enc_path(path_str: &String, art_paths: &mut HashMap<String, String>, art_name: &String) {

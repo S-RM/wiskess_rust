@@ -294,6 +294,12 @@ pub fn run_cmd(bin_path: PathBuf, cmd: Vec<&str>, log_name: &Path, show_err: boo
 async fn get_file(in_link: &String, output: &PathBuf, file: &String, recurse: bool, tool_path: &PathBuf, log_name: &Path) -> Result<PathBuf> {
     let out_file = output.join(&file);
 
+    // Ensure the destination directory exists before azcopy/s3 sync writes into it.
+    // create_dir_all is idempotent, so this is safe when the folder already exists.
+    if !output.exists() {
+        make_folders(output);
+    }
+
     // if file is an item in a folder, make the folder
     if file.contains("/") || file.contains("\\") {
         let folder_path = out_file.parent().unwrap();
@@ -665,8 +671,12 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                     wiskess_args.out_path = format!("{}_{i}", wiskess_folder.display());
                 }
                 process_data(data_source, &log_name, wiskess_args.clone(), args.config.clone(), args.artefacts_config.clone());
-                // upload the data
-                upload_file(&wiskess_folder, &args.out_link, &tool_path, log_name).await;
+                // upload the data — use the actual processed folder (handles the _{i} suffix
+                // for multi-part collections) and the raw base out_link. azcopy creates a
+                // subfolder named after the source folder under the destination, so passing
+                // the per-item link (which already has the folder appended) would double-nest.
+                let processed_folder = PathBuf::from(&wiskess_args.out_path);
+                upload_file(&processed_folder, &args.out_link, &tool_path, log_name).await;
             }
         } else {
             print_log(
