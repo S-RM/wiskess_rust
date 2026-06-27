@@ -78,6 +78,10 @@ pub(crate) fn config_wiskess(config: &PathBuf, artefacts_config: &PathBuf, data_
 
     // check access and copy unreadable artefacts
     let data_paths = paths::check_copy_art(data_paths, main_args);
+
+    // Natively collect PowerShell console host history into the output folder.
+    // Runs on Linux (no pwsh wisker) and Windows (alongside the existing wisker).
+    paths::collect_consolehost(&data_paths, main_args);
     (config, data_paths)
 }
 

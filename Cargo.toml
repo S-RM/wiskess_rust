@@ -2,8 +2,7 @@
 name = "wiskess_rust"
 version = "0.0.8"
 edition = "2021"
-author = "Gavin Hull"
-about = "Automated Windows Disk Processing"
+authors = ["Gavin Hull"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
