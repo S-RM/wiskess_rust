@@ -205,11 +205,18 @@ wiskers:
     outfile: reg-User.csv
     input: user_dir
     github:
+  # - name: SBE
+  #   binary: '{tool_path}\Get-ZimmermanTools\net9\SBECmd.exe'
+  #   args: '-d {input} --csv {outfolder}'
+  #   outfolder: UserActivity
+  #   outfile: '*SBECmd_Messages.txt'
+  #   input: user_dir
+  #   github:    
   - name: SBE
-    binary: '{tool_path}\Get-ZimmermanTools\net9\SBECmd.exe'
-    args: '-d {input} --csv {outfolder}'
+    binary: py
+    args: '{tool_path}\sbecmd_linux.py --tool {tool_path} --users {input} --out {outfolder}'
     outfolder: UserActivity
-    outfile: '*SBECmd_Messages.txt'
+    outfile: '*UsrClass.csv'
     input: user_dir
     github:
   - name: JLECmd
