@@ -17,6 +17,8 @@ from chardet import detect
 import argparse
 import re
 
+import field_mapping
+
 # get file encoding type
 def get_encoding_type(file):
     with open(file, 'rb') as f:
@@ -148,20 +150,24 @@ def df_time(df, art, file, art_time, art_msg, fmt_time, host):
   # filename = file.split('\\')[-1]
   filename = os.path.basename(file)
   # remove duplicate header names that are used as aliases in the list art_msg
-  conflict_name = ['message','timestamp_desc','hostname']
-  for name in conflict_name:
+  for name in field_mapping.RESERVED_COLUMNS:
     if name in art_msg:
       renamed = f'{name}_{art}'
       df = df.rename({name: renamed})
       # replace name with renamed in the list
       art_msg = list(map(lambda x: x.replace(name, renamed), art_msg))
 
+  # normalize known duplicate/case-variant column names, and build the
+  # OpenSearch-friendly select expressions for the artefact-specific columns
+  df, art_msg, msg_exprs, doc_type_expr = field_mapping.apply(df, art, art_msg)
+
   art_tln = df.select([
     pl.col(art_time).str.replace(r"(?:Z|\s*\+\d{2}.*)$","").str.to_datetime(format=fmt_time).alias('datetime'),
     pl.lit(f'{art} - {filename}: {art_time}').alias('timestamp_desc'),
     pl.concat_str(pl.col(art_msg).fill_null(pl.lit(""),), separator="; ").alias('message'),
-    pl.col(art_msg),
-    pl.lit(f'{host}').alias('hostname')
+    msg_exprs,
+    pl.lit(f'{host}').alias('hostname'),
+    doc_type_expr
     ])
   return art_tln
 

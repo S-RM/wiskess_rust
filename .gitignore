@@ -27,6 +27,7 @@
 !/tools/srum-dump/srum_dump2.6.exe
 !/tools/srum-dump/SRUM_TEMPLATE3.xlsx
 !/tools/srum-dump/
+!/tools/field_mapping.py
 /output_test
 /testing_wr
 /logs
