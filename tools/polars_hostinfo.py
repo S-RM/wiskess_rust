@@ -69,6 +69,7 @@ def get_security_retention(channel, art_type, dict_tln):
 
 def get_hostname(dict_tln):
     host_reg = get_reg_val("ComputerName", dict_tln)
+    host_evt = 'Unknown'
 
     # hostname not found in registry
     if os.path.exists(dict_tln['hayabusa']['file']):
@@ -95,15 +96,15 @@ def get_hostinfo(out_filepath, out_filename):
     dict_tln = {
         'registry': {
         'regex_file': r'reg-System\.csv$',
-        'file': f'{out_filepath}\\Registry\\',
-        'out': f'{out_filepath}\\Timeline\\registry.csv',
+        'file': os.path.join(f'{out_filepath}', 'Registry') + os.sep,
+        'out': os.path.join(*[f'{out_filepath}', 'Timeline', 'registry.csv']),
         'msg': ['HivePath','Description','Category','ValueName','ValueData','ValueData2','ValueData3','Comment'],
         'times': ['LastWriteTimestamp'],
-        'fmt_time': '%F %T%.f'    
+        'fmt_time': '%F %T%.f'
         },
         'hayabusa': {
-        'file': f'{out_filepath}\\EventLogs\\hayabusa.csv',
-        'out': f'{out_filepath}\\Timeline\\hayabusa.csv',
+        'file': os.path.join(*[f'{out_filepath}', 'EventLogs', 'hayabusa.csv']),
+        'out': os.path.join(*[f'{out_filepath}', 'Timeline', 'hayabusa.csv']),
         'msg': ['Computer','Channel','EventID','Level','MitreTactics','MitreTags','OtherTags','RecordID','Details','ExtraFieldInfo','RuleFile','EvtxFile'],
         'times': ['datetime'],    
         'fmt_time': '%FT%T%.f'    
