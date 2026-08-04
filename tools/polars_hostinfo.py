@@ -16,14 +16,34 @@ import glob
 
 
 
-def put_timeline(host_info, df, value):
+def add_opensearch_cols(data_frame, hostname):
+    """Add the hostname, doc_type and epoch-millis timestamp columns needed by OpenSearch,
+    and format datetime the same way as the other timelines."""
+    return data_frame.with_columns(
+        pl.col('datetime')
+          .str.replace(r"(?:Z|\s*\+\d{2}.*)$","")
+          .str.to_datetime(format='%F %T%.f', strict=False)
+          .alias('_datetime')
+    ).with_columns([
+        pl.lit(hostname).alias('hostname'),
+        pl.lit('hostinfo').alias('doc_type'),
+        pl.col('_datetime').dt.timestamp('ms').alias('timestamp'),
+        # Format datetime to Opensearch format
+        pl.col('_datetime').dt.strftime('%Y-%m-%dT%H:%M:%S.%3fZ').alias('datetime')
+    ]).drop('_datetime')
+
+
+def put_timeline(host_info, df, value, hostname):
+    if host_info.get(value) in (None, '', 'Unknown'):
+        print(f'No {value} to add to the host info timeline')
+        return df
     for _time in host_info.get(value).split(', '):
         data_frame = pl.DataFrame({
             'datetime': _time,
             'timestamp_desc': f'Hostinfo - {value}',
             'message': value
         })
-        df = pl.concat([df, data_frame])
+        df = pl.concat([df, add_opensearch_cols(data_frame, hostname)])
     return df
 
 
@@ -149,21 +169,24 @@ def get_hostinfo(out_filepath, out_filename):
         
     # create empty data frame fror the timeline
     df = pl.DataFrame({})
-    
+
+    # the time the report was generated, stamped once so every row shares it
+    generated_at = datetime.today().strftime('%Y-%m-%d %H:%M:%S.%f')
+
     for i in host_info:
         print(f"{i}: {host_info[i]}")
         with open(out_file, 'a') as file:
             file.write(f"{i}: {host_info[i]}\n")
         # add the host information to a timeline with timestamp of when it was generated
         data_frame = pl.DataFrame({
-            'datetime': datetime.today().strftime('%Y-%m-%d %H:%M:%S.%f'),
+            'datetime': generated_at,
             'timestamp_desc': f'Hostinfo - All host info. NOTE: `datetime` timestamp is when WISKESS generated the report.',
             'message': f'{i}: {host_info[i]}'
         })
-        df = pl.concat([df, data_frame])
-    
-    df = put_timeline(host_info, df, 'Shutdown Time')
-    df = put_timeline(host_info, df, 'Install Date')
+        df = pl.concat([df, add_opensearch_cols(data_frame, host_reg)])
+
+    df = put_timeline(host_info, df, 'Shutdown Time', host_reg)
+    df = put_timeline(host_info, df, 'Install Date', host_reg)
     df = df.unique(maintain_order=True)
     output_csv = os.path.join(out_filepath, 'Timeline', out_filename.replace('.txt','.csv'))
     print(f'[ ] Writing host info to CSV as a timeline entry here: {output_csv}')
