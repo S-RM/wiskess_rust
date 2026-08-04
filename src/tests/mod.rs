@@ -19,3 +19,5 @@ pub mod archive_processing_tests;
 pub mod path_validation_tests;
 #[cfg(test)]
 pub mod os_config_tests;
+#[cfg(test)]
+pub mod drive_detection_tests;

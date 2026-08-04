@@ -173,6 +173,55 @@ fn move_files_para(files_entries: &[std::path::PathBuf], files_dir: &std::path::
     }
 }
 
+/// Extracts the drive letter (uppercased) from a Velociraptor percent-encoded
+/// path component, matching both forms Velociraptor produces: `<LETTER>%3A`
+/// (e.g. `F%3A` for `F:`) and `%5C%5C.%5C<LETTER>%3A` (e.g. `%5C%5C.%5CF%3A`
+/// for `\\.\F:`). Case-insensitive. Returns `None` if it matches neither.
+pub fn extract_drive_letter(component_str: &str) -> Option<char> {
+    let re = regex::Regex::new(r"(?i)^(?:%5C%5C\.%5C)?([A-Za-z])%3A$").unwrap();
+    re.captures(component_str)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().chars().next())
+        .map(|c| c.to_ascii_uppercase())
+}
+
+/// Returns true if `dir` has an immediate child directory named `Windows`
+/// (case-insensitive), so this works the same on Windows and Linux.
+pub fn has_windows_child(dir: &Path) -> bool {
+    WalkDir::new(dir)
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .any(|entry| {
+            entry.file_type().is_dir()
+                && entry.file_name().to_str()
+                    .map_or(false, |name| name.eq_ignore_ascii_case("windows"))
+        })
+}
+
+/// Walks a Velociraptor `uploads` folder's `auto`/`ntfs` subtrees at depth 2
+/// (i.e. `uploads/<auto|ntfs>/<drive-component>`) and returns the distinct,
+/// sorted drive letters that have an immediate `Windows` child - i.e. are
+/// confirmed to be the OS drive. Either encoded form of the same letter, in
+/// either subtree, confirms that letter.
+pub fn find_os_drive_letters(uploads_dir: &Path) -> Vec<char> {
+    let mut confirmed: Vec<char> = WalkDir::new(uploads_dir)
+        .min_depth(2)
+        .max_depth(2)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|entry| entry.file_type().is_dir())
+        .filter_map(|entry| {
+            let comp_str = entry.file_name().to_str()?;
+            let letter = extract_drive_letter(comp_str)?;
+            has_windows_child(entry.path()).then_some(letter)
+        })
+        .collect();
+    confirmed.sort_unstable();
+    confirmed.dedup();
+    confirmed
+}
 
 /// pre-process an achive of type zip or 7z, extract using 7zip then add artefacts to a vector. If the contents
 /// has a folder in the root called uploads we treat it as a velociraptor collection and move the data into one folder.
@@ -221,19 +270,27 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                             // add `files` folder to process_vector
                             return process_vector.push(files_dir)
                         }
+                        // find which drive letter(s) actually contain a Windows folder,
+                        // rather than assuming the OS drive is always C
+                        let confirmed_drives = find_os_drive_letters(data_file);
+                        let no_drive_confirmed = confirmed_drives.is_empty();
+                        if no_drive_confirmed {
+                            print_log(
+                                "[!] No drive with a Windows folder was found in the Velociraptor collection; processing all drives found.",
+                                log_name,
+                                true
+                            );
+                        }
                         let files_entries: Vec<PathBuf> = WalkDir::new(data_file)
                             .min_depth(3)
                             .max_depth(3)
                             .into_iter()
                             .filter_map(|e| e.ok())
                             .filter(|entry| {
-                                entry.path().components().any(|component|{
-                                    component.as_os_str().to_str().map_or(false, |comp_str| {
-                                        match comp_str.to_uppercase().as_str() {
-                                            "C%3A"|"%5C%5C.%5CC%3A" => true,
-                                            &_ => false
-                                        }
-                                    })
+                                no_drive_confirmed || entry.path().components().any(|component| {
+                                    component.as_os_str().to_str()
+                                        .and_then(extract_drive_letter)
+                                        .map_or(false, |letter| confirmed_drives.contains(&letter))
                                 })
                             })
                             .map(|e| e.into_path())
@@ -244,7 +301,7 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         match move_files_para(&files_entries, &files_dir, &log_name) {
                             Ok(()) => print_log("[ ] All files moved.", log_name, true),
                             Err(error) => print_log(
-                                    format!("[!] Errors occurred during file moving: {}", error).as_str(), 
+                                    format!("[!] Errors occurred during file moving: {}", error).as_str(),
                                     log_name,
                                     true
                                 )
@@ -252,11 +309,13 @@ fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, 
                         // add `files` folder to process_vector
                         process_vector.push(files_dir)
                     },
-                    "C" => {
-                        // this might be a Cylr-like collection, folder `C` is the C-drive
-                        process_vector.push(data_file.to_path_buf())
+                    _ => {
+                        // Cylr-like collection: any top-level folder that itself contains
+                        // an immediate Windows child is the OS drive root, whatever it's named
+                        if has_windows_child(data_file) {
+                            process_vector.push(data_file.to_path_buf())
+                        }
                     }
-                    _ => ()
                 }
             }
         }

@@ -81,11 +81,17 @@ def get_hostname(dict_tln):
 
 
 
-def powershell_history_tln(out_filepath):
+def powershell_history_tln(out_filepath, hostname):
     print('Timelining the PowerShell history files with the MFT')
     # create a lazy frame lf for storing all the data
     df = pl.DataFrame({})
-    mft_lf = pl.scan_csv(os.path.join(out_filepath,'FileSystem','MFTECmd.csv'))
+    mft_file = os.path.join(out_filepath,'FileSystem','MFTECmd.csv')
+    if not os.path.exists(mft_file):
+        print(f'Not found {mft_file}, unable to timeline the PowerShell history')
+        return
+    mft_lf = pl.scan_csv(mft_file, encoding='utf8-lossy', infer_schema_length=10000, null_values='-')
+    # the MFT timestamp columns, in the order they are added to the timeline
+    mft_times = ['Created0x10','LastModified0x10','LastAccess0x10']
     # for each file in out_filepath\PSReadLine\*_ConsoleHost_history.txt:
     powershell_path = os.path.join(out_filepath,'PSReadLine','*_ConsoleHost_history.txt')
     for file in glob.glob(powershell_path):
@@ -93,27 +99,34 @@ def powershell_history_tln(out_filepath):
             # create a lazy frame lf
             # get the username
             username = os.path.basename(file).replace('_ConsoleHost_history.txt', '')
-            # creation_time, last_mod_time, accessed_time = find the timestamps in the out_filepath\FileSystem\MFTECmd.csv
-            creation_time, last_mod_time, accessed_time = mft_lf.filter(
+            # find the timestamps in the out_filepath\FileSystem\MFTECmd.csv, parsed to
+            # datetimes so they can be output in the same format as the other timelines
+            times_df = mft_lf.filter(
                 (pl.col("FileName") == "ConsoleHost_history.txt") &
                 (pl.col("ParentPath")).str.contains(username)
-            ).select(
-                pl.col('Created0x10'),
-                pl.col('LastModified0x10'),
-                pl.col('LastAccess0x10')
-            ).collect()
+            ).select([
+                pl.col(mft_time)
+                  .str.replace(r"(?:Z|\s*\+\d{2}.*)$","")
+                  .str.to_datetime(format='%F %T%.f', strict=False)
+                for mft_time in mft_times
+            ]).collect()
+            if times_df.height == 0:
+                print(f'No MFT entry for the PowerShell history of user: {username}')
+                continue
             # Get contents of _ConsoleHost_history
-            with open(file, 'r') as f:
+            with open(file, 'r', encoding='utf-8', errors='replace') as f:
                 lines = f.readlines()
+                if not lines:
+                    print(f'Empty PowerShell history for user: {username}')
+                    continue
                 first_line = lines[0].strip()
                 last_line = lines[-1].strip()
             # create rows in the dataframe for creation, last mod and access
             data_frame = pl.DataFrame({
-                'datetime' : [
-                    creation_time[0],
-                    last_mod_time[0],
-                    accessed_time[0]
-                ],
+                'datetime' : pl.Series(
+                    [times_df[mft_time][0] for mft_time in mft_times],
+                    dtype=times_df.schema[mft_times[0]]
+                ),
                 'timestamp_desc' : [
                     f'PowerShell hist, user: {username} - creation time and first line',
                     f'PowerShell hist, user: {username} - modified time and last line',
@@ -123,11 +136,20 @@ def powershell_history_tln(out_filepath):
                     first_line,
                     last_line,
                     ''.join(lines).replace('\n', '; ')
-                ]
-            })
+                ],
+                # add hostname and doc_type, as needed by OpenSearch
+                'hostname' : [hostname] * 3,
+                'doc_type' : ['powershell_history'] * 3
+            }).with_columns(
+                # Add a timestamp column in milliseconds
+                pl.col('datetime').dt.timestamp('ms').alias('timestamp')
+            ).with_columns(
+                # Format datetime to Opensearch format
+                pl.col('datetime').dt.strftime('%Y-%m-%dT%H:%M:%S.%3fZ')
+            )
             df = pl.concat([df,data_frame])
-    
-    
+
+
     # output the powershell timeline
     if df.is_empty():
         print('No powershell history in timeframe')
@@ -266,6 +288,7 @@ def get_all_tln(dict_tln, time_from, time_to, host):
 
 
 def csv_to_tln(out_filepath, time_from, time_to):
+  """Timeline the CSV/JSON artefacts and return the hostname that was found."""
   # dict_tln needs the file, out, msg, times and fmt_time. If the file is a dir, the regex_file is needed to match the file name
   dict_tln = {
     'registry': {
@@ -453,6 +476,7 @@ def csv_to_tln(out_filepath, time_from, time_to):
   print(f'Hostname: {host}')
 
   all_tln = get_all_tln(dict_tln, time_from, time_to, host)
+  return host
   # put_all_tln(dict_tln)
   # Sort the all timeline by datetime col
   # if all_tln.width > 0:
@@ -471,9 +495,9 @@ def main():
   parser.add_argument('time_to')
   args = parser.parse_args()
 
-  csv_to_tln(args.out_filepath, args.time_from, args.time_to)
-    
-  powershell_history_tln(args.out_filepath)
+  host = csv_to_tln(args.out_filepath, args.time_from, args.time_to)
+
+  powershell_history_tln(args.out_filepath, host)
 
 if __name__ == '__main__':
   main()
