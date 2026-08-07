@@ -50,7 +50,7 @@ wiskers:
     github: https://github.com/EricZimmerman/evtx.git
   - name: hayabusa
     binary: '{tool_path}\hayabusa\hayabusa.exe'
-    args: 'csv-timeline -d {input} -o {outfolder}\{outfile} -p timesketch-verbose --ISO-8601 -w'
+    args: 'dfir-timeline -d {input} -o {outfolder}\{outfile} -p timesketch-verbose --iso-8601 -w'
     outfolder: EventLogs
     outfile: hayabusa.csv
     input: winevt
