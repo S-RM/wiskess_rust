@@ -1,7 +1,0 @@
-artefacts:
-  - name: none
-    path: ''
-  - name: base
-    path: '{root}'
-  - name: consolehost_history
-    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
