@@ -1,11 +1,120 @@
-use std::{env, io, path::{Path, PathBuf}, time::Duration};
+use std::{env, io, path::{Path, PathBuf}, process::exit, time::Duration};
 use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle, MultiProgress};
+use inquire::Text;
+use regex::Regex;
 use run_script::ScriptOptions;
+use ureq::Agent;
 
 use crate::ops::{exe_ops, file_ops::{self, make_folders}};
 // extern crate git2;
 // use git2::Repository;
+
+/// The result of checking a GitHub personal access token against the GitHub API
+#[derive(Debug, PartialEq)]
+pub enum TokenCheck {
+    /// GitHub accepted the token
+    Valid,
+    /// GitHub rejected the token, with the reason to show the user
+    Invalid(String),
+    /// The check couldn't be completed, i.e. no network
+    Unknown(String),
+}
+
+/// check the token looks like a fine-grained personal access token
+pub fn is_github_token_format(token: &str) -> bool {
+    Regex::new(r"^github_pat_").unwrap().is_match(token)
+}
+
+/// map the HTTP status of the GitHub API response to a token check outcome
+pub fn classify_github_status(code: u32) -> TokenCheck {
+    match code {
+        200 => TokenCheck::Valid,
+        401 => TokenCheck::Invalid(
+            "bad credentials - the token is invalid, expired or has been revoked".to_string()
+        ),
+        403 | 429 => TokenCheck::Unknown(
+            "GitHub rate limited or blocked the request".to_string()
+        ),
+        _ => TokenCheck::Unknown(format!("unexpected HTTP status {}", code)),
+    }
+}
+
+/// ask the GitHub API for the rate limit, a lightweight endpoint that doesn't use up any quota
+fn github_api_status(token: &str) -> Result<u32, String> {
+    let gh_api_str: &str = "https://api.github.com/rate_limit";
+    let agent = Agent::new_with_config(
+        Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(15)))
+            .build()
+    );
+    match agent.get(gh_api_str)
+        .header("Accept", "application/vnd.github+json")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .header("User-Agent", "wiskess")
+        .call()
+    {
+        Ok(response) => Ok(response.status().as_u16() as u32),
+        // the api replied, but with an error status, i.e. 401 when the token is no good
+        Err(ureq::Error::StatusCode(code)) => Ok(code as u32),
+        // no reply at all, i.e. no network or dns failure
+        Err(e) => Err(format!("unable to reach {}: {}", gh_api_str, e)),
+    }
+}
+
+/// check_github_token sees if the personal access token is accepted by the GitHub API
+/// Args:
+/// * `token` - the github personal access token supplied by the user
+///
+/// returns whether the token is valid, invalid or couldn't be checked
+pub fn check_github_token(token: &str) -> TokenCheck {
+    if !is_github_token_format(token) {
+        return TokenCheck::Invalid(
+            "the token is either missing or doesn't start with `github_pat_`".to_string()
+        );
+    }
+    match github_api_status(token) {
+        Ok(code) => classify_github_status(code),
+        Err(e) => TokenCheck::Unknown(e),
+    }
+}
+
+/// ensure_valid_github_token checks the token before setup starts
+/// Args:
+/// * `token` - the github personal access token supplied by the user
+/// * `silent` - no user input, so exit instead of prompting
+///
+/// returns a token that the GitHub API accepted, or that we were unable to check
+pub fn ensure_valid_github_token(token: String, silent: bool) -> String {
+    let mut token = token;
+    for _ in 0..3 {
+        println!("[ ] Checking the GitHub token with the GitHub API...");
+        match check_github_token(&token) {
+            TokenCheck::Valid => {
+                println!("[+] GitHub token validated against the GitHub API");
+                return token;
+            },
+            TokenCheck::Unknown(msg) => {
+                println!("[!] Could not verify the GitHub token: {}. Continuing with setup.", msg);
+                return token;
+            },
+            TokenCheck::Invalid(msg) => {
+                println!("[!] The GitHub token was not accepted: {}", msg);
+                println!("Setup needs a github token to download from public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/");
+                if silent {
+                    println!("[!] Running in silent mode, unable to prompt for another token. Exiting.");
+                    exit(1);
+                }
+                token = Text::new("Please enter your GitHub token (starts with github_pat_):")
+                    .prompt()
+                    .unwrap();
+            },
+        }
+    }
+    println!("[!] The GitHub token is still not valid. Please generate a new one and run setup again.");
+    exit(1);
+}
 
 pub fn prog_spin_init(tick: u64, m: &MultiProgress, colour: &str) -> ProgressBar {
     let pb = m.add(ProgressBar::new_spinner());
@@ -457,7 +566,8 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
 	    "https://github.com/forensicmatt/RustyUsn",
         "https://github.com/obsidianforensics/hindsight.git",
         "https://github.com/Neo23x0/loki.git",
-        "https://github.com/MarkBaggett/srum-dump.git"
+        "https://github.com/MarkBaggett/srum-dump.git",
+        "https://github.com/Velocidex/velociraptor"
     ];
     for url in urls.iter() {
         let msg = format!("Getting: {}", url);
@@ -571,6 +681,7 @@ pub fn check_installed(tool_path: &Path) {
         "mft\\mft.exe",
         "loki\\loki.exe",
         "hayabusa\\hayabusa.exe",
+        "velociraptor\\velociraptor.exe",
     ];
     // check each tool in the list, if it exists on filesystem, try to run it, collecting only failed ones
     let err_list_tools: Vec<&str> = exe_in_tools

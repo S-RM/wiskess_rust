@@ -235,3 +235,4 @@ The following are a list of developments since the last release and are currentl
 * Fixed an issue in the network CSV in timeline, where multiple entries were shown for the same event
 * Fixed an issue with old-whip and GUI when using whipped, where some collections would not be extracted completely
 * artefact collection from disk images on Windows are now done in parallel
+* Velociraptor collections extracted using the velociraptor binary with the artefact `Windows.KapeFiles.Extract` to restore timestamps of collected files.

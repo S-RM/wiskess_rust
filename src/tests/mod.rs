@@ -21,3 +21,7 @@ pub mod path_validation_tests;
 pub mod os_config_tests;
 #[cfg(test)]
 pub mod drive_detection_tests;
+#[cfg(test)]
+pub mod velo_extract_tests;
+#[cfg(test)]
+pub mod github_token_tests;

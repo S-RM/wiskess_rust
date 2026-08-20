@@ -14,8 +14,6 @@ use indicatif::MultiProgress;
 use figrs::{Figlet, FigletOptions};
 use console::style;
 use rand::seq::SliceRandom;
-use regex::Regex;
-use inquire::Text;
 
 /// Wiskess Help - Command line arguments
 #[derive(Parser, Debug)]
@@ -203,6 +201,9 @@ fn main() {
     // Set no_collection to true - only valid for images
     let collect = args.no_collection;
 
+    // Set silent mode, so no prompts for user input
+    let silent = args.silent;
+
     // TODO: check the config file exists
 
     match args.command {
@@ -212,14 +213,8 @@ fn main() {
             check_install
         } => {
             if !check_install {
-                // check the github_token is set and matches the regex
-                let github_token: String = if !Regex::new(r"^github_pat_").unwrap().is_match(&github_token) {
-                    println!("[!] GitHub Token is either missing or doesn't start with `github_pat_`. Please check and supply one with the flag`-g github_pat_...`");
-                    println!("Setup needs a github token to download from public repos, if unsure how to setup see https://github.blog/2022-10-18-introducing-fine-grained-personal-access-tokens-for-github/");
-                    Text::new("Please enter your GitHub token (starts with github_pat_):").prompt().unwrap()
-                } else {
-                    github_token
-                };
+                // check the github_token is set, matches the regex and is accepted by the GitHub API
+                let github_token = setup::ensure_valid_github_token(github_token, silent);
                 // don't run setup if user only wants to check the wiskess has installed
                 scripts::run_setup(&tool_path, github_token, verbose);
             }
