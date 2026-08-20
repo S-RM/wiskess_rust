@@ -71,7 +71,7 @@ def make_symlink(target_dir: str, program: str, script_os: str):
 
   if script_os == 'windows':
     file_type_regex = re.compile('x-(?:dos-executable|dosexec|msdownload)')
-    file_mime_regex = re.compile('PE32\\+ executable \\(console\\) x86-64, for MS Windows')
+    file_mime_regex = re.compile('PE32\\+ executable \\(console\\) x86-64.*?, for MS Windows')
   elif script_os == 'linux':
     file_type_regex = re.compile('x(?:-pie|)-executable|application/x-sharedlib')
     file_mime_regex = re.compile('ELF 64-bit LSB (shared object|pie executable), x86-64')
@@ -90,6 +90,8 @@ def make_symlink(target_dir: str, program: str, script_os: str):
           print(f'[+] Creating link for: {f_path}, with type: {file_type}. Target file: {target_file}')
           source_file = f_path
           break
+        else:
+          print(f'[ ] Skipping file: {f_path}, with type: {file_type} and mime: {file_mime}. Not a match for {script_os} executable.')
   if source_file != '' and source_file != target_file:
     os.symlink(source_file, target_file)
     # make the source executable

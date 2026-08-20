@@ -40,3 +40,4 @@
 /wiskess_rust.exe
 /wiskess_setup.log
 .github_token
+/scripts/release.ps1

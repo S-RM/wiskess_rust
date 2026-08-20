@@ -6,6 +6,7 @@ use crate::ops::{file_ops, wiskess};
 
 use super::whip_s3;
 use super::whip_az;
+use super::whip_velo;
 
 use anyhow::bail;
 use chrono::Utc;
@@ -42,7 +43,7 @@ pub fn set_link(link: &str, folder: &str) -> String {
     url
 }
 
-/// Splits a given string by either a comma or a newline and trims each resulting substring.
+/// split_and_trim splits a given string by either a comma or a newline and trims each resulting substring.
 /// # Arguments
 /// * `data_source_list` - A string containing the source data to be split and trimmed.
 pub fn split_and_trim(data_source_list: &str) -> Vec<String> {
@@ -60,7 +61,7 @@ pub fn split_and_trim(data_source_list: &str) -> Vec<String> {
         .collect()
 }
 
-/// print and log messages
+/// print_log prints and logs messages
 pub fn print_log(msg: &str, out_log:&Path, verbose: bool) {
     if verbose {
         println!("{msg}")
@@ -78,13 +79,14 @@ pub fn url_to_path(url: &String) -> String {
     path.into_os_string().into_string().unwrap()
 }
 
-/// Pre-process some data, get its type and put it into an extracted folder
+/// pre_process_data pre-processes some data, get its type and put it into an extracted folder
 /// return the process_vector - a list of paths needing processing
 /// # Arguments
 /// * `file_path` - The file to pre-process, could be a file or folder
 /// * `log_name` - The file where logs are stored
 /// * `data_folder` - the path to where the data extracted/copied to, i.e. collection.zip is extracted to collection-extracted
-fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) -> Result<Vec<PathBuf>> {
+/// * `tool_path` - the path to the wiskess tools folder, needed to extract a velociraptor collection
+fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf, tool_path: &Path) -> Result<Vec<PathBuf>> {
     
     // log the data downloaded and its size
     let data_meta = metadata(&file_path)?;
@@ -118,14 +120,14 @@ fn pre_process_data(file_path: &Path, log_name: &Path, data_folder: &PathBuf) ->
                         process_vector.push(entry.to_path_buf())
                     },
                     "zip"|"7z" => {
-                        pre_process_zip(entry, data_folder, log_name, &mut process_vector);
+                        pre_process_zip(entry, data_folder, log_name, tool_path, &mut process_vector);
                     }
                     _ => print_log("[ ] File in folder is not a valid artefact type", log_name, true)
                 }
             }
         });
     } else if file_path.extension().unwrap() == "zip" || file_path.extension().unwrap() == "7z" {
-        pre_process_zip(&file_path.to_path_buf(), data_folder, log_name, &mut process_vector);
+        pre_process_zip(&file_path.to_path_buf(), data_folder, log_name, tool_path, &mut process_vector);
     } else {
         process_vector.push(file_path.to_path_buf());
     }
@@ -223,22 +225,18 @@ pub fn find_os_drive_letters(uploads_dir: &Path) -> Vec<char> {
     confirmed
 }
 
-/// pre-process an achive of type zip or 7z, extract using 7zip then add artefacts to a vector. If the contents
-/// has a folder in the root called uploads we treat it as a velociraptor collection and move the data into one folder.
+/// pre-process an achive of type zip or 7z, extract using velociraptor or 7zip then add artefacts to a vector.
+/// If the contents has a folder in the root called uploads we treat it as a velociraptor collection and move
+/// the data into one folder.
 /// # Arguments
 /// `data_file` - the archive file path
 /// `data_folder` - the folder where the archive is stored
 /// `log_name` - the name of the log file
+/// `tool_path` - the path to the wiskess tools folder, needed to extract a velociraptor collection
 /// `process_vector` - the vector of files that need processing, is updated in this function
-fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, process_vector: &mut Vec<PathBuf>) {
-    // if data is an archive, extract it to the extracted folder 
-    let data_str = format!("'{}'", data_file.clone().display());
-    let extract_flag = format!("-o'{}'", data_folder.display());
-    let unzip_cmd = ["x", "-aos", data_str.as_str(), extract_flag.as_str()].to_vec();
-                        
-    let bin_path = Path::new("7z.exe").to_path_buf();
-    print_log(format!("Extracting the archive {data_str}...").as_str(), log_name, true);
-    let _json_data = run_cmd(bin_path, unzip_cmd, log_name, true).unwrap();
+fn pre_process_zip(data_file: &PathBuf, data_folder: &PathBuf, log_name: &Path, tool_path: &Path, process_vector: &mut Vec<PathBuf>) {
+    // if data is an archive, extract it to the extracted folder
+    whip_velo::extract_archive(data_file, data_folder, tool_path, log_name);
     // TODO: check for archives at one level deep, adding paths to the process_vector
     // loop through the extracted archive at one level down, adding relevant data to process_vector
     let entries: Vec<PathBuf> = WalkDir::new(data_folder)
@@ -697,7 +695,7 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                 }
             };
             // pre-process data into process_vector
-            let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path)?;
+            let process_vector = pre_process_data(&data_file, &log_name, &out_folder_path, tool_path)?;
             print_log(
                 format!("Pre-processed data: {:?}", process_vector).as_str(),
                 log_name,

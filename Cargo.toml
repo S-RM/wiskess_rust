@@ -1,6 +1,6 @@
 [package]
 name = "wiskess_rust"
-version = "0.0.8"
+version = "0.0.9"
 edition = "2021"
 authors = ["Gavin Hull"]
 
@@ -39,3 +39,4 @@ windows-elevate = "0.1.0"
 askama = { version = "0.12.1", features = ["with-actix-web"] }
 sudo = "0.6.0"
 tempfile = "3.8.0"
+ureq = "3.4.0"
