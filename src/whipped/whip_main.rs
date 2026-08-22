@@ -721,7 +721,8 @@ pub async fn whip_main(args: WhippedArgs, tool_path: &PathBuf) -> Result<()> {
                 silent: true,
                 collect: false,
                 out_log: PathBuf::new(),
-                multi_pb: MultiProgress::new()
+                multi_pb: MultiProgress::new(),
+                no_timeline_parser: false
             };
             for (i, data_source) in process_vector.iter().enumerate() {
                 if i > 0 {

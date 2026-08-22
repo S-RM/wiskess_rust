@@ -8,7 +8,7 @@ use std::fs::OpenOptions;
 
 use crate::{art::paths, configs::config, init::setup};
 
-use super::{exe_ops, valid_ops, file_ops};
+use super::{exe_ops, valid_ops, file_ops, timeline};
 
 pub fn start_wiskess(args: config::MainArgs, config: &PathBuf, artefacts_config: &PathBuf, data_source: &String) {
     let (date_time_fmt, wiskess_start, main_args) = init_wiskess(args);
@@ -30,6 +30,12 @@ pub fn start_wiskess(args: config::MainArgs, config: &PathBuf, artefacts_config:
             for num_threads in [0, 1] {
                 exe_ops::run_commands(func, &main_args, &data_paths, num_threads);
             }
+    }
+
+    // Run the Wiskess Timeline Parser over the Timeline/ folder
+    if !main_args.no_timeline_parser {
+        setup::prog_spin_stop(&pb, "Wiskess - Wiskers / Enrichers / Reporters complete".to_string());
+        timeline::run_timeline_parser(&main_args);
     }
 
     setup::prog_spin_stop(&pb, "Wiskess complete".to_string());
@@ -115,7 +121,8 @@ pub(crate) fn init_wiskess(args: config::MainArgs) -> (String, chrono::prelude::
         silent: args.silent,
         collect: args.collect,
         out_log,
-        multi_pb: MultiProgress::new()
+        multi_pb: MultiProgress::new(),
+        no_timeline_parser: args.no_timeline_parser
     };
     (date_time_fmt, wiskess_start, main_args)
 }

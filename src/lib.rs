@@ -7,6 +7,7 @@ pub mod init;
 pub mod webs;
 pub mod whipped;
 pub mod utils;
+pub mod timeline_parser;
 
 #[cfg(test)]
 mod tests;

@@ -194,7 +194,8 @@ pub mod web {
             silent,
             collect: true,
             out_log: PathBuf::new(),
-            multi_pb: MultiProgress::new()
+            multi_pb: MultiProgress::new(),
+            no_timeline_parser: false
         };
 
         let mut items = struct_to_vec_main(&args);

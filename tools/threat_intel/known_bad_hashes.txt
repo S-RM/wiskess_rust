@@ -1,0 +1,7 @@
+# Offline known-bad SHA1 hash list for Amcache hash-lookup (air-gap friendly).
+# One SHA1 per line; optional label after a colon -> "sha1:label".
+# Lines starting with '#' are comments. Hashes are matched case-insensitively.
+#
+# Example:
+# da39a3ee5e6b4b0d3255bfef95601890afd80709:EICAR-test
+# These are applied BEFORE any online lookup (CIRCL / Malware Bazaar / VirusTotal).
