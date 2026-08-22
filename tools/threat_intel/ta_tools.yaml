@@ -1,0 +1,191 @@
+credential_access:
+  mimikatz:
+    mitre: T1003
+    patterns: ["mimikatz", "mimi32", "mimi64", "sekurlsa", "kiwi_passwords", "lsadump"]
+  rubeus:
+    mitre: T1558
+    patterns: ["rubeus", "asktgt", "asktgs", "kerberoast", "\\bs4u\\b"]
+  certify:
+    mitre: T1649
+    patterns: ["certify", "certipy", "forg[ae]cert"]
+  sharphound:
+    mitre: T1087.002
+    patterns: ["sharphound", "bloodhound", "azurehound"]
+  lazagne:
+    mitre: T1555
+    patterns: ["lazagne", "lazagne.exe"]
+  pypykatz:
+    mitre: T1003.001
+    patterns: ["pypykatz"]
+  procdump:
+    mitre: T1003.001
+    patterns: ["procdump", "procdump64"]
+  nanodump:
+    mitre: T1003.001
+    patterns: ["nanodump"]
+  secretsdump:
+    mitre: T1003.006
+    patterns: ["secretsdump", "impacket.*secret"]
+  ntdsutil:
+    mitre: T1003.003
+    patterns: ["ntdsutil"]
+  dcsync:
+    mitre: T1003.006
+    patterns: ["dcsync", "lsadump::dcsync"]
+
+lateral_movement:
+  psexec:
+    mitre: T1569.002
+    patterns: ["psexec", "psexesvc", "paexec"]
+  wmiexec:
+    mitre: T1047
+    patterns: ["wmiexec", "wmiprvse.*cmd"]
+  smbexec:
+    mitre: T1021.002
+    patterns: ["smbexec"]
+  atexec:
+    mitre: T1053.002
+    patterns: ["atexec"]
+  crackmapexec:
+    mitre: T1021
+    patterns: ["crackmapexec", "cme\\.exe", "nxc\\.exe", "netexec"]
+  evil_winrm:
+    mitre: T1021.006
+    patterns: ["evil-winrm", "evil_winrm"]
+  wmic_lateral:
+    mitre: T1047
+    patterns: ["wmic.*process.*call.*create", "wmic.*/node:"]
+  dcom_exec:
+    mitre: T1021.003
+    patterns: ["dcomexec", "mmc20", "shellwindows"]
+
+command_control:
+  cobalt_strike:
+    mitre: T1071.001
+    patterns: ["cobalt.?strike", "cobeacon", "cs_beacon", "beacon\\.dll", "sleeve.*beacon"]
+  remotely:
+    mitre: T1219
+    patterns: ["remotely", "remotely_agent", "remotely-win"]
+  anydesk:
+    mitre: T1219
+    patterns: ["anydesk"]
+  screenconnect:
+    mitre: T1219
+    patterns: ["screenconnect", "connectwise"]
+  atera:
+    mitre: T1219
+    patterns: ["atera_agent", "atera\\."]
+  splashtop:
+    mitre: T1219
+    patterns: ["splashtop"]
+  meshagent:
+    mitre: T1219
+    patterns: ["meshagent", "meshcentral"]
+  teamviewer:
+    mitre: T1219
+    patterns: ["teamviewer"]
+  ngrok:
+    mitre: T1572
+    patterns: ["ngrok"]
+  chisel:
+    mitre: T1572
+    patterns: ["chisel"]
+  ligolo:
+    mitre: T1572
+    patterns: ["ligolo"]
+  sliver:
+    mitre: T1071
+    patterns: ["sliver", "sliver-client"]
+  brute_ratel:
+    mitre: T1071
+    patterns: ["brute.?ratel", "badger\\.exe", "badger\\.x64\\.dll"]
+  havoc:
+    mitre: T1071
+    patterns: ["havoc\\.exe", "havoc_demon"]
+
+execution:
+  powershell_empire:
+    mitre: T1059.001
+    patterns: ["\\bempire\\b", "invoke-empire", "\\bstager\\b"]
+  covenant:
+    mitre: T1059
+    patterns: ["covenant\\.exe", "covenantc2", "\\bgrunt\\.exe\\b", "invoke-covenant"]
+
+persistence:
+  scheduled_task_tools:
+    mitre: T1053.005
+    patterns: ["schtasks.*/create"]
+
+defense_evasion:
+  process_hacker:
+    mitre: T1562.001
+    patterns: ["process.?hacker", "processhacker"]
+  pc_hunter:
+    mitre: T1562.001
+    patterns: ["pchunter"]
+  gmer:
+    mitre: T1014
+    patterns: ["gmer"]
+  iobit_unlocker:
+    mitre: T1562.001
+    patterns: ["iobitunlocker", "unlocker"]
+
+discovery:
+  adrecon:
+    mitre: T1087.002
+    patterns: ["adrecon", "ad_recon"]
+  pingcastle:
+    mitre: T1087.002
+    patterns: ["pingcastle"]
+  advanced_ip_scanner:
+    mitre: T1046
+    patterns: ["advanced.?ip.?scanner", "advanced_ip"]
+  netscan:
+    mitre: T1046
+    patterns: ["softperfect.*netscan", "netscan\\.exe"]
+  sharpmapexec:
+    mitre: T1087
+    patterns: ["sharpmapexec"]
+  adfind:
+    mitre: T1018
+    patterns: ["adfind"]
+  ldapsearch:
+    mitre: T1087.002
+    patterns: ["ldapsearch"]
+
+exfiltration:
+  rclone:
+    mitre: T1567.002
+    patterns: ["rclone"]
+  megasync:
+    mitre: T1567.002
+    patterns: ["megasync", "mega\\.nz"]
+  winscp:
+    mitre: T1048
+    patterns: ["winscp"]
+  filezilla:
+    mitre: T1048
+    patterns: ["filezilla"]
+  7zip_staging:
+    mitre: T1560.001
+    patterns: ["7z\\.exe.*-p", "7za\\.exe"]
+
+impact:
+  dragonforce:
+    mitre: T1486
+    patterns: ["dragonforce", "dragon.?force"]
+  lockbit:
+    mitre: T1486
+    patterns: ["lockbit", "lock.?bit"]
+  blackcat:
+    mitre: T1486
+    patterns: ["blackcat", "alphv", "noberus"]
+  conti:
+    mitre: T1486
+    patterns: ["conti\\.exe", "conti_ransomware", "conti_locker"]
+  royal:
+    mitre: T1486
+    patterns: ["royal.*ransom"]
+  blackbasta:
+    mitre: T1486
+    patterns: ["blackbasta", "black.?basta"]

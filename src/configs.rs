@@ -79,7 +79,8 @@ use struct_iterable::Iterable;
       pub silent: bool,
       pub out_log: PathBuf,
       pub multi_pb: MultiProgress,
-      pub collect: bool
+      pub collect: bool,
+      pub no_timeline_parser: bool
   }
 
   // Set struct for setup args

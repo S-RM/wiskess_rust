@@ -1,0 +1,3 @@
+# Offline known-good SHA1 allowlist for Amcache hash-lookup (noise reduction).
+# One SHA1 per line. Lines starting with '#' are comments. Case-insensitive.
+# Hashes here are classified "known-clean" and skip online lookups.

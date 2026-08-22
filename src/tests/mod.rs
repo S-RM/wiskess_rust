@@ -25,3 +25,5 @@ pub mod drive_detection_tests;
 pub mod velo_extract_tests;
 #[cfg(test)]
 pub mod github_token_tests;
+#[cfg(test)]
+pub mod timeline_parser_tests;

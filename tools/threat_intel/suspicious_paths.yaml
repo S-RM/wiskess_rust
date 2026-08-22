@@ -1,0 +1,104 @@
+suspicious_executable_paths:
+  - pattern: "\\\\(Users|Documents and Settings)\\\\[^\\\\]+\\\\(AppData\\\\Local\\\\Temp|Downloads|Desktop)\\\\[^\\\\]+\\.(exe|dll|bat|ps1|vbs|js|hta|scr|com|pif)"
+    reason: user_temp_execution
+    severity: med
+    mitre: T1204
+
+  - pattern: "\\\\ProgramData\\\\(?!Microsoft\\\\Windows Defender|Microsoft\\\\Windows\\\\Start Menu|Package Cache)[^\\\\]+\\.(exe|dll|bat|ps1)"
+    reason: programdata_nonstandard_exe
+    severity: med
+    mitre: T1059
+
+  - pattern: "\\$Recycle\\.Bin"
+    reason: recycle_bin_activity
+    severity: high
+    mitre: T1564.001
+
+  - pattern: "^\\\\?\\.[A-Z]?:?\\\\[^\\\\]{1,4}\\.(exe|dll|bat|ps1|vbs|scr)"
+    reason: short_name_root_drop
+    severity: high
+    mitre: T1036
+
+  - pattern: "\\\\(Windows\\\\)?(fonts|help|inf|debug|addins|IME|Migration|PolicyDefinitions|SchCache|ServiceProfiles|tracing)\\\\[^\\\\]+\\.(exe|dll)"
+    reason: exe_in_unusual_system_dir
+    severity: high
+    mitre: T1036.005
+
+  - pattern: "\\\\[a-zA-Z0-9]{1,3}\\.(exe|dll|sys)$"
+    reason: short_exe_name
+    severity: med
+    mitre: T1036
+
+  - pattern: "\\\\(Windows\\\\Temp|Temp)\\\\[^\\\\]+\\.(exe|dll|bat|ps1|vbs)"
+    reason: windows_temp_execution
+    severity: med
+    mitre: T1059
+
+  - pattern: "\\\\(perflogs|intel|public)\\\\[^\\\\]+\\.(exe|dll|bat|ps1)"
+    reason: hidden_staging_directory
+    severity: high
+    mitre: T1074.001
+
+  - pattern: "\\\\Windows\\\\System32\\\\spool\\\\drivers\\\\[^\\\\]+\\.(exe|dll)"
+    reason: print_spooler_abuse
+    severity: high
+    mitre: T1574
+
+  - pattern: "\\\\Windows\\\\(assembly|Microsoft\\.NET)\\\\[^\\\\]+\\.(exe|bat|ps1)"
+    reason: dotnet_dir_abuse
+    severity: med
+    mitre: T1036.005
+
+suspicious_filenames:
+  - pattern: "(svchost|lsass|csrss|winlogon|services|smss|explorer|spoolsv|taskhost)\\.(exe|dll)"
+    context: "NOT in \\\\Windows\\\\System32"
+    reason: masquerading_system_binary
+    severity: high
+    mitre: T1036.005
+
+  - pattern: "(cmd|powershell|pwsh)\\.(exe|dll)"
+    context: "NOT in \\\\Windows\\\\System32|\\\\Windows\\\\SysWOW64"
+    reason: masquerading_shell
+    severity: high
+    mitre: T1036.005
+
+  - pattern: "\\.(exe|dll|scr|com)\\.txt$"
+    reason: double_extension
+    severity: high
+    mitre: T1036.007
+
+  - pattern: "[^\\\\]+\\s{5,}\\.(exe|dll)"
+    reason: trailing_spaces_extension_hide
+    severity: high
+    mitre: T1036.006
+
+archive_exfiltration_patterns:
+  - pattern: "\\.(zip|rar|7z|tar|gz|cab)$"
+    context: "FileCreate in user directories"
+    reason: archive_creation_potential_staging
+    severity: low
+    mitre: T1560.001
+
+  - pattern: "\\.(zip|rar|7z)$"
+    context: "FileCreate AND FileDelete within 1 hour"
+    reason: archive_create_delete_antiforensics
+    severity: high
+    mitre: T1070.004
+
+usnjrnl_suspicious_reasons:
+  - update_reason: "FileCreate"
+    extensions: [".exe", ".dll", ".bat", ".ps1", ".vbs", ".js", ".hta", ".scr", ".com"]
+    reason: executable_created
+    severity: med
+
+  - update_reason: "FileDelete|Close"
+    extensions: [".exe", ".dll", ".bat", ".ps1", ".evtx", ".log"]
+    reason: suspicious_file_deletion
+    severity: med
+    mitre: T1070.004
+
+  - update_reason: "RenameNewName"
+    extensions: [".exe", ".dll"]
+    reason: executable_renamed
+    severity: med
+    mitre: T1036

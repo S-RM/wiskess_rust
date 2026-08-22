@@ -109,6 +109,9 @@ enum Commands {
         /// IOC list file
         #[arg(short, long)]
         ioc_file: String,
+        /// Skip running the Wiskess Timeline Parser (supertimeline/triage report/OpenSearch NDJSON) over the Timeline folder after wiskers/enrichers/reporters complete
+        #[arg(long)]
+        no_timeline_parser: bool,
     },
     OldWhip {
         /// config file of the binaries to run as processors
@@ -273,10 +276,11 @@ fn main() {
             out_path,
             start_date,
             end_date,
-            ioc_file
+            ioc_file,
+            no_timeline_parser
         } => {
             let (config, artefacts_config) = utils::check_configs(config, &tool_path, artefacts_config);
-            
+
             let args = config::MainArgs {
                 out_path,
                 start_date,
@@ -286,7 +290,8 @@ fn main() {
                 silent: args.silent,
                 collect,
                 out_log: PathBuf::new(),
-                multi_pb: MultiProgress::new()
+                multi_pb: MultiProgress::new(),
+                no_timeline_parser
             };
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },

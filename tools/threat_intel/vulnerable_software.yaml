@@ -1,0 +1,200 @@
+# Installed-software exposure rules.
+#
+# Two kinds of claim live here, and they are deliberately kept apart.
+#
+# Rules are evaluated top to bottom and the FIRST match wins, so the more
+# specific entry must come first: 'Windows Server 2012 R2' is listed above
+# 'Windows Server 2012' because the latter also matches the former's name.
+# (Rust's regex engine has no lookaround, so ordering is the mechanism.)
+#
+#   end_of_life  — a vendor support date. A product past its EOL receives no
+#                  security fixes, so "installed and unsupported" is a finding
+#                  that needs no CVE and cannot go stale in the unsafe
+#                  direction. These are public vendor dates.
+#
+#   products     — categories of software whose presence is worth an analyst's
+#                  attention on a triage: remote access, tunnelling, file
+#                  transfer, dual-use administration. Presence is NOT a
+#                  vulnerability and is never reported as one; it is reported as
+#                  "look at this", because these are the products a threat actor
+#                  installs or abuses for access.
+#
+# `min_safe_version` is supported on any `products` entry and is intentionally
+# unset in the shipped file. Asserting a fixed version is a factual claim about
+# a specific CVE, it ages badly, and a wrong one produces a confident false
+# negative. Populate it from your own threat intel, per engagement, and the
+# comparison runs automatically:
+#
+#   - pattern: '(?i)\bfortic(lient|onnect)\b'
+#     name: FortiClient
+#     category: vpn-client
+#     min_safe_version: '7.2.5'
+#     note: 'per <your source>'
+#
+# Everything not matched here is still inventoried and reported; the rules only
+# decide what gets flagged.
+
+end_of_life:
+  - pattern: '(?i)windows server 2003'
+    name: 'Windows Server 2003'
+    eol: '2015-07-14'
+  - pattern: '(?i)windows server 2008 r2'
+    name: 'Windows Server 2008 R2'
+    eol: '2020-01-14'
+  - pattern: '(?i)windows server 2008'
+    name: 'Windows Server 2008'
+    eol: '2020-01-14'
+  - pattern: '(?i)windows server 2012 r2'
+    name: 'Windows Server 2012 R2'
+    eol: '2023-10-10'
+  - pattern: '(?i)windows server 2012'
+    name: 'Windows Server 2012'
+    eol: '2023-10-10'
+  - pattern: '(?i)windows server 2016'
+    name: 'Windows Server 2016'
+    eol: '2027-01-12'
+  - pattern: '(?i)windows server 2019'
+    name: 'Windows Server 2019'
+    eol: '2029-01-09'
+  - pattern: '(?i)windows server 2022'
+    name: 'Windows Server 2022'
+    eol: '2031-10-14'
+  - pattern: '(?i)windows 7'
+    name: 'Windows 7'
+    eol: '2020-01-14'
+  - pattern: '(?i)windows 8\.1'
+    name: 'Windows 8.1'
+    eol: '2023-01-10'
+  - pattern: '(?i)adobe flash player'
+    name: 'Adobe Flash Player'
+    eol: '2020-12-31'
+  - pattern: '(?i)python 2\.7'
+    name: 'Python 2.7'
+    eol: '2020-01-01'
+  - pattern: '(?i)microsoft sql server 2008'
+    name: 'SQL Server 2008/2008 R2'
+    eol: '2019-07-09'
+  - pattern: '(?i)microsoft sql server 2012'
+    name: 'SQL Server 2012'
+    eol: '2022-07-12'
+  - pattern: '(?i)microsoft sql server 2014'
+    name: 'SQL Server 2014'
+    eol: '2024-07-09'
+
+products:
+  # Remote access and RMM. Legitimate on many estates and routinely installed by
+  # threat actors for persistence — which is why presence is reported rather
+  # than judged.
+  - pattern: '(?i)\banydesk\b'
+    name: AnyDesk
+    category: remote-access
+    note: 'remote access; frequently deployed by intrusion sets for persistence'
+  - pattern: '(?i)\bteamviewer\b'
+    name: TeamViewer
+    category: remote-access
+  - pattern: '(?i)screenconnect|connectwise control'
+    name: ScreenConnect / ConnectWise Control
+    category: remote-access
+    note: 'remote access; ScreenConnect has been a recurring initial-access vector'
+  - pattern: '(?i)\bsplashtop\b'
+    name: Splashtop
+    category: remote-access
+  - pattern: '(?i)\blogmein\b'
+    name: LogMeIn
+    category: remote-access
+  - pattern: '(?i)\bsupremo\b|\baterag?ent\b|\batera\b'
+    name: Atera / Supremo
+    category: remote-access
+  - pattern: '(?i)\bradmin\b'
+    name: Radmin
+    category: remote-access
+  - pattern: '(?i)\bdwservice\b|\bdwagent\b'
+    name: DWService
+    category: remote-access
+  - pattern: '(?i)\brustdesk\b'
+    name: RustDesk
+    category: remote-access
+  - pattern: '(?i)\bultravnc\b|\btightvnc\b|\brealvnc\b|\btigervnc\b'
+    name: VNC server
+    category: remote-access
+
+  # Tunnelling and exposure. A tunnel on a server is how an internal service
+  # reaches the internet without touching the firewall.
+  - pattern: '(?i)\bngrok\b'
+    name: ngrok
+    category: tunnel
+  - pattern: '(?i)cloudflared|cloudflare tunnel'
+    name: Cloudflare Tunnel
+    category: tunnel
+  - pattern: '(?i)\btailscale\b'
+    name: Tailscale
+    category: tunnel
+  - pattern: '(?i)\bzerotier\b'
+    name: ZeroTier
+    category: tunnel
+
+  # Edge software: the products that carry the initial-access CVEs.
+  - pattern: '(?i)\bforticlient\b|\bfortigate\b'
+    name: FortiClient / FortiGate
+    category: vpn-client
+  - pattern: '(?i)\bpulse secure\b|\bivanti connect\b'
+    name: Pulse Secure / Ivanti Connect Secure
+    category: vpn-client
+  - pattern: '(?i)\bcitrix\b.*(gateway|netscaler|adc)'
+    name: Citrix Gateway / NetScaler
+    category: edge-appliance
+  - pattern: '(?i)\bmoveit\b'
+    name: MOVEit Transfer
+    category: file-transfer
+  - pattern: '(?i)\bgoanywhere\b'
+    name: GoAnywhere MFT
+    category: file-transfer
+  - pattern: '(?i)\bfilezilla server\b'
+    name: FileZilla Server
+    category: file-transfer
+  - pattern: '(?i)\bveeam\b'
+    name: Veeam Backup
+    category: backup
+    note: 'backup infrastructure is a standard ransomware target'
+  - pattern: '(?i)\bexchange server\b'
+    name: Microsoft Exchange Server
+    category: mail-server
+  - pattern: '(?i)\bconfluence\b|\bjira\b'
+    name: Atlassian Confluence / Jira
+    category: web-application
+  - pattern: '(?i)\bmanageengine\b'
+    name: ManageEngine
+    category: web-application
+  - pattern: '(?i)\bvcenter\b|\bvmware esxi\b'
+    name: VMware vCenter / ESXi
+    category: hypervisor
+
+  # Dual-use administration and offensive tooling that occasionally arrives via
+  # an installer rather than a dropped binary.
+  - pattern: '(?i)\bprocess hacker\b|\bsystem informer\b'
+    name: Process Hacker / System Informer
+    category: dual-use
+    note: 'ships a signed kernel driver used to terminate EDR'
+  - pattern: '(?i)\bmimikatz\b'
+    name: Mimikatz
+    category: offensive
+  - pattern: '(?i)\bnmap\b|\bzenmap\b'
+    name: Nmap
+    category: dual-use
+  - pattern: '(?i)\bwireshark\b'
+    name: Wireshark
+    category: dual-use
+  - pattern: '(?i)\badvanced ip scanner\b|\badvanced port scanner\b'
+    name: Advanced IP/Port Scanner
+    category: dual-use
+    note: 'near-ubiquitous in ransomware intrusions for internal discovery'
+  - pattern: '(?i)\bnetscan\b|\bsoftperfect network scanner\b'
+    name: SoftPerfect Network Scanner
+    category: dual-use
+  - pattern: '(?i)\bputty\b|\bwinscp\b'
+    name: PuTTY / WinSCP
+    category: dual-use
+  - pattern: '(?i)\brclone\b|\bmegasync\b|\bmega\b.*\bsync\b'
+    name: rclone / MEGAsync
+    category: exfiltration-capable
+    note: 'bulk cloud transfer; a standard exfiltration tool'

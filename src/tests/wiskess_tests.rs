@@ -17,7 +17,8 @@ mod tests {
             silent: true,
             collect: false,
             out_log: PathBuf::from("/tmp/test.log"),
-            multi_pb: MultiProgress::new()
+            multi_pb: MultiProgress::new(),
+            no_timeline_parser: true
         }
     }
 
