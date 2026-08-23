@@ -9,7 +9,7 @@ artefacts:
   - name: mft
     path: '{root}/$MFT'
   - name: recycle_bin
-    path: '{root}/$Recycle.Bin'
+    path: '{root}/$Recycle.bin'
     legacy: '{root}/RECYCLER'
   - name: pagefile
     path: '{root}/pagefile.sys'
@@ -17,7 +17,7 @@ artefacts:
     path: '{root}/Users'
     legacy: "'{root}/Documents and Settings'"
   - name: consolehost_history
-    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt'
+    path: '{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt'
   - name: amcache
     path: '{root}/Windows/AppCompat/Programs/Amcache.hve'
     legacy: '{root}/Windows/appcompat/Programs/Amcache.hve'

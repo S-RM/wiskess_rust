@@ -105,7 +105,11 @@ pub(crate) fn init_wiskess(args: config::MainArgs) -> (String, chrono::prelude::
     let out_log = Path::new(&args.out_path).join(wiskess_log_name);
     file_ops::file_exists_overwrite(&out_log, args.silent);
         
-    // Write start time to log
+    // Write start time to log    
+    let version: &str = env!("CARGO_PKG_VERSION");
+    file_ops::log_msg(&out_log, format!("WISKESS Version: {}", version));
+    file_ops::log_msg(&out_log, format!("Author: Gavin Hull"));
+    file_ops::log_msg(&out_log, format!("----------------------------------------"));
     file_ops::log_msg(&out_log, format!("Starting wiskess at: {}", wiskess_start_str));
 
     // Confirm date is valid

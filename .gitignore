@@ -28,6 +28,7 @@
 !/tools/srum-dump/SRUM_TEMPLATE3.xlsx
 !/tools/srum-dump/
 !/tools/field_mapping.py
+!/tools/threat_intel/
 /output_test
 /testing_wr
 /logs

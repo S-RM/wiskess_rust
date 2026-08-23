@@ -15,6 +15,7 @@ COPY ./templates ./templates
 COPY ./web ./web
 COPY ./config ./config
 COPY ./tools ./tools
+COPY ./iocs.txt ./tools/iocs.txt
 # Copy script needed in the intermediate stage
 COPY ./tools/setup_get_git.py ./setup_get_git.py
 RUN cargo clean --release
