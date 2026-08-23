@@ -8,6 +8,7 @@ use super::file_ops;
 /// run_timeline_parser run Wiskess Timeline Parser over `{out_path}/Timeline`
 pub fn run_timeline_parser(main_args: &config::MainArgs) {
     let timeline_dir = Path::new(&main_args.out_path).join("Timeline");
+    let triage_dir = Path::new(&main_args.out_path).join("Triage");
 
     let txt = timeline_dir.join("Host_Information.txt");
     let csv = timeline_dir.join("Host_Information.csv");
@@ -27,7 +28,7 @@ pub fn run_timeline_parser(main_args: &config::MainArgs) {
         time_start: Some(main_args.start_date.clone()),
         time_end: Some(main_args.end_date.clone()),
         auto_narrow: false,
-        output_dir: timeline_dir,
+        output_dir: triage_dir.clone(),
         hayabusa_level: "med".to_string(),
         no_sigma: false,
         offline: false,
