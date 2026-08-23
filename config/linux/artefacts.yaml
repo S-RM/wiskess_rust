@@ -49,7 +49,7 @@ artefacts:
     path: '{root}/Users/*/AppData/Local/Microsoft/Terminal Server Client/Cache/'
     legacy: '{root}/Documents and Settings/*/Local Settings/Application Data/Microsoft/Terminal Server Client/Cache/'
   - name: srum
-    path: '{root}/Windows/System32/sru/SRUDB.dat'
+    path: '{root}/Windows/System32/SRU/SRUDB.dat'
   - name: system
     path: '{root}/Windows/System32/config/SYSTEM'
   - name: software
