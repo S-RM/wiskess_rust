@@ -380,7 +380,7 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
     // `.json` because `worker.py` skips anything not ending in `json`, and
     // `.jsonl` does not — the two files above are never picked up.
     let (os_count, os_path) =
-        crate::timeline_parser::output::supertimeline::write_opensearch_ndjson(&all_events, &args.output_dir, &hostname)?;
+        crate::timeline_parser::output::supertimeline::write_opensearch_ndjson(&all_events, &args.timeline_dir, &hostname)?;
     eprintln!("[*] OpenSearch NDJSON: {} events -> {}", os_count, os_path.display());
     let elapsed = start.elapsed().as_secs_f64();
     let detection = DetectionCoverage {
