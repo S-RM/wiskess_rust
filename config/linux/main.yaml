@@ -114,15 +114,15 @@ wiskers:
     outfile: prefetch.csv
     input: prefetch
     github: https://github.com/EricZimmerman/Prefetch.git
-  - name: SrumECmd
-    binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/SrumECmd.dll -f {input} -r {input_other} --csv {outfolder}'
-    outfolder: Network
-    outfile: '*_SrumECmd_*.csv'
-    input: srum
-    input_other: software
-    valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
-    github: https://github.com/EricZimmerman/SrumECmd.git
+  # - name: SrumECmd
+  #   binary: '{tool_path}/.dotnet/dotnet'
+  #   args: '{tool_path}/Get-ZimmermanTools/net9/SrumECmd.dll -f {input} -r {input_other} --csv {outfolder}'
+  #   outfolder: Network
+  #   outfile: '*_SrumECmd_*.csv'
+  #   input: srum
+  #   input_other: software
+  #   valid_path: '{root}/Windows/System32/SRU/SRUDB.dat'
+  #   github: https://github.com/EricZimmerman/SrumECmd.git
   # - name: chainsaw_srum
   #   binary: '{tool_path}/chainsaw/chainsaw.exe'
   #   args: 'analyse srum --software {input}/config/SOFTWARE {input}/SRU/SRUDB.dat --output {outfolder}/{outfile}'
@@ -131,14 +131,14 @@ wiskers:
   #   outfolder: Network
   #   outfile: chainsaw_srum.csv
   #   github: https://github.com/WithSecureLabs/chainsaw.git
-  - name: SumECmd
-    binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/SumECmd.dll -d {input} --csv {outfolder}'
-    outfolder: Network
-    outfile: '*SumECmd*.csv'
-    input: sum
-    para: false
-    github: https://github.com/EricZimmerman/SumECmd.git
+  # - name: SumECmd
+  #   binary: '{tool_path}/.dotnet/dotnet'
+  #   args: '{tool_path}/Get-ZimmermanTools/net9/SumECmd.dll -d {input} --csv {outfolder}'
+  #   outfolder: Network
+  #   outfile: '*SumECmd*.csv'
+  #   input: sum
+  #   para: false
+  #   github: https://github.com/EricZimmerman/SumECmd.git
   - name: srum-dump
     binary: '{tool_path}/venv/bin/python3'
     args: '{tool_path}/srum-dump/srum-dump/srum_dump.py -i {input} -o {outfolder} -r {input_other} -e dissect -f csv --NO_CONFIRM'

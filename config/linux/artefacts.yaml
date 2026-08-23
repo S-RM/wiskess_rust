@@ -9,7 +9,7 @@ artefacts:
   - name: mft
     path: '{root}/$MFT'
   - name: recycle_bin
-    path: '{root}/$Recycle.Bin'
+    path: '{root}/$Recycle.bin'
     legacy: '{root}/RECYCLER'
   - name: pagefile
     path: '{root}/pagefile.sys'
