@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
     use std::fs;
-    use crate::art::paths::find_case_insensitive;
+    use indicatif::MultiProgress;
+    use crate::art::paths::{self, find_case_insensitive};
+    use crate::configs::config::{Artefacts, MainArgs};
 
     /// Test path exists check returns true for existing path
     #[test]
@@ -192,6 +194,79 @@ mod tests {
             resolved.is_none(),
             "find_case_insensitive should return None when no matching entry exists"
         );
+    }
+
+    /// Regression test: check_art must resolve a wildcarded artefact path even
+    /// when the config's casing (PSReadline) doesn't match the real on-disk
+    /// casing (PSReadLine), and collect_consolehost must then actually copy
+    /// the file through - reproducing the bug where ConsoleHost_history.txt
+    /// was silently skipped depending on the casing used on the source host.
+    #[test]
+    fn test_consolehost_history_case_mismatch_is_collected() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Real on-disk folder uses the correct Windows casing: PSReadLine
+        let history_dir = root
+            .join("Users")
+            .join("testuser")
+            .join("AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine");
+        fs::create_dir_all(&history_dir).unwrap();
+        let history_file = history_dir.join("ConsoleHost_history.txt");
+        fs::write(&history_file, b"Get-Process\n").unwrap();
+
+        let out_dir = temp_dir.path().join("out");
+        fs::create_dir_all(&out_dir).unwrap();
+
+        let main_args = MainArgs {
+            out_path: out_dir.to_str().unwrap().to_string(),
+            start_date: "2023-01-01".to_string(),
+            end_date: "2023-12-31".to_string(),
+            tool_path: PathBuf::from("/tmp/tools"),
+            ioc_file: "test_iocs.txt".to_string(),
+            silent: true,
+            collect: false,
+            out_log: out_dir.join("test.log"),
+            multi_pb: MultiProgress::new(),
+            no_timeline_parser: true,
+        };
+
+        // Config path deliberately mismatches the real on-disk "PSReadLine" casing
+        let artefact = Artefacts {
+            name: "consolehost_history".to_string(),
+            path: "{root}/Users/*/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadline/ConsoleHost_history.txt".to_string(),
+            legacy: "".to_string(),
+        };
+
+        let root_str = root.to_str().unwrap().to_string();
+        let data_paths = paths::check_art(vec![artefact], &root_str, true, &main_args);
+
+        let resolved = data_paths.get("consolehost_history");
+        assert!(
+            resolved.is_some_and(|p| p != "wiskess_none"),
+            "expected consolehost_history to resolve despite the case mismatch, got {:?}",
+            resolved
+        );
+
+        paths::collect_consolehost(&data_paths, &main_args);
+
+        // Don't assert on the exact username in the filename: extract_user()
+        // matches the first "Users/<name>" segment in the full path, which on
+        // some CI/dev machines can be the real profile dir the temp path lives
+        // under rather than the synthetic "testuser" segment created above.
+        // What matters here is that the file was actually collected.
+        let dest_dir = out_dir.join("PSReadLine");
+        let collected: Vec<_> = fs::read_dir(&dest_dir)
+            .unwrap_or_else(|e| panic!("expected {} to exist after collect_consolehost: {e}", dest_dir.display()))
+            .flatten()
+            .filter(|entry| entry.file_name().to_string_lossy().ends_with("_ConsoleHost_history.txt"))
+            .collect();
+        assert_eq!(
+            collected.len(), 1,
+            "expected exactly one collected ConsoleHost_history.txt in {}, found {:?}",
+            dest_dir.display(), collected.iter().map(|e| e.file_name()).collect::<Vec<_>>()
+        );
+        assert_eq!(fs::read_to_string(collected[0].path()).unwrap(), "Get-Process\n");
     }
 
     /// Test path with spaces handling

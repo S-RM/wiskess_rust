@@ -1,6 +1,6 @@
 pub mod paths {
     use std::{env, fs, path::Path, collections::HashMap};
-    use glob::{glob, glob_with, MatchOptions};
+    use glob::{glob_with, MatchOptions};
     use inquire::Text;
     use regex::Regex;
     use rayon::prelude::*;
@@ -319,18 +319,22 @@ pub mod paths {
     }
 
     fn is_glob_path(path_str: &String) -> bool {
-        // Get path from glob based path  
-        for entry in glob(path_str).expect("Unable to read glob pattern") {
+        // Get path from glob based path, matched case-insensitively
+        let opts = MatchOptions { case_sensitive: false, ..Default::default() };
+        let entries = match glob_with(path_str, opts) {
+            Ok(entries) => entries,
+            Err(e) => {
+                println!("{:?}", e);
+                return false;
+            }
+        };
+        // Don't bail on the first Err
+        for entry in entries {
             match entry {
-                Ok(_) => {
-                    return true;
-                },
-                Err(e) => {
-                    println!("{:?}", e);
-                    return false;
-                }
+                Ok(_) => return true,
+                Err(e) => println!("{:?}", e),
             }
         }
-        return false
+        false
     }
 }
