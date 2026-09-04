@@ -9,6 +9,8 @@ import stat
 import filetype
 import re
 import shutil
+import gzip
+import tarfile
 import magic
 from time import sleep
 
@@ -31,8 +33,16 @@ def get_files(response: str, target_dir: str, backoff=1, max_retries=3):
           with zipfile.ZipFile(filename, 'r') as zip_ref:
             zip_ref.extractall(target_dir)
         elif file_type.mime == 'application/gzip':
-          # extract it
-          shutil.unpack_archive(filename, target_dir)
+          if tarfile.is_tarfile(filename):
+            # extract it
+            shutil.unpack_archive(filename, target_dir)
+          else:
+            # a single gzipped file, i.e. velociraptor-*-linux-amd64-sumo-musl.gz
+            out_file = os.path.join(target_dir, re.sub('\\.gz$', '', os.path.basename(filename)))
+            with gzip.open(filename, 'rb') as f_in, open(out_file, 'wb') as f_out:
+              shutil.copyfileobj(f_in, f_out)
+            out_stats = os.stat(out_file)
+            os.chmod(out_file, out_stats.st_mode | 0o774)
         elif file_type.mime in ('application/x-msdownload', 'application/x-executable', 'x-pie-executable', 'x-dos-executable', 'x-dosexec', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'):
           shutil.copy(filename, target_dir)
         else:
@@ -48,7 +58,7 @@ def get_files(response: str, target_dir: str, backoff=1, max_retries=3):
           backoff += 1
           sleep(backoff * 5)
           try:
-            urllib.request.urlretrieve(url['browser_download_url'], filename, bacjkoff=backoff)
+            urllib.request.urlretrieve(url['browser_download_url'], filename)
           except HTTPError as e:
             print(f'[!] HTTPError downloading files on retry: {e.code} - {e.reason}')
             print(f'[!] URL: {url["browser_download_url"]}')
