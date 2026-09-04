@@ -156,6 +156,7 @@ pub fn parse(
             user: user_profile.to_string(),
             hostname: hostname.to_string(),
             detection_rule: "browser_analysis".to_string(),
+            ..Default::default()
         });
     }
 

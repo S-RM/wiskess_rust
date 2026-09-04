@@ -80,7 +80,8 @@ use struct_iterable::Iterable;
       pub out_log: PathBuf,
       pub multi_pb: MultiProgress,
       pub collect: bool,
-      pub no_timeline_parser: bool
+      pub no_timeline_parser: bool,
+      pub restoration_date: Option<String>
   }
 
   // Set struct for setup args

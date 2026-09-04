@@ -6,7 +6,10 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::LazyLock;
 
-use crate::timeline_parser::config::{severity_order, TimeWindow};
+use crate::timeline_parser::config::{severity_order, PipelineConfig, TimeWindow};
+use crate::timeline_parser::detectors::classify::Automation;
+use crate::timeline_parser::detectors::restoration::{self, PHASE_POST, PHASE_PRE, PHASE_PROCESS, PHASE_RESPONDER};
+use crate::timeline_parser::parsers::host_info::HostIdentity;
 use crate::timeline_parser::detectors::ioc_matcher::IocCoverage;
 use crate::timeline_parser::detectors::restoration::{Continuity, GapKind};
 use crate::timeline_parser::detectors::software::{SoftwareInventory, Verdict};
@@ -149,11 +152,16 @@ impl Agg {
         if so > self.max_sev {
             self.max_sev = so;
         }
-        if self.first.is_empty() || e.timestamp < self.first {
-            self.first = e.timestamp.clone();
-        }
-        if e.timestamp > self.last {
-            self.last = e.timestamp.clone();
+        // A timestamp that does not parse must never define a first/last.
+        // `20200922` sorts below every ISO value, and on one host it silently
+        // became the start of the case-wide activity span.
+        if crate::timeline_parser::detectors::restoration::timestamp_is_usable(&e.timestamp) {
+            if self.first.is_empty() || e.timestamp < self.first {
+                self.first = e.timestamp.clone();
+            }
+            if e.timestamp > self.last {
+                self.last = e.timestamp.clone();
+            }
         }
         if !e.mitre_tactic.is_empty() {
             self.tactics.insert(e.mitre_tactic.clone());
@@ -216,21 +224,40 @@ fn write_detection_coverage<W: Write>(w: &mut W, d: &DetectionCoverage) -> Resul
     Ok(())
 }
 
+/// Everything the report needs beyond the events themselves.
+pub struct ReportContext<'a> {
+    pub window: &'a Option<TimeWindow>,
+    pub identity: &'a HostIdentity,
+    pub elapsed: f64,
+    pub gaps: &'a [CollectionGap],
+    pub geo: &'a GeoReaders,
+    pub ioc_coverage: &'a IocCoverage,
+    pub detection: &'a DetectionCoverage,
+    pub continuity: &'a Continuity,
+    pub software: &'a SoftwareInventory,
+    pub cfg: &'a PipelineConfig,
+    pub automations: &'a [Automation],
+    /// A restoration date the operator supplied, as opposed to one inferred.
+    pub restoration_supplied: Option<&'a str>,
+}
+
+/// Write the triage report and hand back its text.
+///
+/// The text is returned, not just written, because the markdown narrative is
+/// otherwise unreachable: a consumer reading this tool's JSON from an index
+/// never sees the report at all, and the sections below are the only place
+/// several of these findings are stated in full. The caller indexes them.
 pub fn generate_report(
     events: &[UnifiedEvent],
-    window: &Option<TimeWindow>,
-    hostname: &str,
-    elapsed: f64,
-    gaps: &[CollectionGap],
-    geo: &GeoReaders,
-    ioc_coverage: &IocCoverage,
-    detection: &DetectionCoverage,
-    continuity: &Continuity,
-    software: &SoftwareInventory,
+    ctx: &ReportContext<'_>,
     report_path: &Path,
-) -> Result<()> {
-    let file = File::create(report_path)?;
-    let mut w = BufWriter::new(file);
+) -> Result<String> {
+    let ReportContext {
+        window, identity, elapsed, gaps, geo, ioc_coverage, detection, continuity, software,
+        cfg, automations, restoration_supplied,
+    } = *ctx;
+    let hostname = identity.name.as_str();
+    let mut w: Vec<u8> = Vec::new();
 
     let mut sev_counts: HashMap<&str, usize> = HashMap::new();
     for e in events {
@@ -269,21 +296,756 @@ pub fn generate_report(
     }
     writeln!(w)?;
 
+    write_identity(&mut w, identity)?;
     write_detection_coverage(&mut w, detection)?;
     write_continuity(&mut w, continuity)?;
+    write_phases(&mut w, events, continuity, restoration_supplied)?;
+    write_evidence_coverage(&mut w, events, continuity)?;
 
     write_user_table(&mut w, events)?;
     write_ip_table(&mut w, events, geo)?;
+    write_external_touchpoints(&mut w, events, geo)?;
     write_hostname_table(&mut w, events)?;
     write_access_timeline(&mut w, events)?;
+    write_baseline(&mut w, events, cfg)?;
     write_lateral_section(&mut w, events)?;
 
     write_ta_tools(&mut w, events)?;
     write_iocs(&mut w, events, ioc_coverage)?;
     write_software(&mut w, software)?;
+    write_classifications(&mut w, events, automations)?;
     write_tactic_findings(&mut w, events)?;
     write_gaps(&mut w, gaps)?;
 
+    let markdown = String::from_utf8(w)
+        .map_err(|e| anyhow::anyhow!("report is not valid UTF-8: {e}"))?;
+    let file = File::create(report_path)?;
+    let mut out = BufWriter::new(file);
+    out.write_all(markdown.as_bytes())?;
+    out.flush()?;
+    Ok(markdown)
+}
+
+
+// ---------------------------------------------------------------------------
+// Device identity, external touchpoints, evidence coverage, phases
+// ---------------------------------------------------------------------------
+
+/// State the host's name, and any second name the collection resolved for it.
+///
+/// The divergence is real information and it belongs in the report as a
+/// readable line, not only as a comma-joined field that a consumer has to
+/// already know to look for.
+fn write_identity<W: Write>(w: &mut W, id: &HostIdentity) -> Result<()> {
+    writeln!(w, "## Device Identity")?;
+    writeln!(w)?;
+    let aliases = id.aliases();
+    if aliases.is_empty() {
+        writeln!(w, "- **Device name**: {}", cell(&id.name))?;
+        writeln!(w)?;
+        return Ok(());
+    }
+
+    let names: Vec<&str> = aliases.iter().map(|(_, n)| n.as_str()).collect();
+    writeln!(w, "- **Device name**: {} (also resolves to {})",
+        cell(&id.name), cell(&names.join(", ")))?;
+    writeln!(w)?;
+    writeln!(w, "> **This host answers to more than one name.** Output for it is filed under \
+        `{}`. Anything querying by {} will not find it unless it also asks for that name.",
+        cell(&id.name), names.iter().map(|n| format!("`{n}`")).collect::<Vec<_>>().join(" or "))?;
+    writeln!(w)?;
+    writeln!(w, "| Reported by | Name |")?;
+    writeln!(w, "|-------------|------|")?;
+    for (source, name) in &id.observed {
+        writeln!(w, "| {} | {} |", cell(source), cell(name))?;
+    }
+    writeln!(w)?;
+    Ok(())
+}
+
+/// Is this a public (routable) IPv4 — not RFC1918, loopback, link-local,
+/// CGNAT, multicast, broadcast or documentation space?
+fn is_public_ip(ip: &str) -> bool {
+    let Ok(a) = ip.parse::<std::net::Ipv4Addr>() else { return false };
+    let o = a.octets();
+    !(a.is_private()
+        || a.is_loopback()
+        || a.is_link_local()
+        || a.is_broadcast()
+        || a.is_multicast()
+        || a.is_unspecified()
+        || o[0] == 0
+        || (o[0] == 100 && (64..128).contains(&o[1]))     // CGNAT 100.64/10
+        || (o[0] == 192 && o[1] == 0 && o[2] == 2)        // TEST-NET-1
+        || (o[0] == 198 && (18..20).contains(&o[1]))      // benchmarking
+        || (o[0] == 198 && o[1] == 51 && o[2] == 100)     // TEST-NET-2
+        || (o[0] == 203 && o[1] == 0 && o[2] == 113))     // TEST-NET-3
+}
+
+/// A domain reached through a URL: `https://host/...`, `ftp://host`, `\\host\share`.
+static URL_HOST_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\b(?:https?|ftp|ftps|ws|wss)://(?:[^/@\s"'|,;)\]]*@)?([a-z0-9.\-]+\.[a-z]{2,24})"#)
+        .unwrap()
+});
+
+/// A domain named by a field that says it is one — a DNS query name, a URL
+/// field, a server or host field.
+static LABELLED_HOST_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r#"(?i)\b(?:QueryName|DnsQuery|DestinationHostname|TargetServerName|ServerName|HostName|Host|Domain|Url|Uri)["' :=]{1,4}\s*([a-z0-9][a-z0-9.\-]*\.[a-z]{2,24})\b"#,
+    )
+    .unwrap()
+});
+
+/// Suffixes that make a "domain-looking" token a filename, a version string or
+/// an internal name rather than an external domain.
+const NOT_A_DOMAIN_SUFFIX: &[&str] = &[
+    ".exe", ".dll", ".sys", ".log", ".tmp", ".dat", ".csv", ".json", ".xml", ".txt", ".evtx",
+    ".ps1", ".bat", ".cmd", ".msi", ".cab", ".inf", ".ini", ".lnk", ".db", ".etl", ".mui",
+    ".zip", ".rar", ".7z", ".png", ".jpg", ".gif", ".pdf", ".docx", ".xlsx",
+    ".local", ".localdomain", ".internal", ".corp", ".lan", ".home", ".arpa", ".invalid",
+];
+
+/// Does this token read as an external domain name?
+fn looks_like_external_domain(token: &str) -> bool {
+    let t = token.trim_end_matches('.').to_lowercase();
+    if t.parse::<std::net::Ipv4Addr>().is_ok() {
+        return false;
+    }
+    if NOT_A_DOMAIN_SUFFIX.iter().any(|s| t.ends_with(s)) {
+        return false;
+    }
+    if t.matches('.').count() < 1 {
+        return false;
+    }
+    // A numeric last label is a version string (`4.18.2311.4`), not a TLD.
+    let tld = t.rsplit('.').next().unwrap_or("");
+    tld.len() >= 2 && tld.len() <= 24 && tld.chars().all(|c| c.is_ascii_alphabetic())
+}
+
+/// External domains an event actually names, as opposed to strings that happen
+/// to contain a dot.
+///
+/// **Deliberately conservative.** A free-text scan for "something.something"
+/// pulls in usernames (`user.name`), download filenames (`audit.zip` — `.zip`
+/// is a real TLD), .NET assembly names
+/// (`microsoft.azure.activedirectory.synchronization.upgrader`) and shimcache
+/// entries, and presents every one of them as a domain this host touched. A
+/// section whose purpose is to stop a security product's blocklist being read as
+/// 23 compromises must not manufacture its own false signal on the way.
+///
+/// So a domain is taken only from a URL, or from a field that says it is a host
+/// (`QueryName`, `DestinationHostname`, `Url`, …), or from an operator-supplied
+/// IOC. Bare domain-shaped strings in free text remain in the supertimeline,
+/// where an analyst can search for them, and are not asserted here.
+fn extract_domains(e: &UnifiedEvent) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    let mut take = |d: &str| {
+        let d = d.trim().trim_end_matches('.').to_lowercase();
+        if looks_like_external_domain(&d) {
+            out.insert(d);
+        }
+    };
+    for c in URL_HOST_RE.captures_iter(&e.description) {
+        take(&c[1]);
+    }
+    for c in LABELLED_HOST_RE.captures_iter(&e.description) {
+        take(&c[1]);
+    }
+    for ind in &e.indicators {
+        for tag in ["IOC:", "IOC_DOMAIN:", "DOMAIN:"] {
+            if let Some(v) = ind.strip_prefix(tag) {
+                take(v);
+            }
+        }
+    }
+    out
+}
+
+/// Where a string was seen: something the host *did*, or something its software
+/// is *configured* with.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+enum Provenance {
+    /// A network connection, DNS resolution, browser visit or process execution.
+    Activity,
+    /// A registry value, policy or product settings tree.
+    Configuration,
+}
+
+impl Provenance {
+    fn of(e: &UnifiedEvent) -> Provenance {
+        if e.classification.starts_with("config:")
+            || matches!(e.source.as_str(), "registry" | "regripper")
+            || crate::timeline_parser::detectors::classify::is_configuration_key(&e.description)
+        {
+            Provenance::Configuration
+        } else {
+            Provenance::Activity
+        }
+    }
+}
+
+#[derive(Default)]
+struct Touchpoint {
+    hits: usize,
+    max_sev: u8,
+    first: String,
+    last: String,
+    sources: std::collections::BTreeSet<String>,
+    example: String,
+}
+
+impl Touchpoint {
+    fn observe(&mut self, e: &UnifiedEvent) {
+        self.hits += 1;
+        let so = severity_order(&e.severity);
+        if so > self.max_sev {
+            self.max_sev = so;
+        }
+        if crate::timeline_parser::detectors::restoration::timestamp_is_usable(&e.timestamp) {
+            if self.first.is_empty() || e.timestamp < self.first {
+                self.first = e.timestamp.clone();
+            }
+            if e.timestamp > self.last {
+                self.last = e.timestamp.clone();
+            }
+        }
+        self.sources.insert(e.source.clone());
+        if self.example.is_empty() {
+            self.example = trunc_desc(&e.description, &e.indicators);
+        }
+    }
+}
+
+/// External IP addresses and domains this host's evidence touched.
+///
+/// Split by provenance, and that split is the whole point. An F-Secure
+/// Ultralight registry value (`...\Settings\nif.untrusted_urls`) enumerates
+/// dozens of domains in a `REG_MULTI_SZ` — the product's own sinkhole list,
+/// carrying `anydesk.com` and `teamviewer.com` beside genuinely malicious-looking
+/// names. It appeared on 23 hosts in one pilot and was first read as 23 separate
+/// compromises. A section that lists everything matching a string pattern
+/// manufactures exactly that, at scale.
+fn write_external_touchpoints<W: Write>(
+    w: &mut W,
+    events: &[UnifiedEvent],
+    geo: &GeoReaders,
+) -> Result<()> {
+    let mut ips: HashMap<(String, Provenance), Touchpoint> = HashMap::new();
+    let mut domains: HashMap<(String, Provenance), Touchpoint> = HashMap::new();
+
+    for e in events {
+        let prov = Provenance::of(e);
+        let mut seen_ip: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for c in IP_RE.captures_iter(&e.description) {
+            seen_ip.insert(c[1].to_string());
+        }
+        for ind in &e.indicators {
+            for tag in ["LOGON_FROM:", "COMPROMISED_IP:", "IOC:", "IP:"] {
+                if let Some(v) = ind.strip_prefix(tag) {
+                    if let Some(c) = IP_RE.captures(v) {
+                        seen_ip.insert(c[1].to_string());
+                    }
+                }
+            }
+        }
+        for ip in seen_ip {
+            if is_public_ip(&ip) {
+                ips.entry((ip, prov)).or_default().observe(e);
+            }
+        }
+
+        for d in extract_domains(e) {
+            domains.entry((d, prov)).or_default().observe(e);
+        }
+    }
+
+    writeln!(w, "## External Touchpoints (public IPs and domains)")?;
+    writeln!(w)?;
+    if ips.is_empty() && domains.is_empty() {
+        writeln!(w, "No public IP address or external domain was observed in this host's parsed \
+            evidence. Note that this is a statement about the artefacts collected, not about the \
+            host's network activity as a whole — no firewall, proxy or DNS log is in scope here.")?;
+        writeln!(w)?;
+        return Ok(());
+    }
+
+    let mut activity_ips: Vec<_> = ips.iter().filter(|((_, p), _)| *p == Provenance::Activity).collect();
+    let mut config_ips: Vec<_> = ips.iter().filter(|((_, p), _)| *p == Provenance::Configuration).collect();
+    let mut activity_dom: Vec<_> = domains.iter().filter(|((_, p), _)| *p == Provenance::Activity).collect();
+    let mut config_dom: Vec<_> = domains.iter().filter(|((_, p), _)| *p == Provenance::Configuration).collect();
+    for v in [&mut activity_ips, &mut config_ips, &mut activity_dom, &mut config_dom] {
+        v.sort_by(|a, b| b.1.max_sev.cmp(&a.1.max_sev)
+            .then(b.1.hits.cmp(&a.1.hits))
+            .then(a.0 .0.cmp(&b.0 .0)));
+    }
+
+    writeln!(w, "### Observed in activity")?;
+    writeln!(w)?;
+    writeln!(w, "Seen in network, browser, execution or event-log evidence — that is, in a record \
+        of something this host did. Domains are taken only from URLs, from fields that say they \
+        are hosts (`QueryName`, `DestinationHostname`, …), or from supplied IOCs; a bare \
+        domain-shaped string in free text is not asserted here as a domain this host contacted.")?;
+    writeln!(w)?;
+    if activity_ips.is_empty() && activity_dom.is_empty() {
+        writeln!(w, "None.")?;
+        writeln!(w)?;
+    } else {
+        writeln!(w, "| Indicator | Kind | Hits | Max Sev | First Seen | Last Seen | Sources | Geo / ASN |")?;
+        writeln!(w, "|-----------|------|------|---------|-----------|-----------|---------|-----------|")?;
+        for ((ip, _), t) in &activity_ips {
+            let g = geo.lookup(ip);
+            let geo_cell = if g.is_empty() { "—".to_string() }
+                else if g.is_anonymizing() { format!("⚠ {}", g.summary()) }
+                else { g.summary() };
+            writeln!(w, "| {} | public IP | {} | {} | {} | {} | {} | {} |",
+                ip, t.hits, sev_label(t.max_sev), t.first, t.last,
+                cell(&t.sources.iter().cloned().collect::<Vec<_>>().join(", ")), cell(&geo_cell))?;
+        }
+        for ((d, _), t) in &activity_dom {
+            writeln!(w, "| {} | domain | {} | {} | {} | {} | {} | — |",
+                cell(d), t.hits, sev_label(t.max_sev), t.first, t.last,
+                cell(&t.sources.iter().cloned().collect::<Vec<_>>().join(", ")))?;
+        }
+        writeln!(w)?;
+    }
+
+    if !config_ips.is_empty() || !config_dom.is_empty() {
+        writeln!(w, "### Present in configuration only — NOT evidence of contact")?;
+        writeln!(w)?;
+        writeln!(w, "These strings were read out of registry values, policy or security-product \
+            settings. A blocklist naming a domain is the software saying it would block it, not \
+            the host saying it went there. Do not read a row below as a connection.")?;
+        writeln!(w)?;
+        writeln!(w, "| Indicator | Kind | Hits | Sources | Where |")?;
+        writeln!(w, "|-----------|------|------|---------|-------|")?;
+        for ((ip, _), t) in config_ips.iter().take(50) {
+            writeln!(w, "| {} | public IP | {} | {} | {} |", ip, t.hits,
+                cell(&t.sources.iter().cloned().collect::<Vec<_>>().join(", ")), cell(&t.example))?;
+        }
+        for ((d, _), t) in config_dom.iter().take(50) {
+            writeln!(w, "| {} | domain | {} | {} | {} |", cell(d), t.hits,
+                cell(&t.sources.iter().cloned().collect::<Vec<_>>().join(", ")), cell(&t.example))?;
+        }
+        let extra = (config_ips.len() + config_dom.len()).saturating_sub(100);
+        if extra > 0 {
+            writeln!(w, "\n_… {extra} more configuration-sourced strings; the complete set is in the supertimeline._")?;
+        }
+        writeln!(w)?;
+    }
+    Ok(())
+}
+
+/// What each artefact family could see, and where its record starts.
+///
+/// "Treating a start-of-available-log as a start-of-activity is the flaw running
+/// through the whole timing table." A 239-day "gap" that is really the edge of
+/// log retention is an evidence-availability boundary, not attacker cadence, and
+/// a finding sitting at that boundary means *we cannot see earlier* — which is
+/// categorically different from *nothing happened earlier*.
+fn write_evidence_coverage<W: Write>(
+    w: &mut W,
+    events: &[UnifiedEvent],
+    c: &Continuity,
+) -> Result<()> {
+    #[derive(Default)]
+    struct Span {
+        count: usize,
+        first: String,
+        last: String,
+        first_hit: String,
+    }
+    let mut by_source: HashMap<&str, Span> = HashMap::new();
+    for e in events {
+        if !crate::timeline_parser::detectors::restoration::timestamp_is_usable(&e.timestamp) {
+            continue;
+        }
+        let s = by_source.entry(e.source.as_str()).or_default();
+        s.count += 1;
+        if s.first.is_empty() || e.timestamp < s.first {
+            s.first = e.timestamp.clone();
+        }
+        if e.timestamp > s.last {
+            s.last = e.timestamp.clone();
+        }
+        if severity_order(&e.severity) >= severity_order("high")
+            && (s.first_hit.is_empty() || e.timestamp < s.first_hit)
+        {
+            s.first_hit = e.timestamp.clone();
+        }
+    }
+    if by_source.is_empty() {
+        return Ok(());
+    }
+
+    writeln!(w, "## Evidence Coverage (what could be seen, and from when)")?;
+    writeln!(w)?;
+    if let Some(k) = &c.collection_at {
+        writeln!(w, "- **Collected at**: {} (from the host's own Security log retention range)", k)?;
+    }
+    if let Some(r) = &c.security_log_retention {
+        writeln!(w, "- **Security log retention**: {}", r)?;
+    }
+    if let (Some(f), Some(l)) = (&c.series_first, &c.series_last) {
+        writeln!(w, "- **Event-log record actually spans**: {f} to {l} — this is the \
+            retention boundary, and it is the only artefact family here whose true \
+            earliest is known")?;
+    }
+    writeln!(w)?;
+    writeln!(w, "| Artefact family | Events kept | Earliest in output | Latest in output | Earliest high+ finding | At the retention edge? |")?;
+    writeln!(w, "|-----------------|-------------|--------------------|------------------|------------------------|------------------------|")?;
+    let mut rows: Vec<_> = by_source.into_iter().collect();
+    rows.sort_by_key(|(k, _)| *k);
+    // The true earliest is only known where nothing filtered it: the continuity
+    // scan reads every row of event-logs.csv, including the ones the parser
+    // discards. Every other family's minimum is the earliest row that *survived
+    // filtering*, which is a fact about the filter, not about the evidence — so
+    // no boundary claim is made from it.
+    let record_start = c.series_first.as_deref().and_then(restoration::parse_ts);
+    for (source, s) in rows {
+        let edge = if source == "event-logs" {
+            match (record_start, restoration::parse_ts(&s.first_hit)) {
+                (Some(a), Some(b)) if (b - a).num_hours().abs() <= 24 => {
+                    "**yes — cannot see earlier**"
+                }
+                (Some(_), Some(_)) => "no",
+                _ => "—",
+            }
+        } else {
+            "not determinable"
+        };
+        writeln!(w, "| {} | {} | {} | {} | {} | {} |",
+            source, s.count, s.first, s.last,
+            if s.first_hit.is_empty() { "—" } else { &s.first_hit },
+            edge)?;
+    }
+    writeln!(w)?;
+    writeln!(w, "**\"Earliest in output\" is not \"earliest available\".** Every family except \
+        `event-logs` is filtered before it reaches this table, so its minimum is the earliest row \
+        that survived filtering — a fact about the filter, not about what the artefact holds. \
+        No retention claim is drawn from those rows.")?;
+    writeln!(w)?;
+    writeln!(w, "Where the boundary *is* known, it bounds the conclusion: a finding at the edge \
+        of the retained record means **we cannot see earlier**, which is categorically different \
+        from **nothing happened earlier**. A long \"gap\" measured back to that edge is an \
+        evidence-availability boundary, not attacker cadence.")?;
+    writeln!(w)?;
+    Ok(())
+}
+
+/// Findings after the restoration date, partitioned so the interesting category
+/// is small and loud.
+fn write_phases<W: Write>(
+    w: &mut W,
+    events: &[UnifiedEvent],
+    c: &Continuity,
+    supplied: Option<&str>,
+) -> Result<()> {
+    let date = supplied
+        .map(str::to_string)
+        .or_else(|| c.best_candidate().map(|k| k.resumes.clone()));
+    let Some(date) = date else { return Ok(()) };
+
+    writeln!(w, "## Restoration Phases")?;
+    writeln!(w)?;
+    writeln!(w, "- **Restoration date used**: {} ({})", date,
+        if supplied.is_some() { "supplied by the operator" } else { "inferred from log continuity" })?;
+    writeln!(w)?;
+
+    if !c.candidates.is_empty() {
+        writeln!(w, "All candidate dates, ranked — a host restored twice, or with a long outage \
+            before the restore, has more than one:")?;
+        writeln!(w)?;
+        writeln!(w, "| Rank | Resumes | Record stops | Gap | Assessment | Corroboration |")?;
+        writeln!(w, "|------|---------|--------------|-----|------------|---------------|")?;
+        for (i, k) in c.candidates.iter().enumerate().take(6) {
+            writeln!(w, "| {} | {} | {} | {}h | {} | {} |",
+                i + 1, k.resumes, k.stops, k.gap_hours, k.kind.label(),
+                if k.corroboration.is_empty() { "—".to_string() } else { cell(&k.corroboration.join("; ")) })?;
+        }
+        writeln!(w)?;
+    }
+
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    for e in events {
+        if !e.phase.is_empty() {
+            *counts.entry(e.phase.as_str()).or_default() += 1;
+        }
+    }
+    writeln!(w, "| Phase | Events | Reading |")?;
+    writeln!(w, "|-------|--------|---------|")?;
+    writeln!(w, "| {} | {} | Before the restore. Belongs to the machine that was replaced. |",
+        PHASE_PRE, counts.get(PHASE_PRE).unwrap_or(&0))?;
+    writeln!(w, "| {} | {} | EDR deployment, domain rejoin, patching, OS servicing. Expected. |",
+        PHASE_PROCESS, counts.get(PHASE_PROCESS).unwrap_or(&0))?;
+    writeln!(w, "| {} | {} | The forensic collection itself. Not attacker activity. |",
+        PHASE_RESPONDER, counts.get(PHASE_RESPONDER).unwrap_or(&0))?;
+    writeln!(w, "| {} | {} | **Unexplained after the rebuild — the serious category.** |",
+        PHASE_POST, counts.get(PHASE_POST).unwrap_or(&0))?;
+    writeln!(w)?;
+
+    // "Definitionally true and evidentially empty" — the reviewer's phrase for a
+    // host whose entire 7.7-hour record postdated its restoration, and which was
+    // therefore reported as carrying post-restoration activity. If most of the
+    // record sits after the date, the partition is describing the record's shape
+    // rather than anything about the rebuild, and saying so is the finding.
+    let pre = *counts.get(PHASE_PRE).unwrap_or(&0);
+    let post = *counts.get(PHASE_POST).unwrap_or(&0);
+    if post > 0 && post >= pre {
+        writeln!(w, "> **Most of this host's record postdates the restoration date, so \
+            \"post-restoration activity\" here is close to definitionally true.** {post} of \
+            {} phased events fall after {date}, against {pre} before it. Either the date is \
+            early for this record — check it against the ranked candidates above — or the \
+            collection simply does not reach far enough back to say what preceded the rebuild. \
+            Read the list below as ordinary triage, not as evidence of a post-rebuild intrusion.",
+            pre + post)?;
+        writeln!(w)?;
+    }
+
+    let in_window: Vec<&UnifiedEvent> = events
+        .iter()
+        .filter(|e| {
+            e.indicators.iter().any(|i| i.starts_with("RESTORE_WINDOW:"))
+                && crate::timeline_parser::output::supertimeline::is_triage_hit(e)
+        })
+        .collect();
+    if !in_window.is_empty() {
+        let days = in_window[0]
+            .indicators
+            .iter()
+            .find_map(|i| i.strip_prefix("RESTORE_WINDOW:"))
+            .unwrap_or("");
+        writeln!(w, "### Highest-relevance window (the {} before the restore)", days)?;
+        writeln!(w)?;
+        writeln!(w, "A compromise that led to this restore happened in the window that ends at \
+            it. {} triage hit(s) fall inside that window; findings predating it by a wide margin \
+            describe a machine that was subsequently replaced.", in_window.len())?;
+        writeln!(w)?;
+        let mut rows = in_window.clone();
+        rows.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        for e in rows.iter().take(25) {
+            writeln!(w, "- **[{}]** `{}` — {}", e.severity.to_uppercase(), e.timestamp,
+                trunc_desc(&e.description, &e.indicators))?;
+        }
+        if rows.len() > 25 {
+            writeln!(w, "- _… {} more; filter the triage timeline on `RESTORE_WINDOW`._", rows.len() - 25)?;
+        }
+        writeln!(w)?;
+    }
+
+    let mut post: Vec<&UnifiedEvent> = events
+        .iter()
+        .filter(|e| e.phase == PHASE_POST && crate::timeline_parser::output::supertimeline::is_triage_hit(e))
+        .collect();
+    post.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    writeln!(w, "### Post-restoration, unexplained")?;
+    writeln!(w)?;
+    if post.is_empty() {
+        writeln!(w, "Nothing after the restoration date is both a triage hit and unaccounted for \
+            by the restoration process or the responder's own collection.")?;
+        writeln!(w)?;
+        return Ok(());
+    }
+    writeln!(w, "{} finding(s) postdate the restore and are not explained by rebuild activity or \
+        by the collection. This is either the most serious result a sheep-dip can produce or a \
+        mis-tagged job; nothing else in this report distinguishes them, so read every row.",
+        post.len())?;
+    writeln!(w)?;
+    for e in post.iter().take(40) {
+        writeln!(w, "- **[{}]** `{}` — {}", e.severity.to_uppercase(), e.timestamp,
+            trunc_desc(&e.description, &e.indicators))?;
+        if !e.indicators.is_empty() {
+            writeln!(w, "  - Indicators: {}", cell(&e.indicators.iter().take(4).cloned().collect::<Vec<_>>().join(", ")))?;
+        }
+    }
+    if post.len() > 40 {
+        writeln!(w, "- _… {} more; filter the triage timeline on `Phase == {}`._",
+            post.len() - 40, PHASE_POST)?;
+    }
+    writeln!(w)?;
+    Ok(())
+}
+
+/// What the parser decided, so nothing downstream has to decide it again.
+fn write_classifications<W: Write>(
+    w: &mut W,
+    events: &[UnifiedEvent],
+    automations: &[Automation],
+) -> Result<()> {
+    let mut by_class: HashMap<&str, usize> = HashMap::new();
+    for e in events {
+        if !e.classification.is_empty() {
+            *by_class.entry(e.classification.as_str()).or_default() += 1;
+        }
+    }
+    if by_class.is_empty() && automations.is_empty() {
+        return Ok(());
+    }
+
+    writeln!(w, "## Deterministic Classifications")?;
+    writeln!(w)?;
+    writeln!(w, "Events the parser could account for from their own fields. They remain in the \
+        supertimeline — the evidence is not suppressed — but they are **not findings** and are \
+        excluded from the triage timeline unless a direct IOC or malicious-hash verdict overrides \
+        the classification.")?;
+    writeln!(w)?;
+    writeln!(w, "Classification is drawn from the **path**, not the filename — `fls.exe` is Sleuth \
+        Kit and also ships inside F-Secure's response package, and `7za.exe` ships with VMware \
+        Tools. An Authenticode signer would be the better key, because a path allowlist is \
+        spoofable; the wiskess Timeline export carries no signature field, so none was available. \
+        A supplied-IOC match or a malicious hash verdict overrides any classification below.")?;
+    writeln!(w)?;
+    writeln!(w, "| Classification | Events | Means |")?;
+    writeln!(w, "|----------------|--------|-------|")?;
+    let mut rows: Vec<_> = by_class.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    for (class, n) in rows {
+        let meaning = if class.starts_with("vendor:") {
+            "sits inside a security-product or platform install tree; the path decides, not the filename"
+        } else if class == "os:component-store" || class == "os:driver-store" || class == "os:gac"
+            || class == "os:windows-update" || class == "os:msi-cache" {
+            "OS servicing store — presence here is not evidence of execution"
+        } else if class == "os:servicing" {
+            "an OS-shipped task or service changed by the OS"
+        } else if class.starts_with("automation:") {
+            "a scheduled/managed process, not a person"
+        } else if class.starts_with("responder:") {
+            "the forensic collection's own footprint"
+        } else if class.starts_with("config:") {
+            "a product's settings, including its blocklists — not a record of contact"
+        } else if class.starts_with("removal:") {
+            "describes a deletion or disable; cannot support a persistence tag"
+        } else {
+            "—"
+        };
+        writeln!(w, "| `{}` | {} | {} |", class, n, meaning)?;
+    }
+    writeln!(w)?;
+
+    if !automations.is_empty() {
+        writeln!(w, "### Machine-account automation")?;
+        writeln!(w)?;
+        writeln!(w, "Group-membership changes performed by a machine account or SYSTEM, on a \
+            regular cadence, over a small recurring member set — the signature of Group Policy \
+            Restricted Groups or a management agent. Stated as a rate, because \"776 admin group \
+            additions\" and \"776 additions of the same 3 SIDs at ~1.5h intervals\" are different \
+            statements and only the second is decidable by a reader.")?;
+        writeln!(w)?;
+        writeln!(w, "| Subject | Group | Rate | Members | First | Last |")?;
+        writeln!(w, "|---------|-------|------|---------|-------|------|")?;
+        for a in automations {
+            writeln!(w, "| {} | {} | {} | {} | {} | {} |",
+                cell(&a.subject), cell(&a.group), cell(&a.as_rate()),
+                cell(&a.members.join(", ")), a.first, a.last)?;
+        }
+        writeln!(w)?;
+        writeln!(w, "A change that breaks the pattern — a member outside the recurring set — is \
+            **not** classified as automation and stays in the triage timeline, tagged \
+            `OFF_CADENCE_MEMBER`. That single event is the finding.")?;
+        writeln!(w)?;
+    }
+
+    // Presence vs execution.
+    let mut exec: HashMap<&str, usize> = HashMap::new();
+    for e in events {
+        if !e.execution_evidence.is_empty() {
+            *exec.entry(e.execution_evidence.as_str()).or_default() += 1;
+        }
+    }
+    if !exec.is_empty() {
+        writeln!(w, "### Presence vs execution")?;
+        writeln!(w)?;
+        writeln!(w, "| Execution evidence | Events | Means |")?;
+        writeln!(w, "|--------------------|--------|-------|")?;
+        for (k, meaning) in [
+            ("executed", "prefetch / jump-list / LNK / shimcache 'Executed: Yes' — it ran"),
+            ("registered", "an Amcache or shimcache entry — the file was seen by the OS, not necessarily run"),
+            ("none", "the file exists on disk and **nothing shows it ran**"),
+        ] {
+            if let Some(n) = exec.get(k) {
+                writeln!(w, "| {} | {} | {} |", k, n, meaning)?;
+            }
+        }
+        writeln!(w)?;
+    }
+    Ok(())
+}
+
+/// The baseline record, carried only when `--verbose-events` is set.
+fn write_baseline<W: Write>(w: &mut W, events: &[UnifiedEvent], cfg: &PipelineConfig) -> Result<()> {
+    if !cfg.verbosity.baseline() {
+        return Ok(());
+    }
+    let baseline: Vec<&UnifiedEvent> = events
+        .iter()
+        .filter(|e| e.indicators.iter().any(|i| i == "BASELINE_LOGON"))
+        .collect();
+
+    writeln!(w, "## Baseline Logon Activity")?;
+    writeln!(w)?;
+    writeln!(w, "Every successful logon by a real (non-machine, non-service-principal) account, \
+        carried because `--verbose-events` was set. Working hours are {:02}:00–{:02}:00 UTC; \
+        weekends count as out of hours. A (user, logon type, source) combination seen fewer than \
+        {} times across the record is flagged rare.",
+        cfg.business_hours.0, cfg.business_hours.1, cfg.rare_logon_max)?;
+    writeln!(w)?;
+    if baseline.is_empty() {
+        writeln!(w, "No successful logon by a real account was found in the event-log record.")?;
+        writeln!(w)?;
+        return Ok(());
+    }
+
+    // user -> (type, source) -> count, with the flags that matter.
+    #[derive(Default)]
+    struct Row {
+        count: usize,
+        off_hours: usize,
+        rare: bool,
+        first: String,
+        last: String,
+    }
+    let mut rows: std::collections::BTreeMap<(String, String, String), Row> = Default::default();
+    for e in &baseline {
+        let ltype = e.indicators.iter()
+            .find_map(|i| i.strip_prefix("LOGON_TYPE:"))
+            .unwrap_or("Other")
+            .to_string();
+        let from = e.indicators.iter()
+            .find_map(|i| i.strip_prefix("LOGON_FROM:"))
+            .unwrap_or("—")
+            .to_string();
+        let r = rows.entry((clean_user(&e.user), ltype, from)).or_default();
+        r.count += 1;
+        if e.indicators.iter().any(|i| i == "OFF_HOURS_LOGON") {
+            r.off_hours += 1;
+        }
+        r.rare |= e.indicators.iter().any(|i| i.starts_with("RARE_LOGON:"));
+        if r.first.is_empty() || e.timestamp < r.first {
+            r.first = e.timestamp.clone();
+        }
+        if e.timestamp > r.last {
+            r.last = e.timestamp.clone();
+        }
+    }
+
+    writeln!(w, "| User | Logon type | From | Logons | Out of hours | Rare | First | Last |")?;
+    writeln!(w, "|------|-----------|------|--------|--------------|------|-------|------|")?;
+    let mut sorted: Vec<_> = rows.into_iter().collect();
+    // Rare first, then out-of-hours, then loudest.
+    sorted.sort_by(|a, b| b.1.rare.cmp(&a.1.rare)
+        .then(b.1.off_hours.cmp(&a.1.off_hours))
+        .then(b.1.count.cmp(&a.1.count)));
+    for ((user, ltype, from), r) in sorted.iter().take(200) {
+        writeln!(w, "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            cell(user), cell(ltype), cell(from), r.count,
+            if r.off_hours > 0 { r.off_hours.to_string() } else { "—".to_string() },
+            if r.rare { "**yes**" } else { "—" }, r.first, r.last)?;
+    }
+    if sorted.len() > 200 {
+        writeln!(w, "\n_… {} more combinations; the full set is in the supertimeline._", sorted.len() - 200)?;
+    }
+    writeln!(w)?;
     Ok(())
 }
 
@@ -655,8 +1417,18 @@ fn write_tactic_findings<W: Write>(w: &mut W, events: &[UnifiedEvent]) -> Result
     ];
 
     let mut tactics: HashMap<&str, Vec<&UnifiedEvent>> = HashMap::new();
+    let mut explained_skipped = 0usize;
     for e in events {
         if severity_order(&e.severity) >= severity_order("med") {
+            // An event the parser could account for is not a finding, and must
+            // not swell a tactic count. Impact appearing on 18 of 28 hosts —
+            // including all three the reviewer called clean — carries no
+            // information, and presenting it as "ransomware-deployment
+            // candidates" would be a material overstatement.
+            if e.is_explained() {
+                explained_skipped += 1;
+                continue;
+            }
             let tactic = if e.mitre_tactic.is_empty() { "Unknown/Uncategorized" } else { &e.mitre_tactic };
             tactics.entry(tactic).or_default().push(e);
         }
@@ -666,6 +1438,33 @@ fn write_tactic_findings<W: Write>(w: &mut W, events: &[UnifiedEvent]) -> Result
     writeln!(w)?;
     writeln!(w, "_Top events per tactic; the complete, untruncated set is in the supertimeline CSV/JSONL._")?;
     writeln!(w)?;
+
+    let total: usize = tactics.values().map(|v| v.len()).sum();
+    if total > 0 {
+        writeln!(w, "| Tactic | Events | Share of tagged findings |")?;
+        writeln!(w, "|--------|--------|--------------------------|")?;
+        let mut counts: Vec<(&str, usize)> = tactics.iter().map(|(k, v)| (*k, v.len())).collect();
+        counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        for (tactic, n) in &counts {
+            let share = (*n as f64) * 100.0 / (total as f64);
+            writeln!(w, "| {} | {} | {:.1}% {} |", tactic, n, share,
+                if share >= 60.0 { "← dominates this host; discount accordingly" } else { "" })?;
+        }
+        writeln!(w)?;
+        writeln!(w, "A tactic carrying most of a host's findings is describing the host's ordinary \
+            furniture, not an intrusion — a Persistence count that is really an inventory of every \
+            scheduled task, service and autorun the machine ships with. Compare these shares across \
+            the estate before reading any one of them as a result: a tag present on most hosts in a \
+            collection carries no information about any of them.")?;
+        writeln!(w)?;
+    }
+    if explained_skipped > 0 {
+        writeln!(w, "_{explained_skipped} medium-or-higher event(s) are excluded from the counts \
+            above because the parser could account for them (vendor tree, OS servicing, scheduled \
+            automation, or the responder's own collection). They remain in the supertimeline; see \
+            **Deterministic Classifications**._")?;
+        writeln!(w)?;
+    }
 
     for tactic in tactic_order {
         if let Some(tactic_events) = tactics.get(tactic) {
@@ -917,6 +1716,7 @@ mod tests {
             user: "svc".into(),
             hostname: "H".into(),
             detection_rule: "t".into(),
+            ..Default::default()
         }
     }
 
@@ -1236,9 +2036,137 @@ mod tests {
         assert!(out.starts_with(&"H".repeat(50)));
     }
 
+    fn ev_desc(source: &str, desc: &str) -> UnifiedEvent {
+        UnifiedEvent {
+            source: source.to_string(),
+            description: desc.to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// Every one of these was produced by a free-text "something.something" scan
+    /// on the corpus, and every one was presented as a domain the host touched.
+    #[test]
+    fn domain_extraction_refuses_usernames_filenames_and_assembly_names() {
+        for junk in [
+            "AuthenticatedUserName: user.name",
+            r"Program Execution: AppCompatCache = SIGN.MEDIA=65AA183C 00 Archive",
+            r"File created: C:\Users\frank\Downloads\net82.zip",
+            "Amcache: microsoft.azure.activedirectory.synchronization.upgrader",
+            r"Extension: PNG Absolute path: This PC\Z:\frank\WINSCP-UPDATED.PNG",
+            "Defender platform version 4.18.2311.4",
+        ] {
+            let got = extract_domains(&ev_desc("registry", junk));
+            assert!(got.is_empty(), "{junk} produced {got:?}");
+        }
+    }
+
+    /// ...while a domain the evidence actually names still comes through.
+    #[test]
+    fn domain_extraction_keeps_urls_labelled_hosts_and_supplied_iocs() {
+        let url = extract_domains(&ev_desc(
+            "browser-hist",
+            "Visited https://cdn.evil-c2.net/beacon?id=1",
+        ));
+        assert!(url.contains("cdn.evil-c2.net"), "{url:?}");
+
+        let dns = extract_domains(&ev_desc(
+            "hayabusa",
+            "DNS query | QueryName: pastebin.com | result ok",
+        ));
+        assert!(dns.contains("pastebin.com"), "{dns:?}");
+
+        let ioc = extract_domains(&UnifiedEvent {
+            indicators: vec!["IOC:dragonforce-panel.onion.to".to_string()],
+            ..ev_desc("event-logs", "nothing in the text")
+        });
+        assert!(ioc.contains("dragonforce-panel.onion.to"), "{ioc:?}");
+    }
+
+    /// The touchpoint table is about *external* addresses. Internal space,
+    /// CGNAT and the documentation ranges are not that.
+    #[test]
+    fn only_routable_addresses_count_as_external() {
+        for public in ["87.106.179.142", "8.8.8.8", "217.194.210.5"] {
+            assert!(is_public_ip(public), "{public}");
+        }
+        for internal in [
+            "10.0.0.2", "172.16.1.5", "192.168.40.3", "127.0.0.1", "169.254.1.1",
+            "100.64.0.1", "0.0.0.0", "255.255.255.255", "224.0.0.1", "203.0.113.9",
+        ] {
+            assert!(!is_public_ip(internal), "{internal}");
+        }
+    }
+
+    /// A registry value is configuration. The F-Secure blocklist that read as 23
+    /// separate host compromises must land on the other side of the split.
+    #[test]
+    fn a_registry_sourced_string_is_configuration_not_activity() {
+        let reg = ev_desc(
+            "registry",
+            r"F-Secure\Ultralight\Settings\nif.untrusted_urls = anydesk.com;teamviewer.com",
+        );
+        assert_eq!(Provenance::of(&reg), Provenance::Configuration);
+        let net = ev_desc("browser-hist", "Visited https://anydesk.com/download");
+        assert_eq!(Provenance::of(&net), Provenance::Activity);
+    }
+
+    fn phased(ts: &str, phase: &str, sev: &str) -> UnifiedEvent {
+        UnifiedEvent {
+            timestamp: ts.to_string(),
+            source: "event-logs".to_string(),
+            severity: sev.to_string(),
+            description: "a thing happened".to_string(),
+            phase: phase.to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn render_phases(events: &[UnifiedEvent], c: &Continuity, supplied: Option<&str>) -> String {
+        let mut w: Vec<u8> = Vec::new();
+        write_phases(&mut w, events, c, supplied).unwrap();
+        String::from_utf8(w).unwrap()
+    }
+
+    /// "Definitionally true and evidentially empty" — a host whose whole record
+    /// postdates its restoration must not be reported as carrying
+    /// post-restoration attacker activity.
+    #[test]
+    fn a_record_that_wholly_postdates_the_restore_says_so_instead_of_claiming_a_finding() {
+        let events = vec![
+            phased("2026-05-20T01:00:00Z", PHASE_POST, "high"),
+            phased("2026-05-20T02:00:00Z", PHASE_POST, "high"),
+        ];
+        let out = render_phases(&events, &Continuity::default(), Some("2026-05-19T00:00:00Z"));
+        assert!(out.contains("Most of this host's record postdates the restoration date"), "{out}");
+        assert!(out.contains("supplied by the operator"));
+    }
+
+    /// The ordinary shape: a rebuild with most of the record before it, and one
+    /// unexplained finding after. That one is the whole point of the section.
+    #[test]
+    fn a_single_unexplained_post_restoration_finding_is_shown_without_the_caveat() {
+        let mut events: Vec<UnifiedEvent> = (0..10)
+            .map(|i| phased(&format!("2026-05-0{i}T01:00:00Z"), PHASE_PRE, "high"))
+            .collect();
+        events.push(phased("2026-05-21T01:00:00Z", PHASE_POST, "high"));
+        let out = render_phases(&events, &Continuity::default(), Some("2026-05-19T00:00:00Z"));
+        assert!(!out.contains("Most of this host's record postdates"), "{out}");
+        assert!(out.contains("### Post-restoration, unexplained"));
+        assert!(out.contains("1 finding(s) postdate the restore"), "{out}");
+    }
+
+    /// With no restoration date there is nothing to partition against, and the
+    /// section must not appear at all rather than appear empty.
+    #[test]
+    fn no_restoration_date_means_no_phase_section() {
+        let out = render_phases(&[], &Continuity::default(), None);
+        assert!(out.is_empty(), "{out}");
+    }
+
     #[test]
     fn standout_hostnames_flagged() {
-        assert!(suspicious_hostname("DESKTOP-BBETH6K").is_some());
+        assert!(suspicious_hostname("DESKTOP-A1B2C3D").is_some());
         assert!(suspicious_hostname("WIN-ABCDEFG1234").is_some());
         assert!(suspicious_hostname("kali").is_some());
         assert!(suspicious_hostname("MY-FILE01").is_none());

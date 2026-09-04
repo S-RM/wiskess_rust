@@ -302,6 +302,29 @@ pub fn parse(
 
         let user = extract_user_from_details(details);
 
+        // A sigma rule family is not evidence of what it is named after.
+        //
+        // `win_taskscheduler_susp_schtasks_delete_or_disable` fired 69 times
+        // in-window on one host, every one of them
+        // `\Microsoft\Windows\UpdateOrchestrator\Resume On Boot` under
+        // SYSTEM — reported, all 69, as Persistence. Deleting or disabling a
+        // scheduled task is not persistence, and a task the OS ships, changed by
+        // the OS, is servicing.
+        let mut classification = String::new();
+        let mut tactic = tactic;
+        let mut technique = tags.to_string();
+        if tactic == "Persistence"
+            && crate::timeline_parser::detectors::classify::persistence_is_contradicted(rule_file, &scan_text)
+        {
+            classification = if crate::timeline_parser::detectors::classify::is_os_task_servicing(&scan_text) {
+                "os:servicing".to_string()
+            } else {
+                "removal:not-persistence".to_string()
+            };
+            tactic = String::new();
+            technique.clear();
+        }
+
         events.push(UnifiedEvent {
             timestamp: ts,
             source: "hayabusa".to_string(),
@@ -310,10 +333,12 @@ pub fn parse(
             description,
             indicators,
             mitre_tactic: tactic,
-            mitre_technique: tags.to_string(),
+            mitre_technique: technique,
             user,
             hostname: hostname.to_string(),
             detection_rule: rule_file.to_string(),
+            classification,
+            ..Default::default()
         });
     }
 

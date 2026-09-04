@@ -38,6 +38,7 @@ pub fn run_timeline_parser(main_args: &config::MainArgs) {
         vt_rate: 4,
         data_dir: Some(main_args.tool_path.join("threat_intel")),
         verbose: false,
+        restoration_date: main_args.restoration_date.clone(),
     };
 
     match pipeline::run(args) {

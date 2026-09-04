@@ -1,3 +1,4 @@
+pub mod classify;
 pub mod compromised;
 pub mod ioc_matcher;
 pub mod restoration;

@@ -11,11 +11,10 @@
 //! detector that stops at "gap" flags every weekend and every holiday shutdown.
 //! What separates them is what brackets the gap:
 //!
-//!   * a clean shutdown followed by a boot  -> the machine was off. Downtime.
-//!   * an event-log clear (1102 / 104)      -> the record was destroyed, not lost.
-//!   * neither                              -> the record stops with no
-//!                                             explanation in it, which is what
-//!                                             a restore from image looks like.
+//! * a clean shutdown followed by a boot -> the machine was off. Downtime.
+//! * an event-log clear (1102 / 104) -> the record was destroyed, not lost.
+//! * neither -> the record stops with no explanation in it, which is what a
+//!   restore from image looks like.
 //!
 //! All three are reported. Only the last two are treated as findings, and the
 //! first is reported precisely so a reader can see it was considered and
@@ -112,6 +111,41 @@ pub struct LogGap {
     pub evidence: String,
 }
 
+/// A ranked restoration candidate: one gap, with whatever independently
+/// corroborates it.
+///
+/// The estimate already worked — on a 28-host run it produced dates for 22 of
+/// 28 and revealed the estate had restored in two clusters 44 days apart. What
+/// it lacked was a shape a consumer could read. Three full runs of a downstream
+/// tool rejected the estimate because the word "POSSIBLE" reached the model
+/// inside a wall of markdown, and because a host restored twice collapsed to a
+/// single date.
+#[derive(Debug, Clone)]
+pub struct RestorationCandidate {
+    /// The date the record resumes: the restoration date being proposed.
+    pub resumes: String,
+    pub stops: String,
+    pub gap_hours: i64,
+    pub kind: GapKind,
+    /// Why this gap is read the way it is.
+    pub basis: String,
+    /// Independent evidence of a rebuild around this date — OS install, EDR
+    /// (re)installation, the first post-gap boot. Each is evidence on its own;
+    /// together they are the difference between an inference and a finding.
+    pub corroboration: Vec<String>,
+    /// Days from this resume to the end of the record. Recency is the primary
+    /// ranking key: a restore is the *most recent* unexplained break.
+    pub days_before_end: i64,
+}
+
+impl RestorationCandidate {
+    /// Higher is a better candidate. Recent first, then the longer gap, then
+    /// corroborated over bare.
+    fn rank_key(&self) -> (i64, i64, usize) {
+        (-self.days_before_end, self.gap_hours, self.corroboration.len())
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Continuity {
     pub events_scanned: usize,
@@ -130,6 +164,10 @@ pub struct Continuity {
     /// says it was logging, which is the closest thing to a collection time the
     /// evidence carries.
     pub collection_at: Option<String>,
+    /// Every unexplained gap, ranked. Not just the most recent: a host restored
+    /// twice, or with a long outage before the restore, collapses to one date
+    /// otherwise.
+    pub candidates: Vec<RestorationCandidate>,
     /// Hours between the last parsed event and [`Continuity::collection_at`].
     /// A record that stops before the host was collected leaves a window in
     /// which nothing was observed — the same finding as an interior gap, at the
@@ -143,15 +181,91 @@ impl Continuity {
     pub fn restoration_date(&self) -> Option<&str> {
         self.gaps
             .iter()
-            .filter(|g| matches!(g.kind, GapKind::PossibleRestoration))
-            .next_back()
+            .rfind(|g| matches!(g.kind, GapKind::PossibleRestoration))
             .map(|g| g.after.as_str())
     }
 
     pub fn findings(&self) -> impl Iterator<Item = &LogGap> {
         self.gaps.iter().filter(|g| g.kind.is_finding())
     }
+
+    /// The best restoration candidate, as a structured value rather than as a
+    /// sentence buried in markdown.
+    pub fn best_candidate(&self) -> Option<&RestorationCandidate> {
+        self.candidates.first()
+    }
+
+    /// Build the ranked candidate list from the gaps, folding in corroboration.
+    ///
+    /// `installs` are `(when, what)` pairs for independent rebuild signals the
+    /// caller found elsewhere in the timeline — an EDR agent install, the OS
+    /// install date, a first boot.
+    pub fn rank_candidates(&mut self, installs: &[(String, String)]) {
+        let end = self.series_last.as_deref().and_then(parse_ts);
+        let mut out: Vec<RestorationCandidate> = Vec::new();
+
+        for g in self.gaps.iter().filter(|g| g.kind.is_finding()) {
+            let resume = parse_ts(&g.after);
+            let days_before_end = match (resume, end) {
+                (Some(r), Some(e)) => (e - r).num_days(),
+                _ => i64::MAX,
+            };
+
+            let mut corroboration = Vec::new();
+            if let (Some(r), Some(install)) =
+                (resume, self.install_date.as_deref().and_then(parse_ts))
+            {
+                let delta = (r - install).num_days();
+                if delta.abs() <= RESTORE_CORROBORATION_DAYS {
+                    corroboration.push(format!(
+                        "OS install date {} is {} day(s) from this resume",
+                        iso(&install),
+                        delta.abs()
+                    ));
+                }
+            }
+            for (when, what) in installs {
+                if let (Some(r), Some(w)) = (resume, parse_ts(when)) {
+                    let delta = (w - r).num_days();
+                    if (0..=RESTORE_CORROBORATION_DAYS).contains(&delta) {
+                        corroboration.push(format!("{what} at {when}, {delta} day(s) after the resume"));
+                    }
+                }
+            }
+
+            out.push(RestorationCandidate {
+                resumes: g.after.clone(),
+                stops: g.before.clone(),
+                gap_hours: g.hours,
+                kind: g.kind,
+                basis: g.evidence.clone(),
+                corroboration,
+                days_before_end,
+            });
+        }
+
+        out.sort_by_key(|c| std::cmp::Reverse(c.rank_key()));
+        self.candidates = out;
+    }
 }
+
+/// How close an independent rebuild signal has to sit to a resume for it to
+/// corroborate it.
+///
+/// ASSUMPTION: not specified by the operator. A rebuild is patched, re-enrolled
+/// and re-agented over the days that follow, not the same minute.
+pub const RESTORE_CORROBORATION_DAYS: i64 = 7;
+
+/// Products whose (re)installation is independent evidence of a rebuild, and —
+/// after a restoration date — evidence that a finding belongs to the
+/// restoration process rather than to an actor.
+pub const REBUILD_SIGNAL_MARKERS: &[&str] = &[
+    "sentinelone", "sentinel agent", "crowdstrike", "falcon sensor", "f-secure", "withsecure",
+    "sophos", "carbon black", "cylance", "defender for endpoint", "mma agent",
+    "microsoft monitoring agent", "azure connected machine", "tanium", "rapid7", "insight agent",
+    "arctic wolf", "huntress", "trellix", "mcafee agent", "vmware tools", "domain join",
+    "joined to domain", "windows update", "cumulative update", "servicing stack",
+];
 
 /// Parse the timestamps wiskess writes. Two shapes appear: ISO with a `Z`
 /// (`2026-02-01T00:01:31.575Z`) and a space-separated local form
@@ -369,9 +483,237 @@ pub fn to_events(c: &Continuity, hostname: &str) -> Vec<UnifiedEvent> {
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "log_continuity".to_string(),
+            ..Default::default()
         });
     }
     out
+}
+
+// ── Phase partition ──────────────────────────────────────────────────────────
+
+pub const PHASE_PRE: &str = "pre-restoration";
+pub const PHASE_PROCESS: &str = "restoration-process";
+pub const PHASE_RESPONDER: &str = "responder";
+pub const PHASE_POST: &str = "post-restoration";
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PhaseCounts {
+    pub pre: usize,
+    pub process: usize,
+    pub responder: usize,
+    pub post: usize,
+}
+
+/// Independent rebuild signals found in the timeline: EDR/agent installs,
+/// platform updates, domain rejoins. Used both to corroborate a restoration
+/// date and to explain what happens immediately after one.
+pub fn rebuild_signals(events: &[UnifiedEvent]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for e in events {
+        if !matches!(
+            e.event_type.as_str(),
+            "service_installed" | "process_execution" | "software_installed" | "file_created"
+        ) {
+            continue;
+        }
+        let lower = e.description.to_lowercase();
+        if let Some(m) = REBUILD_SIGNAL_MARKERS.iter().find(|m| lower.contains(**m)) {
+            out.push((e.timestamp.clone(), format!("{m} installed/updated")));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Partition every event against the host's restoration date.
+///
+/// A finding dated after a restoration is one of exactly three things, and they
+/// are not equally interesting: the restoration process itself (EDR deployment,
+/// domain rejoin, patching — expected, high volume, benign), the responder's own
+/// collection, or genuine post-restoration attacker activity. Today all three
+/// land in one undifferentiated pile, which is how a host whose entire 7.7-hour
+/// window postdates its restoration produced a "post-restoration activity"
+/// finding that was, in the reviewer's words, "definitionally true and
+/// evidentially empty".
+///
+/// The last category is meant to be small and loud. Everything this function can
+/// name, it names, so that what is left over is worth reading.
+pub fn assign_phases(events: &mut [UnifiedEvent], restoration_date: &str) -> PhaseCounts {
+    let mut counts = PhaseCounts::default();
+    for e in events.iter_mut() {
+        // A timestamp we could not read cannot be placed on either side of a
+        // date. Leaving it unphased is the honest answer.
+        if parse_ts(&e.timestamp).is_none() {
+            continue;
+        }
+        let phase = if e.timestamp.as_str() < restoration_date {
+            counts.pre += 1;
+            PHASE_PRE
+        } else if e.classification.starts_with("responder:") {
+            counts.responder += 1;
+            PHASE_RESPONDER
+        } else if e.classification.starts_with("vendor:")
+            || e.classification.starts_with("os:")
+            || e.classification.starts_with("automation:")
+            || {
+                let lower = e.description.to_lowercase();
+                REBUILD_SIGNAL_MARKERS.iter().any(|m| lower.contains(*m))
+            }
+        {
+            counts.process += 1;
+            PHASE_PROCESS
+        } else {
+            counts.post += 1;
+            PHASE_POST
+        };
+        e.phase = phase.to_string();
+    }
+    counts
+}
+
+/// Mark the window immediately before a restoration as the high-relevance one.
+///
+/// The investigation team's own rule of thumb: the one to two months before a
+/// host's restoration date is the highest-value window to scrutinise, because
+/// that is the window in which a compromise leading to the restore would have
+/// happened. A finding inside it and a finding predating it by a wide margin are
+/// not equally interesting, and the report should not present them as if they
+/// were.
+pub fn mark_restoration_window(
+    events: &mut [UnifiedEvent],
+    restoration_date: &str,
+    window_days: i64,
+) -> usize {
+    let Some(end) = parse_ts(restoration_date) else { return 0 };
+    let start = end - Duration::days(window_days);
+    let mut n = 0usize;
+    for e in events.iter_mut() {
+        let Some(dt) = parse_ts(&e.timestamp) else { continue };
+        if dt >= start && dt < end {
+            e.indicators.push(format!("RESTORE_WINDOW:{}d", window_days));
+            n += 1;
+        }
+    }
+    n
+}
+
+// ── Timestamp hygiene ────────────────────────────────────────────────────────
+
+/// Validate every timestamp on the way out, and never let a parse failure
+/// escape as a value arithmetic will accept.
+///
+/// The case: a host's activity start was the literal string `20200922` — no
+/// time, wrong format — and because it sorts below every ISO timestamp it
+/// silently became the start of the **case-wide** activity span, distorting
+/// every gap calculation in the timing table. A value that does not parse must
+/// be marked as such, not passed through.
+///
+/// `not_after` is the collection time: anything later is impossible and is
+/// flagged rather than believed.
+pub fn validate_timestamps(events: &mut [UnifiedEvent], not_after: Option<&str>) -> usize {
+    let ceiling = not_after
+        .and_then(parse_ts)
+        // A day of slack: the retention line and the event stream are not
+        // written by the same clock.
+        .map(|dt| dt + Duration::days(1));
+    let mut bad = 0usize;
+    for e in events.iter_mut() {
+        match parse_ts(&e.timestamp) {
+            None => {
+                e.indicators.push(format!("TIMESTAMP_INVALID:{}", e.timestamp));
+                bad += 1;
+            }
+            Some(dt) if !plausible(&dt) => {
+                e.indicators.push(format!("TIMESTAMP_IMPLAUSIBLE:{}", e.timestamp));
+                bad += 1;
+            }
+            Some(dt) => {
+                if let Some(c) = ceiling {
+                    if dt > c {
+                        e.indicators
+                            .push(format!("TIMESTAMP_AFTER_COLLECTION:{}", e.timestamp));
+                        bad += 1;
+                    }
+                }
+            }
+        }
+    }
+    bad
+}
+
+/// Is this a timestamp downstream arithmetic may use?
+pub fn timestamp_is_usable(ts: &str) -> bool {
+    parse_ts(ts).map(|dt| plausible(&dt)).unwrap_or(false)
+}
+
+/// The structured restoration record, written as its own ingestible timeline
+/// file so a consumer reads a field rather than parsing a sentence out of
+/// markdown.
+///
+/// One NDJSON line, not pretty-printed JSON: `worker.py` ingests any file whose
+/// name ends in `json` and reads it a line at a time, so a multi-line object
+/// would be fed to it as a sequence of syntax errors. It carries the same six
+/// fields every wiskess timeline document carries — dated when the parser ran,
+/// because the estimate is the analysis, not the evidence — with the estimate
+/// itself alongside as fields.
+pub fn write_restoration_json(
+    c: &Continuity,
+    hostname: &str,
+    supplied: Option<&str>,
+    out_dir: &Path,
+) -> Result<std::path::PathBuf> {
+    let filename = format!("{hostname}_restoration.json");
+    let path = out_dir.join(&filename);
+    let best = c.best_candidate();
+
+    let now = chrono::Utc::now();
+    let doc = serde_json::json!({
+        "datetime": format!("{}Z", now.format("%Y-%m-%dT%H:%M:%S%.3f")),
+        "timestamp": now.timestamp_millis(),
+        "timestamp_desc": format!("restoration - {filename}: RestorationEstimate"),
+        "message": restoration_sentence(supplied, best),
+        "hostname": hostname,
+        "doc_type": "restoration",
+
+        "restoration_supplied": supplied,
+        "restoration_inferred": best.map(|b| b.resumes.clone()),
+        "restoration_basis": best.map(|b| b.basis.clone()),
+        "gap_hours": best.map(|b| b.gap_hours),
+        "corroboration": best.map(|b| b.corroboration.clone()).unwrap_or_default(),
+        "record_first_event": c.series_first,
+        "record_last_event": c.series_last,
+        "collection_at": c.collection_at,
+        "security_log_retention": c.security_log_retention,
+        "os_install_date": c.install_date,
+        "os_install_is_recent": c.install_is_recent,
+        "trailing_gap_hours": c.trailing_gap_hours,
+        "log_cleared_at": c.cleared_at,
+        "candidates": c.candidates.iter().map(|k| serde_json::json!({
+            "resumes": k.resumes,
+            "stops": k.stops,
+            "gap_hours": k.gap_hours,
+            "assessment": k.kind.label(),
+            "basis": k.basis,
+            "corroboration": k.corroboration,
+            "days_before_end_of_record": k.days_before_end,
+        })).collect::<Vec<_>>(),
+    });
+    std::fs::write(&path, format!("{}\n", serde_json::to_string(&doc)?))?;
+    Ok(path)
+}
+
+/// One sentence stating the estimate, for the `message` field every document in
+/// the index carries.
+fn restoration_sentence(supplied: Option<&str>, best: Option<&RestorationCandidate>) -> String {
+    match (supplied, best) {
+        (Some(s), _) => format!("Restoration date supplied by the operator: {s}."),
+        (None, Some(b)) => format!(
+            "Restoration inferred at {} from a {}h break in the event-log record ({}).",
+            b.resumes, b.gap_hours, b.basis
+        ),
+        (None, None) => "No restoration date was inferred for this host.".to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -650,6 +992,148 @@ mod tests {
         assert_eq!(events[0].severity, "high");
         assert_eq!(events[0].source, "log-continuity");
         assert!(events[0].indicators.iter().any(|i| i.starts_with("LOG_GAP:")));
+    }
+
+
+    // ── Ranked candidates, phases and timestamp hygiene ──────────────────────
+
+    fn ev(ts: &str, desc: &str, class: &str) -> UnifiedEvent {
+        UnifiedEvent {
+            timestamp: ts.to_string(),
+            source: "event-logs".to_string(),
+            event_type: "service_installed".to_string(),
+            severity: "high".to_string(),
+            description: desc.to_string(),
+            classification: class.to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// A host restored twice collapses to one date today. Both gaps have to
+    /// survive, ranked, with the most recent first.
+    #[test]
+    fn every_unexplained_gap_becomes_a_ranked_candidate() {
+        let mut c = scan(&series(
+            &["2026-01-01", "2026-01-02", "2026-01-20", "2026-05-09", "2026-05-10"],
+            &[],
+        ));
+        c.rank_candidates(&[]);
+        assert_eq!(c.candidates.len(), 2, "{:?}", c.candidates);
+        assert_eq!(c.candidates[0].resumes, "2026-05-09T01:00:00Z", "most recent ranks first");
+        assert_eq!(c.candidates[1].resumes, "2026-01-20T01:00:00Z");
+        assert_eq!(c.best_candidate().unwrap().gap_hours, 2594);
+    }
+
+    /// An EDR install hours after the resume is independent evidence of a
+    /// rebuild, and it should be emitted rather than left for a reader to spot.
+    #[test]
+    fn an_edr_install_after_the_resume_corroborates_the_candidate() {
+        let mut c = scan(&series(
+            &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
+            &[],
+        ));
+        c.rank_candidates(&[(
+            "2026-05-09T06:00:00Z".to_string(),
+            "sentinelone installed/updated".to_string(),
+        )]);
+        let best = c.best_candidate().unwrap();
+        assert_eq!(best.corroboration.len(), 1, "{best:?}");
+        assert!(best.corroboration[0].contains("sentinelone"), "{best:?}");
+    }
+
+    /// An install long after the resume is not corroboration of it.
+    #[test]
+    fn a_distant_install_does_not_corroborate() {
+        let mut c = scan(&series(&["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"], &[]));
+        c.rank_candidates(&[("2026-07-01T06:00:00Z".to_string(), "sentinelone installed/updated".to_string())]);
+        assert!(c.best_candidate().unwrap().corroboration.is_empty());
+    }
+
+    /// The four-way split. The last category is the one that matters and it has
+    /// to be small: everything nameable is named.
+    #[test]
+    fn findings_after_a_restoration_are_partitioned_four_ways() {
+        let mut events = vec![
+            ev("2026-05-01T10:00:00Z", "A new service was installed: evil.exe", ""),
+            ev("2026-05-20T10:00:00Z", "SentinelOne agent installed", ""),
+            ev("2026-05-20T11:00:00Z", "ir-Collector-Windows.exe ran", "responder:collector"),
+            ev("2026-05-21T02:00:00Z", "A new service was installed: srvhost.exe", ""),
+        ];
+        let counts = assign_phases(&mut events, "2026-05-19T00:00:00Z");
+        assert_eq!(counts, PhaseCounts { pre: 1, process: 1, responder: 1, post: 1 });
+        assert_eq!(events[0].phase, PHASE_PRE);
+        assert_eq!(events[1].phase, PHASE_PROCESS, "an EDR install after a rebuild is the rebuild");
+        assert_eq!(events[2].phase, PHASE_RESPONDER);
+        assert_eq!(events[3].phase, PHASE_POST, "the unexplained one must stand alone");
+    }
+
+    /// An unreadable timestamp cannot be placed on either side of a date, and
+    /// pretending otherwise is how `20200922` became a case-wide activity start.
+    #[test]
+    fn an_unreadable_timestamp_is_left_unphased() {
+        let mut events = vec![ev("20200922", "something", "")];
+        let counts = assign_phases(&mut events, "2026-05-19T00:00:00Z");
+        assert_eq!(counts, PhaseCounts::default());
+        assert!(events[0].phase.is_empty());
+    }
+
+    /// The literal case from the run: a value that does not parse must be
+    /// flagged, never passed through as something arithmetic will accept.
+    #[test]
+    fn a_malformed_timestamp_is_flagged_rather_than_believed() {
+        let mut events = vec![
+            ev("20200922", "activity start", ""),
+            ev("1970-01-21T03:00:00Z", "microsecond value read as millis", ""),
+            ev("2026-05-05T10:00:00Z", "ordinary", ""),
+            ev("2027-01-01T00:00:00Z", "after the collection", ""),
+        ];
+        let bad = validate_timestamps(&mut events, Some("2026-05-11 09:35:03"));
+        assert_eq!(bad, 3);
+        assert!(events[0].indicators.iter().any(|i| i.starts_with("TIMESTAMP_INVALID:")));
+        assert!(events[1].indicators.iter().any(|i| i.starts_with("TIMESTAMP_IMPLAUSIBLE:")));
+        assert!(events[2].indicators.is_empty(), "a good timestamp must be left alone");
+        assert!(events[3].indicators.iter().any(|i| i.starts_with("TIMESTAMP_AFTER_COLLECTION:")));
+
+        assert!(!timestamp_is_usable("20200922"));
+        assert!(timestamp_is_usable("2026-05-05T10:00:00Z"));
+    }
+
+    /// The investigation team's rule of thumb: the window that *ends* at the
+    /// restore is where the compromise that led to it happened.
+    #[test]
+    fn the_window_before_a_restore_is_marked_and_nothing_else_is() {
+        let mut events = vec![
+            ev("2026-01-01T10:00:00Z", "long before", ""),   // 138 days before
+            ev("2026-04-20T10:00:00Z", "inside the window", ""), // 29 days before
+            ev("2026-05-20T10:00:00Z", "after the restore", ""),
+        ];
+        let n = mark_restoration_window(&mut events, "2026-05-19T00:00:00Z", 60);
+        assert_eq!(n, 1);
+        assert!(events[1].indicators.iter().any(|i| i == "RESTORE_WINDOW:60d"));
+        assert!(events[0].indicators.is_empty());
+        assert!(events[2].indicators.is_empty());
+    }
+
+    /// The estimate has to leave as fields, not as a sentence in markdown.
+    #[test]
+    fn the_restoration_record_is_written_as_structured_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = scan(&series(&["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"], &[]));
+        c.rank_candidates(&[]);
+        let path = write_restoration_json(&c, "MY-DC02", None, dir.path()).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.lines().count(), 1, "must be one NDJSON line, not pretty-printed");
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        // The six fields every wiskess timeline document carries.
+        for f in ["datetime", "timestamp", "timestamp_desc", "message", "hostname", "doc_type"] {
+            assert!(v.get(f).is_some(), "missing {f}");
+        }
+        assert_eq!(v["doc_type"], "restoration");
+        assert!(v["message"].as_str().unwrap().contains("146h"), "{}", v["message"]);
+        assert_eq!(v["restoration_inferred"], "2026-05-09T01:00:00Z");
+        assert_eq!(v["gap_hours"], 146);
+        assert_eq!(v["restoration_supplied"], serde_json::Value::Null);
+        assert_eq!(v["candidates"].as_array().unwrap().len(), 1);
     }
 
     /// Downtime is not a finding and must not reach the timeline as one.

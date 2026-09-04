@@ -76,6 +76,7 @@ pub fn parse(
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "lnk_suspicious".to_string(),
+            ..Default::default()
         });
     }
 

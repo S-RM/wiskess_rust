@@ -229,6 +229,7 @@ mod tests {
             out_log: out_dir.join("test.log"),
             multi_pb: MultiProgress::new(),
             no_timeline_parser: true,
+            restoration_date: None,
         };
 
         // Config path deliberately mismatches the real on-disk "PSReadLine" casing

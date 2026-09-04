@@ -243,6 +243,7 @@ fn process_page_visited(
         user: profile_short.to_string(),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight".to_string(),
+        ..Default::default()
     })
 }
 
@@ -310,6 +311,7 @@ fn process_file_downloaded(
         user: profile_short.to_string(),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight_download".to_string(),
+        ..Default::default()
     })
 }
 
@@ -365,5 +367,6 @@ fn process_login_item(
         user: profile_short.to_string(),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight_login".to_string(),
+        ..Default::default()
     })
 }

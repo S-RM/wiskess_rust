@@ -72,6 +72,7 @@ pub fn parse(
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "appcompat_suspicious_path".to_string(),
+            ..Default::default()
         });
     }
 

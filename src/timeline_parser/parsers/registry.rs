@@ -73,11 +73,29 @@ pub fn parse(
 
         let mut indicators: Vec<String> = Vec::new();
         let mut severity = "med".to_string();
+        let mut classification = String::new();
 
+        // Establishment, not inventory.
+        //
+        // Every Windows host ships with Run keys, services and autoruns; a rule
+        // that fires on their existence produces an inventory of the machine's
+        // own furniture and calls it Persistence. Across one 28-host run that was
+        // 25,952 "Persistence findings" on 27 of 28 hosts — a number that says
+        // nothing about any of them.
+        //
+        // The key's LastWriteTime is the discriminator the artefact already
+        // carries: written inside the window of interest, the entry was
+        // *established* there and the tactic is earned. Outside it, the entry
+        // predates the window and is inventory. It is still reported — a Run key
+        // pointing at something odd is worth reading whenever it was written —
+        // but it does not get a Persistence tag.
+        let established = cfg.in_timewindow(&ts);
         if is_persistence {
             indicators.push("REG:persistence_key".to_string());
-            if cfg.in_timewindow(&ts) {
+            if established {
                 severity = "high".to_string();
+            } else {
+                classification = "inventory:autorun-entry".to_string();
             }
         }
         for hit in &ta_hits {
@@ -99,13 +117,91 @@ pub fn parse(
             severity,
             description,
             indicators,
-            mitre_tactic: if is_persistence { "Persistence".to_string() } else { String::new() },
-            mitre_technique: if is_persistence { "T1547.001".to_string() } else { String::new() },
+            mitre_tactic: if is_persistence && established { "Persistence".to_string() } else { String::new() },
+            mitre_technique: if is_persistence && established { "T1547.001".to_string() } else { String::new() },
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "registry_persistence_check".to_string(),
+            classification,
+            ..Default::default()
         });
     }
 
     Ok(events)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::timeline_parser::config::TimeWindow;
+    use std::io::Write;
+
+    fn csv(dir: &tempfile::TempDir, rows: &[(&str, &str, &str)]) -> std::path::PathBuf {
+        let p = dir.path().join("registry.csv");
+        let mut f = std::fs::File::create(&p).unwrap();
+        writeln!(f, "datetime,Description,Category,ValueName,ValueData,HivePath").unwrap();
+        for (ts, name, data) in rows {
+            writeln!(
+                f,
+                r"{ts},Registry Key,Autorun,{name},{data},C:\Windows\System32\config\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+            )
+            .unwrap();
+        }
+        p
+    }
+
+    fn parse_rows(rows: &[(&str, &str, &str)], window: Option<TimeWindow>) -> Vec<UnifiedEvent> {
+        let dir = tempfile::tempdir().unwrap();
+        let path = csv(&dir, rows);
+        let cfg = PipelineConfig { window, ..Default::default() };
+        let data = std::path::Path::new("/nonexistent");
+        parse(
+            &path,
+            &cfg,
+            &TAToolDetector::new(data).unwrap(),
+            &IOCMatcher::new(None).unwrap(),
+            "H",
+        )
+        .unwrap()
+    }
+
+    /// The 25,952-findings case: a Run key that has been there since the OS was
+    /// installed is the host's furniture, not an intrusion. It is still
+    /// reported — but not as Persistence.
+    #[test]
+    fn a_pre_existing_autorun_entry_is_inventory_not_persistence() {
+        let events = parse_rows(
+            &[("2019-06-07T23:40:00Z", "OneDriveSetup", r"C:\Windows\SysWOW64\OneDriveSetup.exe")],
+            Some(TimeWindow {
+                start: "2026-05-05T00:00:00Z".into(),
+                end: "2026-05-07T00:00:00Z".into(),
+                event_count: 0,
+                confidence: "user-specified".into(),
+            }),
+        );
+        assert_eq!(events.len(), 1, "the entry must still be reported");
+        assert_eq!(events[0].mitre_tactic, "", "no Persistence tag on an inventory entry");
+        assert_eq!(events[0].classification, "inventory:autorun-entry");
+        assert!(events[0].indicators.iter().any(|i| i == "REG:persistence_key"));
+    }
+
+    /// ...and a key written inside the window was established there, which is
+    /// what a persistence tag is supposed to mean.
+    #[test]
+    fn an_autorun_entry_written_in_the_window_earns_the_persistence_tag() {
+        let events = parse_rows(
+            &[("2026-05-05T10:00:00Z", "Remotely_Agent", r"C:\ProgramData\Remotely\Remotely_Agent.exe")],
+            Some(TimeWindow {
+                start: "2026-05-05T00:00:00Z".into(),
+                end: "2026-05-07T00:00:00Z".into(),
+                event_count: 0,
+                confidence: "user-specified".into(),
+            }),
+        );
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].mitre_tactic, "Persistence");
+        assert_eq!(events[0].severity, "high");
+        assert_eq!(events[0].classification, "");
+    }
 }

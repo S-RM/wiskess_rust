@@ -18,7 +18,8 @@ mod tests {
             collect: false,
             out_log: PathBuf::from("/tmp/test.log"),
             multi_pb: MultiProgress::new(),
-            no_timeline_parser: true
+            no_timeline_parser: true,
+            restoration_date: None
         }
     }
 

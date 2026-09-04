@@ -504,6 +504,7 @@ pub fn to_events(inv: &SoftwareInventory, hostname: &str) -> Vec<UnifiedEvent> {
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "installed_software_exposure".to_string(),
+            ..Default::default()
         });
     }
     out

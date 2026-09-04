@@ -6,6 +6,9 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use crate::timeline_parser::config::{severity_order, PipelineConfig};
+use crate::timeline_parser::detectors::classify::{
+    self, is_automation_principal, is_machine_account, strip_principal, Automation, GroupChange,
+};
 use crate::timeline_parser::detectors::compromised::CompromisedEntities;
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::detectors::ta_tools::TAToolDetector;
@@ -37,6 +40,67 @@ impl SessionLogon {
             2 => "Interactive",
             _ => "Logon",
         }
+    }
+}
+
+/// Everything `parse_correlated` learned from `event-logs.csv`.
+///
+/// Grew from a 2-tuple because two of these — the machine-account cadence and
+/// the rare-logon count — are properties of the **whole file** and cannot be
+/// decided a row at a time.
+pub struct EventLogOutput {
+    pub events: Vec<UnifiedEvent>,
+    /// Inbound RDP/SMB sessions, for precursor correlation.
+    pub logons: Vec<SessionLogon>,
+    /// Machine-account group-membership series recognised as automation.
+    pub automations: Vec<Automation>,
+    /// Successful logons by real accounts carried as baseline (verbose only).
+    pub baseline_logons: usize,
+    /// Of those, how many were out of hours.
+    pub off_hours_logons: usize,
+    /// Of those, how many were rare combinations.
+    pub rare_logons: usize,
+}
+
+/// A logon combination, counted across the whole record so rarity is decidable.
+type LogonKey = (String, u8, String);
+
+/// Is this a real person's (or a real service account's) logon, as opposed to
+/// the machine's own or a built-in principal?
+///
+/// The operator's line: "all the successful logons from legitimate users, not
+/// machine accounts". `ANONYMOUS LOGON` is excluded for the same reason — it
+/// names no account at all.
+fn is_baseline_user(user: &str) -> bool {
+    let u = strip_principal(user);
+    !u.is_empty()
+        && u != "-"
+        && !u.ends_with('$')
+        && u != "system"
+        && u != "localsystem"
+        && u != "anonymous logon"
+        && !u.starts_with("nt authority")
+        && !u.starts_with("local service")
+        && !u.starts_with("network service")
+        && !u.starts_with("dwm-")
+        && !u.starts_with("umfd-")
+        && !u.starts_with("s-1-")
+        && u.len() > 1
+}
+
+/// Human label for a Windows logon type.
+fn logon_type_name(t: u8) -> &'static str {
+    match t {
+        2 => "Interactive",
+        3 => "Network",
+        4 => "Batch",
+        5 => "Service",
+        7 => "Unlock",
+        8 => "NetworkCleartext",
+        9 => "NewCredentials",
+        10 => "RemoteInteractive",
+        11 => "CachedInteractive",
+        _ => "Other",
     }
 }
 
@@ -140,7 +204,9 @@ fn critical_eids() -> HashMap<u32, CriticalEID> {
     map.insert(4697, CriticalEID { severity: "high", mitre: "T1543.003", tactic: "Persistence", event_type: "service_installed", channel: "Security" });
     map.insert(4698, CriticalEID { severity: "high", mitre: "T1053.005", tactic: "Persistence", event_type: "scheduled_task_created", channel: "Security" });
     map.insert(4720, CriticalEID { severity: "high", mitre: "T1136.001", tactic: "Persistence", event_type: "account_created", channel: "Security" });
+    map.insert(4728, CriticalEID { severity: "high", mitre: "T1098", tactic: "Persistence", event_type: "group_member_added", channel: "Security" });
     map.insert(4732, CriticalEID { severity: "high", mitre: "T1098", tactic: "Persistence", event_type: "group_member_added", channel: "Security" });
+    map.insert(4756, CriticalEID { severity: "high", mitre: "T1098", tactic: "Persistence", event_type: "group_member_added", channel: "Security" });
     map.insert(4768, CriticalEID { severity: "low", mitre: "T1558.003", tactic: "Credential Access", event_type: "kerberos_tgt", channel: "Security" });
     map.insert(4769, CriticalEID { severity: "low", mitre: "T1558.003", tactic: "Credential Access", event_type: "kerberos_tgs", channel: "Security" });
     map.insert(4776, CriticalEID { severity: "low", mitre: "T1110", tactic: "Credential Access", event_type: "ntlm_auth", channel: "Security" });
@@ -168,10 +234,18 @@ pub fn parse_correlated(
     ioc_matcher: &IOCMatcher,
     hostname: &str,
     compromised: &CompromisedEntities,
-) -> Result<(Vec<UnifiedEvent>, Vec<SessionLogon>)> {
+) -> Result<EventLogOutput> {
     let critical = critical_eids();
     let mut events = Vec::new();
     let mut logons: Vec<SessionLogon> = Vec::new();
+    // Every observed group-membership change, emitted or not: a cadence measured
+    // only over the rows that survived filtering is not the host's cadence.
+    let mut group_changes: Vec<GroupChange> = Vec::new();
+    // Every observed real-account logon, so "rare" is a fact about the record
+    // rather than about what happened to be in the window.
+    let mut logon_counts: HashMap<LogonKey, usize> = HashMap::new();
+    let mut emitted_logons: Vec<(usize, LogonKey)> = Vec::new();
+    let mut off_hours_logons = 0usize;
 
     let file = std::fs::File::open(filepath)?;
     let reader = BufReader::new(file);
@@ -247,6 +321,24 @@ pub fn parse_correlated(
         let mut severity = "low".to_string();
         // The principal shown on the emitted event (overridden for logon/lateral).
         let mut display_user = user.clone();
+        let mut classification = String::new();
+        // Indices of the records this row produced, so an emitted event can be
+        // linked back to them once we know it survived the include gate. Held
+        // per row rather than inferred from the tail of the vector: a future
+        // early-exit between here and the push would otherwise hand a stale
+        // entry to the *next* event.
+        let mut pending_group_change: Option<usize> = None;
+        let mut pending_logon: Option<usize> = None;
+
+        // The acting principal, needed to tell automation from a person.
+        let subject_user = payload_field(payload, "SubjectUserName")
+            .filter(|s| !s.is_empty() && *s != "-")
+            .map(str::to_string)
+            .unwrap_or_else(|| user.clone());
+        let subject_sid = payload_field(payload, "SubjectUserSid").unwrap_or("");
+        let subject_logon_id = payload_field(payload, "SubjectLogonId").unwrap_or("");
+        let by_automation =
+            is_automation_principal(&subject_user, subject_sid, subject_logon_id);
 
         if !ta_hits.is_empty() {
             include = true;
@@ -290,6 +382,40 @@ pub fn parse_correlated(
 
         // --- Session logon tracking + lateral movement (runs regardless of the
         // critical-EID gate, so we can correlate precursor logons later). ---
+
+        // Baseline: every successful logon by a real account, counted whether or
+        // not it is kept. The count is what makes rarity decidable below.
+        if event_id == 4624 && is_baseline_user(&logon_user) {
+            let key: LogonKey = (
+                strip_principal(&logon_user),
+                logon_type,
+                if src_ip.is_empty() { src_host.to_lowercase() } else { src_ip.clone() },
+            );
+            *logon_counts.entry(key.clone()).or_default() += 1;
+
+            if cfg.verbosity.baseline() {
+                include = true;
+                display_user = logon_user.clone();
+                indicators.push("BASELINE_LOGON".to_string());
+                indicators.push(format!("LOGON_TYPE:{}", logon_type_name(logon_type)));
+                if !src_ip.is_empty() {
+                    indicators.push(format!("LOGON_FROM:{}", src_ip));
+                }
+                if logon_type == 3 && is_external_src(&src_ip) {
+                    indicators.push("NETWORK_LOGON".to_string());
+                }
+                if cfg.is_out_of_hours(&ts) {
+                    indicators.push("OFF_HOURS_LOGON".to_string());
+                    off_hours_logons += 1;
+                    if severity_order(&severity) < severity_order("med") {
+                        severity = "med".to_string();
+                    }
+                }
+                // Index is resolved after the push, at the bottom of the loop.
+                pending_logon = Some(emitted_logons.len());
+                emitted_logons.push((usize::MAX, key));
+            }
+        }
 
         // Record meaningful inbound logons: RDP (type 10), and externally-sourced
         // network/SMB logons (type 3). These feed precursor correlation.
@@ -352,6 +478,54 @@ pub fn parse_correlated(
             }
         }
 
+        // Group-membership changes: recorded for every row, so the cadence pass
+        // below sees the whole series and can state it as a rate.
+        if matches!(event_id, 4728 | 4732 | 4756) {
+            if let Some(when) = crate::timeline_parser::detectors::restoration::parse_ts(&ts) {
+                let member = payload_field(payload, "MemberSid")
+                    .filter(|s| !s.is_empty() && *s != "-")
+                    .or_else(|| payload_field(payload, "MemberName"))
+                    .unwrap_or("")
+                    .to_string();
+                let group = payload_field(payload, "TargetUserName")
+                    .filter(|s| !s.is_empty() && *s != "-")
+                    .unwrap_or("group")
+                    .to_string();
+                if !member.is_empty() {
+                    pending_group_change = Some(group_changes.len());
+                    group_changes.push(GroupChange {
+                        event_idx: None,
+                        when,
+                        subject: subject_user.clone(),
+                        member,
+                        group,
+                        by_machine: by_automation,
+                    });
+                }
+            }
+        }
+
+        // A machine account is never a user account. `TA-created User Account:
+        // MY-REM03$` was the host itself; a computer object being created or
+        // added to a group is domain plumbing, not an attacker-created account.
+        if event_id == 4720 && is_machine_account(&logon_user) {
+            classification = "automation:machine-account".to_string();
+            severity = "low".to_string();
+        }
+
+        // Persistence has to mean establishment. `4698` on a task under
+        // `\Microsoft\Windows\` changed by SYSTEM is OS servicing, and a rule
+        // family that describes a *deletion* cannot support a persistence tag.
+        if is_critical_eid && critical[&event_id].tactic == "Persistence" {
+            let rule = format!("correlated_eid_{}", event_id);
+            let describes_removal =
+                !classify::persistence_is_established(critical[&event_id].event_type, &rule, msg);
+            let os_task_by_the_os = by_automation && classify::is_os_task_servicing(msg);
+            if describes_removal || os_task_by_the_os {
+                classification = "os:servicing".to_string();
+            }
+        }
+
         if !include {
             continue;
         }
@@ -388,6 +562,13 @@ pub fn parse_correlated(
             build_description(event_id, msg, &indicators)
         };
 
+        if let Some(i) = pending_logon {
+            emitted_logons[i].0 = events.len();
+        }
+        if let Some(i) = pending_group_change {
+            group_changes[i].event_idx = Some(events.len());
+        }
+
         events.push(UnifiedEvent {
             timestamp: ts,
             source: "event-logs".to_string(),
@@ -400,15 +581,84 @@ pub fn parse_correlated(
             user: display_user,
             hostname: hostname.to_string(),
             detection_rule: format!("correlated_eid_{}", event_id),
+            classification,
+            ..Default::default()
         });
     }
 
-    Ok((events, logons))
+    // Rarity is a property of the whole record, so it is decided here rather
+    // than row by row. A service account with ten thousand logons is furniture;
+    // one with two is the thing worth reading.
+    let mut rare_logons = 0usize;
+    for (idx, key) in &emitted_logons {
+        if *idx == usize::MAX {
+            continue;
+        }
+        let seen = logon_counts.get(key).copied().unwrap_or(0);
+        if seen < cfg.rare_logon_max {
+            if let Some(e) = events.get_mut(*idx) {
+                e.indicators.push(format!("RARE_LOGON:{}", seen));
+                if severity_order(&e.severity) < severity_order("med") {
+                    e.severity = "med".to_string();
+                }
+                rare_logons += 1;
+            }
+        }
+    }
+
+    // Machine-account group-membership churn, classified as the automation it is.
+    let automations = classify::classify_group_membership(&mut events, &group_changes);
+
+    let baseline_logons = emitted_logons.iter().filter(|(i, _)| *i != usize::MAX).count();
+    Ok(EventLogOutput { events, logons, automations, baseline_logons, off_hours_logons, rare_logons })
 }
 
 #[cfg(test)]
 mod desc_tests {
     use super::*;
+
+    /// The operator's line: "all the successful logons from legitimate users,
+    /// not machine accounts". Everything rejected here is the machine talking to
+    /// itself, and carrying it would drown the accounts that are people.
+    #[test]
+    fn only_real_accounts_count_as_baseline_users() {
+        for real in [
+            "super admin",
+            "DOMAIN\\user.name",
+            "svc_backup",
+            "ldapadmin",
+            "msol_b0ae60f928ee",
+        ] {
+            assert!(is_baseline_user(real), "{real} should count");
+        }
+        for machine in [
+            "MY-DC02$",
+            "DOMAIN\\MY-CTX01$",
+            "SYSTEM",
+            "NT AUTHORITY\\SYSTEM",
+            "LOCAL SERVICE",
+            "NETWORK SERVICE",
+            "ANONYMOUS LOGON",
+            "DWM-1",
+            "UMFD-0",
+            "S-1-5-21-1-2-3-500",
+            "-",
+            "",
+        ] {
+            assert!(!is_baseline_user(machine), "{machine} should not count");
+        }
+    }
+
+    /// The type is stated by name, because "10" is not something a reader can
+    /// act on and "RemoteInteractive" is.
+    #[test]
+    fn logon_types_are_named_not_numbered() {
+        assert_eq!(logon_type_name(2), "Interactive");
+        assert_eq!(logon_type_name(3), "Network");
+        assert_eq!(logon_type_name(5), "Service");
+        assert_eq!(logon_type_name(10), "RemoteInteractive");
+        assert_eq!(logon_type_name(99), "Other");
+    }
 
     #[test]
     fn short_message_preserved() {

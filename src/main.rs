@@ -112,6 +112,9 @@ enum Commands {
         /// Skip running the Wiskess Timeline Parser (supertimeline/triage report/OpenSearch NDJSON) over the Timeline folder after wiskers/enrichers/reporters complete
         #[arg(long)]
         no_timeline_parser: bool,
+        /// Known host restoration/rebuild date (ISO, e.g. 2026-05-19). 
+        #[arg(long)]
+        restoration_date: Option<String>,
     },
     OldWhip {
         /// config file of the binaries to run as processors
@@ -277,7 +280,8 @@ fn main() {
             start_date,
             end_date,
             ioc_file,
-            no_timeline_parser
+            no_timeline_parser,
+            restoration_date
         } => {
             let (config, artefacts_config) = utils::check_configs(config, &tool_path, artefacts_config);
 
@@ -291,7 +295,8 @@ fn main() {
                 collect,
                 out_log: PathBuf::new(),
                 multi_pb: MultiProgress::new(),
-                no_timeline_parser
+                no_timeline_parser,
+                restoration_date
             };
             wiskess::start_wiskess(args, &config, &artefacts_config, &data_source);
         },

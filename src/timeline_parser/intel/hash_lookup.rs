@@ -351,7 +351,11 @@ pub fn resolve_vt_key(cli_key: Option<&str>) -> Option<String> {
 }
 
 /// Write the text + JSON hash-lookup reports into `out_dir`.
-pub fn write_reports(results: &HashMap<String, HashResult>, out_dir: &Path) -> Result<()> {
+pub fn write_reports(
+    results: &HashMap<String, HashResult>,
+    hostname: &str,
+    out_dir: &Path,
+) -> Result<()> {
     use std::collections::BTreeMap;
     let mut by_class: BTreeMap<&str, Vec<&HashResult>> = BTreeMap::new();
     for r in results.values() {
@@ -385,8 +389,36 @@ pub fn write_reports(results: &HashMap<String, HashResult>, out_dir: &Path) -> R
     std::fs::create_dir_all(out_dir)?;
     std::fs::write(out_dir.join("hash_lookup.txt"), &report)?;
 
+    // One NDJSON line, carrying the six fields every wiskess timeline document
+    // carries, because `worker.py` ingests any filename ending in `json` and
+    // reads it a line at a time. This was pretty-printed, so the worker met it
+    // as one syntax error per line — a whole file's worth, silently.
+    //
+    // One summary document rather than one per hash: a hundred "unknown" rows
+    // are not a hundred findings, and the verdicts that matter are already on
+    // the events themselves as `HASH_INTEL:` indicators. The full result list
+    // rides along as a field for anything that wants the detail.
+    let mut sorted: Vec<&HashResult> = results.values().collect();
+    sorted.sort_by(|a, b| a.sha1.cmp(&b.sha1));
+    let malicious = count(&Classification::KnownBad) + count(&Classification::VtMalicious);
+    let now = chrono::Utc::now();
     let json = serde_json::json!({
+        "datetime": format!("{}Z", now.format("%Y-%m-%dT%H:%M:%S%.3f")),
+        "timestamp": now.timestamp_millis(),
+        "timestamp_desc": "hash_lookup - hash_lookup.json: HashLookupSummary",
+        "message": format!(
+            "Amcache SHA1 reputation: {total} unique hash(es) checked, {malicious} malicious \
+             ({} known-bad, {} VT-malicious), {} known-clean, {} unknown.",
+            count(&Classification::KnownBad),
+            count(&Classification::VtMalicious),
+            count(&Classification::KnownClean) + count(&Classification::VtClean),
+            count(&Classification::Unknown),
+        ),
+        "hostname": hostname,
+        "doc_type": "hash_lookup",
+
         "total": total,
+        "malicious": malicious,
         "summary": {
             "known_bad": count(&Classification::KnownBad),
             "vt_malicious": count(&Classification::VtMalicious),
@@ -394,12 +426,15 @@ pub fn write_reports(results: &HashMap<String, HashResult>, out_dir: &Path) -> R
             "vt_clean": count(&Classification::VtClean),
             "unknown": count(&Classification::Unknown),
         },
-        "results": results.values().map(|r| serde_json::json!({
+        "results": sorted.iter().map(|r| serde_json::json!({
             "sha1": r.sha1,
             "classification": r.classification.label(),
             "detail": r.detail,
         })).collect::<Vec<_>>(),
     });
-    std::fs::write(out_dir.join("hash_lookup.json"), serde_json::to_string_pretty(&json)?)?;
+    std::fs::write(
+        out_dir.join("hash_lookup.json"),
+        format!("{}\n", serde_json::to_string(&json)?),
+    )?;
     Ok(())
 }

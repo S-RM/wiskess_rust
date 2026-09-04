@@ -101,6 +101,7 @@ fn make_precursor_event(l: &SessionLogon, hostname: &str, action_ts: &str) -> Un
         user: l.user.clone(),
         hostname: hostname.to_string(),
         detection_rule: "precursor_logon_correlation".to_string(),
+        ..Default::default()
     }
 }
 
@@ -187,6 +188,7 @@ mod tests {
             user: user.into(),
             hostname: "H".into(),
             detection_rule: String::new(),
+            ..Default::default()
         }
     }
 

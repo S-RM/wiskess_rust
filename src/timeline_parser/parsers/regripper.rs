@@ -77,6 +77,7 @@ pub fn parse(
             user,
             hostname: hostname.to_string(),
             detection_rule: "regripper_finding".to_string(),
+            ..Default::default()
         });
     }
 

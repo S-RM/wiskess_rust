@@ -96,6 +96,7 @@ pub fn parse(
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "amcache_analysis".to_string(),
+            ..Default::default()
         });
     }
 
@@ -185,6 +186,7 @@ pub fn parse_regripper(
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "amcache_regripper_analysis".to_string(),
+            ..Default::default()
         });
     }
 

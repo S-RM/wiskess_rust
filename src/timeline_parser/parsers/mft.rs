@@ -108,6 +108,7 @@ pub fn parse(
             user: String::new(),
             hostname: hostname.to_string(),
             detection_rule: "mft_suspicious_file".to_string(),
+            ..Default::default()
         });
     }
 

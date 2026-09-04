@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::timeline_parser::{config, intel, output, parsers};
-use crate::timeline_parser::config::PipelineConfig;
+use crate::timeline_parser::config::{PipelineConfig, Verbosity, DEFAULT_BUSINESS_HOURS, DEFAULT_RARE_LOGON_MAX};
+use crate::timeline_parser::detectors::classify::{self, Automation};
 use crate::timeline_parser::detectors::compromised::CompromisedEntities;
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::detectors::restoration;
@@ -12,11 +13,16 @@ use crate::timeline_parser::detectors::suspicious_paths::SuspiciousPathDetector;
 use crate::timeline_parser::detectors::ta_tools::TAToolDetector;
 use crate::timeline_parser::output::dedup;
 use crate::timeline_parser::output::event::UnifiedEvent;
-use crate::timeline_parser::output::report::{generate_report, DetectionCoverage};
+use crate::timeline_parser::output::report::{generate_report, DetectionCoverage, ReportContext};
 use crate::timeline_parser::parsers::wiskess_log;
 use crate::timeline_parser::parsers::wiskess_log::CollectionGap;
 use crate::timeline_parser::output::supertimeline::{write_supertimeline, write_triage_timeline};
 use crate::timeline_parser::parsers::discovery::discover_artifacts;
+
+/// Days before the restoration date treated as the highest-relevance window.
+/// Upstream exposes this as `--restoration-window-days`; wiskess does not, so
+/// the vendored pipeline pins upstream's default.
+const RESTORATION_WINDOW_DAYS: i64 = 60;
 
 /// Plain (non-clap) arguments for a single Timeline/ folder pipeline run.
 /// Field-for-field equivalent of upstream's `Cli`, minus CLI-parsing concerns.
@@ -36,6 +42,9 @@ pub struct TimelineParserArgs {
     pub vt_rate: u32,
     pub data_dir: Option<PathBuf>,
     pub verbose: bool,
+    /// Upstream's `--restoration-date`: a rebuild date the operator knows,
+    /// which overrides the one the parser infers from log continuity.
+    pub restoration_date: Option<String>,
 }
 
 /// What the caller needs to log/report after a run.
@@ -95,9 +104,17 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
         eprintln!("[*] No GeoIP databases found (set MAXMIND_DB_DIR; IP geo enrichment disabled)");
     }
 
-    let hostname = parsers::host_info::get_hostname(&artifacts, &args.timeline_dir)
-        .unwrap_or_else(|| "UNKNOWN".to_string());
-    eprintln!("[*] Hostname: {}", hostname);
+    // Upstream moved from a bare hostname to a HostIdentity: the report needs
+    // to state a divergence (`X, also resolves to Y`) rather than file the host
+    // under the comma-joined pair. `name` is still what every output path uses.
+    let identity = parsers::host_info::resolve_identity(&artifacts, &args.timeline_dir);
+    let hostname = identity.name.clone();
+    if identity.diverges() {
+        let others: Vec<&str> = identity.aliases().iter().map(|(_, n)| n.as_str()).collect();
+        eprintln!("[*] Hostname: {} (also resolves to {})", hostname, others.join(", "));
+    } else {
+        eprintln!("[*] Hostname: {}", hostname);
+    }
 
     // Phase 2: Timeframe detection
     let window = if let (Some(ref ts), Some(ref te)) = (&args.time_start, &args.time_end) {
@@ -149,6 +166,15 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
         no_sigma: args.no_sigma,
         offline: args.offline,
         verbose: args.verbose,
+        // Upstream gates these three behind --verbose-events / --business-hours
+        // / --rare-logon-max. wiskess does not expose those flags, so the
+        // vendored pipeline runs at upstream's defaults: curated output, no
+        // baseline-logon carrying. Listed explicitly rather than filled from
+        // `..Default::default()` so that the next field upstream adds breaks
+        // the build here instead of silently taking a default.
+        verbosity: Verbosity::Curated,
+        business_hours: DEFAULT_BUSINESS_HOURS,
+        rare_logon_max: DEFAULT_RARE_LOGON_MAX,
     };
 
     // Phase 3a: Hayabusa → build compromised entities
@@ -169,14 +195,24 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
 
     // Phase 3b: Event-logs correlated (also returns inbound RDP/SMB session logons)
     let mut session_logons: Vec<parsers::event_logs::SessionLogon> = Vec::new();
+    let mut automations: Vec<Automation> = Vec::new();
     if let Some(path) = artifacts.get("event-logs") {
         eprintln!("[*] Parsing event-logs (correlated)...");
-        let (events, logons) = parsers::event_logs::parse_correlated(
+        let out = parsers::event_logs::parse_correlated(
             path, &cfg, &ta_detector, &ioc_matcher, &hostname, &compromised,
         )?;
-        eprintln!("[*]   {} events, {} session logons", events.len(), logons.len());
-        all_events.extend(events);
-        session_logons = logons;
+        eprintln!("[*]   {} events, {} session logons", out.events.len(), out.logons.len());
+        if cfg.verbosity.baseline() {
+            eprintln!("[*]   baseline logons: {} ({} out-of-hours, {} rare)",
+                      out.baseline_logons, out.off_hours_logons, out.rare_logons);
+        }
+        for a in &out.automations {
+            eprintln!("[*]   Automation (not a finding): {}", a.as_rate());
+        }
+        automations = out.automations;
+        all_events.extend(classify::automation_events(&automations, &hostname));
+        all_events.extend(out.events);
+        session_logons = out.logons;
     }
 
     // Phase 3c: Network
@@ -297,7 +333,7 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
             }
         }
         eprintln!("[*]   Hash lookup: {} malicious hits flagged", bad);
-        hash_lookup::write_reports(&results, &args.output_dir)?;
+        hash_lookup::write_reports(&results, &hostname, &args.output_dir)?;
     }
 
     // Phase 5c: Correlate precursor RDP/SMB logons to findings
@@ -358,6 +394,44 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
               inventory.installed.len(), inventory.flags.len());
     all_events.extend(software::to_events(&inventory, &hostname));
 
+    // Phase 5h: Restoration — ranked candidates, corroboration, and the phase
+    // each finding belongs to. Ported alongside --restoration-date: the report's
+    // Restoration Phases section reads `event.phase` and `continuity.candidates`,
+    // so without this block a supplied date would name itself in the prose and
+    // then partition nothing.
+    let signals = restoration::rebuild_signals(&all_events);
+    continuity.rank_candidates(&signals);
+    // A date-only `--restoration-date` means midnight that day. Left as
+    // `2026-05-19` it would still partition correctly (string order works out)
+    // but would not parse, so the relevance window before it could never be
+    // marked.
+    let supplied_restoration = args.restoration_date.as_deref().map(|d| {
+        if d.len() == 10 && d.as_bytes()[4] == b'-' { format!("{d}T00:00:00Z") } else { d.to_string() }
+    });
+    let restoration_date: Option<String> = supplied_restoration
+        .clone()
+        .or_else(|| continuity.best_candidate().map(|c| c.resumes.clone()));
+    if let Some(ref d) = restoration_date {
+        let source = if supplied_restoration.is_some() { "supplied" } else { "inferred" };
+        let counts = restoration::assign_phases(&mut all_events, d);
+        let in_window = restoration::mark_restoration_window(
+            &mut all_events, d, RESTORATION_WINDOW_DAYS);
+        eprintln!("[*]   {} event(s) sit in the {}-day window before the restore (highest relevance)",
+                  in_window, RESTORATION_WINDOW_DAYS);
+        eprintln!(
+            "[*] Restoration ({source}) {d}: {} pre / {} restoration-process / {} responder / {} post-restoration unexplained",
+            counts.pre, counts.process, counts.responder, counts.post
+        );
+        for c in continuity.candidates.iter().take(3) {
+            eprintln!("[*]   candidate {} ({}h, {}){}", c.resumes, c.gap_hours, c.kind.label(),
+                      if c.corroboration.is_empty() { String::new() }
+                      else { format!(" — corroborated: {}", c.corroboration.join("; ")) });
+        }
+    }
+    let restoration_json = restoration::write_restoration_json(
+        &continuity, &hostname, supplied_restoration.as_deref(), &args.output_dir)?;
+    eprintln!("[*] Restoration record: {}", restoration_json.display());
+
     // Phase 6: Merge, dedup, output
     eprintln!("[*] Sorting {} events...", all_events.len());
     all_events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
@@ -392,8 +466,21 @@ pub fn run(args: TimelineParserArgs) -> Result<TimelineParserSummary> {
             e + p
         },
     };
-    generate_report(&all_events, &window, &hostname, elapsed, &gaps, &geo,
-                    &ioc_matcher.coverage(), &detection, &continuity, &inventory, &report_path)?;
+    let report_ctx = ReportContext {
+        window: &window,
+        identity: &identity,
+        elapsed,
+        gaps: &gaps,
+        geo: &geo,
+        ioc_coverage: &ioc_matcher.coverage(),
+        detection: &detection,
+        continuity: &continuity,
+        software: &inventory,
+        cfg: &cfg,
+        automations: &automations,
+        restoration_supplied: supplied_restoration.as_deref(),
+    };
+    generate_report(&all_events, &report_ctx, &report_path)?;
 
     eprintln!("[*] === COMPLETE ({:.1}s) ===", elapsed);
     eprintln!("[*] Supertimeline: {} | {}", csv_path.display(), jsonl_path.display());

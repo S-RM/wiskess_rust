@@ -30,6 +30,7 @@ mod tests {
             multi_pb: MultiProgress::new(),
             collect: false,
             no_timeline_parser: false,
+            restoration_date: None,
         };
 
         run_timeline_parser(&main_args);

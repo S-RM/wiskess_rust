@@ -18,6 +18,113 @@ use std::path::{Path, PathBuf};
 /// was never the right thing to gate on. The hostname names every output file
 /// (`<host>_supertimeline.jsonl`), so getting it wrong strands the results:
 /// anything asking for them by host finds nothing.
+/// Every name this collection resolves for the host, and where each came from.
+///
+/// wiskess writes its own `hostname` field as a comma-joined pair —
+/// `<device-reported name>, <AD/DNS-resolved name>` — whenever the two differ.
+/// That is legitimate information: the parser resolved a second name for the
+/// device. But expressing it *only* by concatenating both into one field means
+/// nothing querying by the device's plain name ever finds the output filed under
+/// the pair. On a 31-host pilot that cost 5 hosts an unnecessary slow fallback
+/// or an outright failure.
+///
+/// So the divergence is stated as a fact — `Device name: MY-NPS01 (also
+/// resolves to WIN-A1B2C3D4E5F)` — rather than left as an accident of how a
+/// field got indexed.
+#[derive(Debug, Clone, Default)]
+pub struct HostIdentity {
+    /// The name used for output files and the report title.
+    pub name: String,
+    /// Every distinct name observed, with the artefact that reported it.
+    pub observed: Vec<(String, String)>,
+}
+
+impl HostIdentity {
+    /// Names that are genuinely *different* from the primary one.
+    ///
+    /// An FQDN of the same machine is not a divergence — `MY-DC02` and
+    /// `MY-DC02.domain.local` are one name written two ways, and reporting
+    /// that on every domain-joined host would bury the case this exists for
+    /// (`MY-NPS01` also answering to `WIN-A1B2C3D4E5F`). Comparison is on the
+    /// short name.
+    pub fn aliases(&self) -> Vec<&(String, String)> {
+        let short = |h: &str| h.split('.').next().unwrap_or(h).trim().to_lowercase();
+        let primary = short(&self.name);
+        let mut seen: Vec<String> = Vec::new();
+        let mut out = Vec::new();
+        for pair in &self.observed {
+            let s = short(&pair.1);
+            if s == primary || seen.contains(&s) {
+                continue;
+            }
+            seen.push(s);
+            out.push(pair);
+        }
+        out
+    }
+
+    pub fn diverges(&self) -> bool {
+        !self.aliases().is_empty()
+    }
+}
+
+/// Resolve the host's identity: its primary name plus every alias the
+/// collection reports for it.
+pub fn resolve_identity(
+    artifacts: &HashMap<String, PathBuf>,
+    timeline_dir: &Path,
+) -> HostIdentity {
+    let mut observed: Vec<(String, String)> = Vec::new();
+    let mut note = |source: &str, name: &str| {
+        // wiskess joins a divergent pair with a comma; split it back apart so
+        // both names are visible as names rather than as one odd string.
+        for part in name.split(',') {
+            let n = part.trim();
+            if n.is_empty() || n == "-" || n.eq_ignore_ascii_case("n/a") {
+                continue;
+            }
+            if !observed
+                .iter()
+                .any(|(s, existing)| s == source && existing.eq_ignore_ascii_case(n))
+            {
+                observed.push((source.to_string(), n.to_string()));
+            }
+        }
+    };
+
+    let host_info_csv = timeline_dir.join("Host_Information.csv");
+    if host_info_csv.exists() {
+        for (key, value) in host_info_fields(&host_info_csv) {
+            if key.starts_with("Hostname") {
+                note(&key, &value);
+            }
+        }
+    }
+    for key in ["registry", "event-logs", "amcache", "appcompatcache"] {
+        if let Some(path) = artifacts.get(key) {
+            if let Some(n) = hostname_from_csv_column(path) {
+                note(key, &n);
+            }
+        }
+    }
+    // Same, for files sitting in Timeline/ but not in the artifact map — the
+    // fallback `get_hostname` already relies on.
+    for name in ["registry.csv", "event-logs.csv"] {
+        if artifacts.values().any(|p| p.file_name().and_then(|f| f.to_str()) == Some(name)) {
+            continue;
+        }
+        let p = timeline_dir.join(name);
+        if p.exists() {
+            if let Some(n) = hostname_from_csv_column(&p) {
+                note(name, &n);
+            }
+        }
+    }
+
+    let name = get_hostname(artifacts, timeline_dir).unwrap_or_else(|| "UNKNOWN".to_string());
+    HostIdentity { name, observed }
+}
+
 pub fn get_hostname(artifacts: &HashMap<String, PathBuf>, timeline_dir: &Path) -> Option<String> {
     // 1. Host_Information.csv, written into Timeline/ by wiskess.
     let host_info_csv = timeline_dir.join("Host_Information.csv");
@@ -150,7 +257,7 @@ fn parse_host_info_csv(path: &Path) -> Option<String> {
     let msg_idx = headers.iter().position(|h| h.trim() == "message")?;
     for result in rdr.records().flatten() {
         let msg = result.get(msg_idx).unwrap_or("").trim();
-        // Lines like "Hostname Registry: T440-3B9Y3" or "Hostname Event Logs: T440-3B9Y3"
+        // Lines like "Hostname Registry: WKS-0001" or "Hostname Event Logs: WKS-0001"
         if msg.starts_with("Hostname") {
             if let Some((_, after)) = msg.split_once(':') {
                 let name = after.trim().to_string();
@@ -288,6 +395,61 @@ mod tests {
         let got = get_hostname(&HashMap::new(), &d);
         std::fs::remove_dir_all(&d).ok();
         assert_eq!(got, None);
+    }
+
+    /// The case this exists for: a device answering to a second, unrelated name.
+    /// Nothing querying by the device's plain name finds output filed under the
+    /// pair, and on a 31-host pilot that cost 5 hosts a fallback or a failure.
+    #[test]
+    fn a_genuinely_different_second_name_is_surfaced_as_an_alias() {
+        let d = tmp("alias");
+        std::fs::write(
+            d.join("Host_Information.csv"),
+            "datetime,message\n\
+             t,Hostname Registry: MY-NPS01\n\
+             t,Hostname Event Logs: WIN-A1B2C3D4E5F\n",
+        ).unwrap();
+
+        let id = resolve_identity(&HashMap::new(), &d);
+        std::fs::remove_dir_all(&d).ok();
+        assert_eq!(id.name, "MY-NPS01");
+        assert!(id.diverges());
+        let names: Vec<&str> = id.aliases().iter().map(|(_, n)| n.as_str()).collect();
+        assert_eq!(names, vec!["WIN-A1B2C3D4E5F"]);
+    }
+
+    /// An FQDN is the same name written twice. Reporting it as a divergence on
+    /// every domain-joined host would bury the real ones.
+    #[test]
+    fn an_fqdn_of_the_same_host_is_not_a_divergence() {
+        let d = tmp("fqdn");
+        std::fs::write(
+            d.join("Host_Information.csv"),
+            "datetime,message\n\
+             t,Hostname Registry: MY-DC02\n\
+             t,Hostname Event Logs: MY-DC02.domain.local\n",
+        ).unwrap();
+
+        let id = resolve_identity(&HashMap::new(), &d);
+        std::fs::remove_dir_all(&d).ok();
+        assert_eq!(id.name, "MY-DC02");
+        assert!(!id.diverges(), "{:?}", id.aliases());
+    }
+
+    /// wiskess writes a divergent pair comma-joined into one field. Both halves
+    /// have to come back out as names.
+    #[test]
+    fn a_comma_joined_pair_is_split_back_into_two_names() {
+        let d = tmp("joined");
+        std::fs::write(
+            d.join("registry.csv"),
+            "datetime,hostname\nt,\"MY-NPS01, WIN-A1B2C3D4E5F\"\n",
+        ).unwrap();
+
+        let id = resolve_identity(&HashMap::new(), &d);
+        std::fs::remove_dir_all(&d).ok();
+        assert!(id.observed.iter().any(|(_, n)| n == "MY-NPS01"), "{:?}", id.observed);
+        assert!(id.observed.iter().any(|(_, n)| n == "WIN-A1B2C3D4E5F"), "{:?}", id.observed);
     }
 
     /// A CSV with no hostname column must not be mistaken for a source.

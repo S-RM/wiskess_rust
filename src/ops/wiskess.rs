@@ -126,7 +126,8 @@ pub(crate) fn init_wiskess(args: config::MainArgs) -> (String, chrono::prelude::
         collect: args.collect,
         out_log,
         multi_pb: MultiProgress::new(),
-        no_timeline_parser: args.no_timeline_parser
+        no_timeline_parser: args.no_timeline_parser,
+        restoration_date: args.restoration_date
     };
     (date_time_fmt, wiskess_start, main_args)
 }

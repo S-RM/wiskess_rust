@@ -1,0 +1,77 @@
+# Vendor and platform install trees.
+#
+# Anything under one of these paths is tagged `vendor:<product>` at parse time,
+# BEFORE any suspicion rule runs. This exists because the same binary in the
+# same place produced three different verdicts across a 28-host review:
+# `MpDlpCmd.exe` under Defender's platform tree supported an AMBER, a GREEN and
+# a RED, and `fls.exe` under F-Secure's response package was cited as "forensic
+# tooling in user-writable locations".
+#
+# Two rules that this file exists to enforce:
+#
+#   * The PATH decides, never the filename. `fls.exe` is Sleuth Kit and is also
+#     shipped inside F-Secure's response package; `7za.exe` ships with VMware
+#     Tools. A filename allowlist would excuse the attacker's copy too.
+#   * A path allowlist is spoofable. Where the collection carries Authenticode
+#     signer data, prefer it — this file is the fallback, not the authority.
+#
+# `path:` is a literal fragment, matched case-insensitively anywhere in the
+# path. `pattern:` is a regex, for the cases a literal cannot express.
+#
+# Entries here EXTEND the built-in list compiled into the binary
+# (src/detectors/classify.rs::BUILTIN_VENDOR_PATHS); they never replace it, so a
+# missing or truncated file degrades to "fewer trees known", not to "every EDR
+# install tree is suspicious again".
+
+vendor_paths:
+  # --- Endpoint protection --------------------------------------------------
+  - product: withsecure
+    path: '\ProgramData\F-Secure\'
+  - product: withsecure
+    path: '\Program Files (x86)\F-Secure\PSB\'
+  - product: withsecure
+    pattern: '\\F-Secure\\Ultralight\\'
+  - product: sentinelone
+    path: '\Program Files\SentinelOne\'
+  - product: sentinelone
+    path: '\system32\DRIVERS\SentinelOne\'
+  - product: microsoft-defender
+    path: '\ProgramData\Microsoft\Windows Defender\platform\'
+  - product: crowdstrike
+    path: '\Program Files\CrowdStrike\'
+  - product: sophos
+    path: '\Program Files\Sophos\'
+  - product: eset
+    path: '\Program Files\ESET\'
+  - product: trellix
+    path: '\Program Files\Trellix\'
+  - product: trellix
+    path: '\Program Files\McAfee\'
+  - product: arctic-wolf
+    path: '\Program Files\Arctic Wolf Networks\'
+  - product: rapid7-insight
+    path: '\Program Files\Rapid7\'
+  - product: tanium
+    path: '\Program Files (x86)\Tanium\'
+
+  # --- Platform / hypervisor tooling ---------------------------------------
+  - product: vmware-tools
+    path: '\Program Files\VMware\VMware Tools\'
+  - product: hyper-v-integration
+    path: '\Windows\System32\vmguestagent\'
+  - product: citrix
+    path: '\Program Files\Citrix\'
+  - product: citrix
+    path: '\Program Files (x86)\Citrix\'
+
+  # --- Management agents ----------------------------------------------------
+  - product: sccm
+    path: '\Windows\CCM\'
+  - product: azure-monitor
+    path: '\Program Files\Microsoft Monitoring Agent\'
+  - product: azure-arc
+    path: '\Program Files\AzureConnectedMachineAgent\'
+  - product: nable
+    path: '\Program Files (x86)\N-able Technologies\'
+  - product: datto-rmm
+    path: '\Program Files (x86)\CentraStage\'
