@@ -301,21 +301,29 @@ pub mod paths {
         }
     }
 
-    /// Resolve a path case-insensitively by listing the parent directory,
-    /// lowercasing both the target filename and each entry name, and returning
-    /// the actual filesystem path when they match.
+    /// Resolve a path case-insensitively, one component at a time, so a
+    /// mismatch anywhere in the path is found (i.e. `System32/SRU` vs `System32/sru`).
+    /// Components that exist as written are used directly; otherwise the
+    /// directory is listed and matched on lowercased names.
     pub fn find_case_insensitive(path: &Path) -> Option<std::path::PathBuf> {
-        let parent = path.parent()?;
-        let target = path.file_name()?.to_string_lossy().to_lowercase();
-
-        std::fs::read_dir(parent).ok()?.flatten().find_map(|entry| {
-            let entry_name = entry.file_name();
-            if entry_name.to_string_lossy().to_lowercase() == target {
-                Some(entry.path())
-            } else {
-                None
+        let mut resolved = std::path::PathBuf::new();
+        for comp in path.components() {
+            let exact = resolved.join(comp);
+            if exact.exists() || !matches!(comp, std::path::Component::Normal(_)) {
+                resolved = exact;
+                continue;
             }
-        })
+            let target = comp.as_os_str().to_string_lossy().to_lowercase();
+            let dir = if resolved.as_os_str().is_empty() { Path::new(".") } else { resolved.as_path() };
+            resolved = std::fs::read_dir(dir).ok()?.flatten().find_map(|entry| {
+                if entry.file_name().to_string_lossy().to_lowercase() == target {
+                    Some(entry.path())
+                } else {
+                    None
+                }
+            })?;
+        }
+        Some(resolved)
     }
 
     fn is_glob_path(path_str: &String) -> bool {

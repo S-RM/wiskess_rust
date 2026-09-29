@@ -107,13 +107,21 @@ wiskers:
     outfile: RecentFileCache.csv
     input: recentFileCache
     github: https://github.com/EricZimmerman/RecentFileCacheParser.git    
+  # PECmd exits on Linux: it needs Windows libraries to decompress Win10+ prefetch
+  # - name: Prefetch
+  #   binary: '{tool_path}/.dotnet/dotnet'
+  #   args: '{tool_path}/Get-ZimmermanTools/net9/PECmd.dll -d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
+  #   outfolder: FileExecution
+  #   outfile: prefetch.csv
+  #   input: prefetch
+  #   github: https://github.com/EricZimmerman/Prefetch.git
   - name: Prefetch
-    binary: '{tool_path}/.dotnet/dotnet'
-    args: '{tool_path}/Get-ZimmermanTools/net9/PECmd.dll -d {input} --csv {outfolder} --csvf {outfile} --vss --mp -q'
+    binary: wiskess_native
+    args: prefetch
     outfolder: FileExecution
-    outfile: prefetch.csv
+    outfile: prefetch_native.csv
     input: prefetch
-    github: https://github.com/EricZimmerman/Prefetch.git
+    github: https://github.com/ForensicRS/frnsc-prefetch
   # - name: SrumECmd
   #   binary: '{tool_path}/.dotnet/dotnet'
   #   args: '{tool_path}/Get-ZimmermanTools/net9/SrumECmd.dll -f {input} -r {input_other} --csv {outfolder}'

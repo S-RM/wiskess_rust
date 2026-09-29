@@ -247,6 +247,35 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         outmsg.push_str(&output_script(v, code, output, error));
     }
 
+    // shellbags.pl, shellbags_tln.pl and comdlg32.pl scan a shell item byte by byte for the
+    // 0xbeef extension block (and the NUL ending the short name) with no end-of-data check,
+    // so a malformed item spins at 100% CPU forever. Bound each scan to the item length.
+    // Idempotent - patched loops no longer match. Re-run setup after an apt upgrade of regripper.
+    prog_spin_msg(&pb3, "Patching regripper plugins".to_string());
+    let (code, output, error) = run_script::run_script!(
+        r##"
+         patch_expr='
+         s/while\s*\(\$tag\)\s*\{(\s*if \(unpack\("v",substr\(\$data,\$ofs \+ \$cnt,2\)\) == 0xbeef\))/while (\$tag && \$ofs + \$cnt + 2 <= length(\$data)) {$1/g;
+         s/while\s*\(\$tag\)\s*\{(\s*if \(unpack\("v",substr\(\$data,\$ofs,2\)\) == 0xbeef\))/while (\$tag && \$ofs + 2 <= length(\$data)) {$1/g;
+         s/while\s*\(\$tag\)\s*\{(\s*my \$s = substr\(\$data,\$ofs_shortname \+ \$cnt,1\);)/while (\$tag && \$ofs_shortname + \$cnt < length(\$data)) {$1/g;
+         '
+         seen=""
+         for d in /usr/share/regripper/plugins /usr/lib/regripper/plugins; do
+             [ -d "$d" ] || continue
+             real=$(readlink -f "$d")
+             case " $seen " in *" $real "*) continue ;; esac
+             seen="$seen $real"
+             for f in shellbags.pl shellbags_tln.pl comdlg32.pl; do
+                 [ -f "$real/$f" ] || continue
+                 perl -0pi -e "$patch_expr" "$real/$f" && echo "Patched: $real/$f"
+             done
+         done
+         [ -n "$seen" ] || echo "No regripper plugin directory found"
+         "##,
+         &vec![],
+         &options
+    ).unwrap();
+    outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Installing Python packages...".to_string());
     let (code, output, error) = run_script::run_script!(

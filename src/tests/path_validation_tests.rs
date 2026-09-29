@@ -179,6 +179,27 @@ mod tests {
         );
     }
 
+    /// Regression test: the casing mismatch can be in a directory, not the
+    /// filename - config has System32/SRU/SRUDB.dat, collection has sru/SRUDB.dat.
+    #[test]
+    fn test_case_insensitive_path_match_in_dir() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let actual_dir = temp_dir.path().join("System32").join("sru");
+        fs::create_dir_all(&actual_dir).unwrap();
+        let actual_path = actual_dir.join("SRUDB.dat");
+        fs::write(&actual_path, b"dummy").unwrap();
+
+        let wrong_case = temp_dir.path().join("System32").join("SRU").join("SRUDB.dat");
+        let resolved = find_case_insensitive(&wrong_case);
+
+        assert_eq!(
+            resolved.as_deref(),
+            Some(actual_path.as_path()),
+            "find_case_insensitive should resolve a wrong-cased directory in the path"
+        );
+    }
+
     /// Test that find_case_insensitive returns None for a file that does not
     /// exist under any casing in the parent directory.
     #[test]

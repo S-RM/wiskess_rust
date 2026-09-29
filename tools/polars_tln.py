@@ -314,6 +314,14 @@ def csv_to_tln(out_filepath, time_from, time_to):
       'times': ['RunTime'],
       'fmt_time': '%F %T%.f'
     },
+    'prefetch_native': {
+      # wiskess_native prefetch parser (Linux), one row per run time
+      'file': os.path.join(*[f'{out_filepath}','FileExecution','prefetch_native.csv']),
+      'out': os.path.join(*[f'{out_filepath}','Timeline','prefetch_native.csv']),
+      'msg': ['ExecutableName','RunCount','RunTimeSlot','FilesLoadedCount','Volumes','SourceFilename'],
+      'times': ['RunTime'],
+      'fmt_time': '%F %T%.f'
+    },
     'appcompatcache': {
       'file': os.path.join(*[f'{out_filepath}','FileExecution','appcompatcache.csv']),
       'out': os.path.join(*[f'{out_filepath}','Timeline','appcompatcache.csv']),

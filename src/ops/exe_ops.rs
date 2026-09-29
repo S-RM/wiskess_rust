@@ -5,7 +5,7 @@ use rayon::ThreadPoolBuilder;
 use std::fs::{canonicalize, OpenOptions};
 use crate::configs::config::{self, Wiskers};
 use crate::init::setup;
-use super::file_ops;
+use super::{file_ops, native_ops};
 
 pub fn run_whipped_script(script: &String, args: config::WhippedArgs) {
     let mut pwsh = "pwsh".to_string();
@@ -250,7 +250,7 @@ pub fn load_wisker(main_args_c: &config::MainArgs, wisker: &config::Wiskers, dat
 
 pub fn installed_binary_check(chk_exists: bool, binary: &String) -> String {
     let mut installed = false;
-    if chk_exists {
+    if chk_exists && !native_ops::is_native(binary) {
         for test_arg in ["-h", "help", "--version", "-v", "-V", "-c print('wiskess')"] {
             if binary.starts_with("py") {
                 let python_check = run_wisker(binary, &"-V 2>&1".to_string(), Path::new(""));
@@ -330,6 +330,7 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
         pool.spawn(move || {
             let input_file = data_paths_c[&wisker.input].as_str();
             if input_file != "wiskess_none" {
+                let input_path = get_wisker_art(&data_paths_c, &wisker.input, &main_args_c);
                 // Build the variables needed to run the binary
                 let (wisker_arg, wisker_binary, wisker_script, overwrite_file, err_msg) = load_wisker(
                     &main_args_c, 
@@ -348,16 +349,23 @@ pub fn run_commands(func: &Vec<Wiskers>, main_args: &config::MainArgs, data_path
                         _ = run_posh("-c", &wisker_script, &main_args_c.out_log, &"".to_string(), true);
                     }
 
-                    let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
+                    // run the binary with the args, or the in-process parser named by the args
+                    let (stdout, stderr) = if native_ops::is_native(&wisker_binary) {
+                        file_ops::log_msg(&main_args_c.out_log, format!("[ ] Running native: {} on {}", &wisker_arg, &input_path));
+                        let out_folder = Path::new(&main_args_c.out_path).join(&wisker.outfolder);
+                        native_ops::run_native(&wisker_arg, Path::new(&input_path), &out_folder, &wisker.outfile)
+                    } else {
+                        let output = run_wisker(&wisker_binary, &wisker_arg, &main_args_c.out_log);
+                        (output.stdout, output.stderr)
+                    };
                     
-                    // run the binary with the args
                     file_ops::log_msg(&main_args_c.out_log, format!("[+] Done {} with command: {} {}", 
                         &wisker.name, 
                         &wisker_binary,
                         &wisker_arg));
                         
-                    tx.send(output.stdout).unwrap();
-                    tx.send(output.stderr).unwrap();
+                    tx.send(stdout).unwrap();
+                    tx.send(stderr).unwrap();
                             
                 } else {    
                     let folder_path = format!("{}/{}", &main_args_c.out_path, &wisker.outfolder);
