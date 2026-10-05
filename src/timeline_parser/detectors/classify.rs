@@ -25,6 +25,8 @@ use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::timeline_parser::detectors::file_classes::normalise_path;
+use crate::timeline_parser::detectors::{warn_skipped, SkippedRule};
 use crate::timeline_parser::output::event::UnifiedEvent;
 
 // ── Principals ───────────────────────────────────────────────────────────────
@@ -92,18 +94,43 @@ const COMPONENT_STORE: &[(&str, &str)] = &[
 /// The responder's own footprint. Class 2 of the post-restoration partition:
 /// the forensic collection is not attacker activity, and on the run that
 /// prompted this it was landing in the same undifferentiated pile.
+///
+/// Each entry names a **directory or an executable**, and is matched at the start
+/// of a path segment by [`path_segment_starts_with`] — never as a bare substring.
+/// Unanchored, `collection-` explains away anything named `…datacollection-*` and
+/// `hayabusa` anything under a directory containing the word, and an event this
+/// classifies leaves the triage cut. That was tolerable while path classification
+/// only ever saw drive-rooted paths; once `PATH_RE` also matches the relative
+/// `.\…` form that `MFTECmd.csv` carries, it applies to every MFT row on the host.
 const RESPONDER_MARKERS: &[(&str, &str)] = &[
     ("ir-collector", "collector"),
     ("velociraptor", "collector"),
     ("vql_", "collector-output"),
     ("kape.exe", "collector"),
-    ("\\kape\\", "collector"),
+    ("kape\\", "collector"),
     ("wiskess", "collector"),
     ("collection-", "collection-archive"),
     ("evtxecmd", "parser"),
     ("mftecmd", "parser"),
     ("hayabusa", "parser"),
 ];
+
+/// Does `frag` appear in `lower` at the start of a path segment?
+///
+/// `lower` must already be lowercased and separator-normalised. A match at
+/// position 0 counts: a path can reach here without a drive or a leading
+/// separator (`Collection-HOST-…\Timeline\x.csv`), and the first segment is still
+/// a segment.
+///
+/// This is a prefix test within the segment, not a whole-segment test, because
+/// every marker is deliberately a stem — `collection-` is followed by a hostname,
+/// `vql_` by a query name. The cost is that a directory merely *starting* with a
+/// marker matches too; the alternative is missing the real thing on every host.
+fn path_segment_starts_with(lower: &str, frag: &str) -> bool {
+    lower
+        .match_indices(frag)
+        .any(|(at, _)| at == 0 || lower.as_bytes()[at - 1] == b'\\')
+}
 
 /// Built-in vendor trees, used when no `vendor_paths.yaml` is supplied and
 /// merged with it when one is.
@@ -181,6 +208,7 @@ pub struct Classifier {
     /// Where the vendor rules came from, for the report's coverage table.
     pub vendor_rule_count: usize,
     pub vendor_source: String,
+    skipped: Vec<SkippedRule>,
 }
 
 impl Classifier {
@@ -198,6 +226,7 @@ impl Classifier {
             .collect();
 
         let mut source = "built-in".to_string();
+        let mut skipped: Vec<SkippedRule> = Vec::new();
         let yaml_path = data_dir.join("vendor_paths.yaml");
         if yaml_path.exists() {
             let content = std::fs::read_to_string(&yaml_path)?;
@@ -209,7 +238,8 @@ impl Classifier {
                     if product.is_empty() {
                         continue;
                     }
-                    // `path` is a literal path fragment; `pattern` is a regex.
+                    // `path` is a literal path fragment, escaped here, so its
+                    // compilation cannot fail. `pattern` is a regex and can.
                     if let Some(frag) = rule.get("path").and_then(|v| v.as_str()) {
                         if let Ok(re) = Regex::new(&format!("(?i){}", regex::escape(frag))) {
                             vendor.push(VendorRule { pattern: re, product: product.to_string() });
@@ -217,9 +247,18 @@ impl Classifier {
                         }
                     }
                     if let Some(pat) = rule.get("pattern").and_then(|v| v.as_str()) {
-                        if let Ok(re) = Regex::new(&format!("(?i){}", pat)) {
-                            vendor.push(VendorRule { pattern: re, product: product.to_string() });
-                            added += 1;
+                        match Regex::new(&format!("(?i){}", pat)) {
+                            Ok(re) => {
+                                vendor
+                                    .push(VendorRule { pattern: re, product: product.to_string() });
+                                added += 1;
+                            }
+                            Err(e) => skipped.push(SkippedRule {
+                                section: "vendor_paths.yaml".to_string(),
+                                reason: product.to_string(),
+                                pattern: pat.to_string(),
+                                error: e.to_string(),
+                            }),
                         }
                     }
                 }
@@ -227,8 +266,19 @@ impl Classifier {
             source = format!("built-in + {} from {}", added, yaml_path.display());
         }
 
+        // A vendor rule that does not compile is the inverse of the other packs:
+        // it does not lose a detection, it loses an *explanation*, so an install
+        // tree stays unclassified and crowds the triage cut. Still degraded, still
+        // has to be said.
+        warn_skipped("vendor-path", &skipped, vendor.len());
+
         let n = vendor.len();
-        Ok(Self { vendor, vendor_rule_count: n, vendor_source: source })
+        Ok(Self { vendor, vendor_rule_count: n, vendor_source: source, skipped })
+    }
+
+    /// Vendor patterns present in `vendor_paths.yaml` that are not active.
+    pub fn skipped_rules(&self) -> &[SkippedRule] {
+        &self.skipped
     }
 
     /// The product whose install tree this path sits under, if any.
@@ -246,18 +296,25 @@ impl Classifier {
     ///
     /// Vendor beats component store: a vendor package unpacked under
     /// `ProgramData` is more informative than "somewhere on disk".
+    ///
+    /// The path is normalised first. Every fragment below is written in Windows
+    /// form, and `mft_dump.csv`'s `/`-separated `FullPath` would otherwise match
+    /// none of them.
     pub fn classify_path(&self, path: &str) -> Option<String> {
         if path.is_empty() {
             return None;
         }
-        if let Some(product) = self.vendor_for_path(path) {
+        let normalised = normalise_path(path);
+        if let Some(product) = self.vendor_for_path(&normalised) {
             return Some(format!("vendor:{product}"));
         }
-        let lower = path.to_lowercase();
+        let lower = normalised.to_lowercase();
         if let Some((_, what)) = COMPONENT_STORE.iter().find(|(frag, _)| lower.contains(frag)) {
             return Some(format!("os:{what}"));
         }
-        if let Some((_, what)) = RESPONDER_MARKERS.iter().find(|(frag, _)| lower.contains(frag)) {
+        if let Some((_, what)) =
+            RESPONDER_MARKERS.iter().find(|(frag, _)| path_segment_starts_with(&lower, frag))
+        {
             return Some(format!("responder:{what}"));
         }
         None
@@ -551,8 +608,37 @@ pub fn automation_events(autos: &[Automation], hostname: &str) -> Vec<UnifiedEve
 // ── One pass over the file-artefact events ───────────────────────────────────
 
 /// Windows paths as they appear inside a description line.
+///
+/// This used to require a drive-rooted path (`C:\`, `\\?\C:\`,
+/// `\Device\HarddiskVolume2\`). Two of the three largest artifacts do not carry
+/// one: `MFTECmd.csv` writes its parent path **relative** to the volume root
+/// (`.\Windows\Temp\…`), and `usnjrnl_j_rusty.csv` writes `[root]/…`, which
+/// `normalise_path` reduces to a leading `\`. So path classification matched
+/// nothing at all on the MFT and USN rows — the bulk of the timeline — and
+/// nothing said so: `classify_path` returning `None` is indistinguishable from
+/// "this path is not in a vendor tree".
+///
+/// The alternatives, in preference order at a given start position:
+///   1. `\\?\C:` — the extended-length form, first so `\\` is not read as UNC
+///   2. `\Device\HarddiskVolume<n>` — the volume-device form
+///   3. `\\host` — UNC
+///   4. `C:` — a drive letter
+///   5. `.` / `..` — MFTECmd's relative parent
+///   6. failing all of those, `\segment\…` — rooted at the volume with no drive,
+///      which is what a stripped `[root]` leaves. Two segments are required so a
+///      lone `\x` in prose is not read as a path.
+///
+/// A spurious match is safe in the direction that matters: `classify_path` simply
+/// finds no marker in it and the event keeps its place in the triage cut.
 static PATH_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
-    Regex::new(r#"(?i)(?:[a-z]:|\\\\\?\\[a-z]:|\\Device\\HarddiskVolume\d+)\\[^"|,;]*"#).unwrap()
+    Regex::new(concat!(
+        r#"(?i)(?:"#,
+        r#"(?:\\\\\?\\[a-z]:|\\Device\\HarddiskVolume\d+|\\\\[a-z0-9._$-]+|[a-z]:|\.{1,2})"#,
+        r#"\\[^"|,;]*"#,
+        r#"|\\[^"|,;\\]+\\[^"|,;]*"#,
+        r#")"#,
+    ))
+    .unwrap()
 });
 
 /// Sources whose rows are *about* a file or a registry key, and where the path
@@ -827,6 +913,97 @@ mod tests {
             .classify_path(r"C:\Temp\VQL_processes.jsonl")
             .unwrap()
             .starts_with("responder:"));
+    }
+
+    /// A marker must name a directory or a binary, not appear anywhere in a
+    /// string. Unanchored, these three were all read as the responder's own kit
+    /// and dropped out of the triage cut — and after the `PATH_RE` widening the
+    /// substring test ran against every MFT row on the host, not just the few
+    /// that carried a drive letter.
+    #[test]
+    fn a_marker_inside_a_name_is_not_the_responders_kit() {
+        let c = Classifier::load(Path::new("/nonexistent")).unwrap();
+        for path in [
+            r"C:\Windows\System32\datacollection-service.dll",
+            r"C:\Program Files\Acme\telemetry-hayabusa-plugin.dll",
+            r"C:\inetpub\wwwroot\upload-collection-2026.aspx",
+        ] {
+            assert_eq!(c.classify_path(path), None, "{path} is not the responder's own kit");
+        }
+    }
+
+    /// ...while the real thing still is, at the start of any segment.
+    #[test]
+    fn a_marker_starting_a_segment_is_still_the_responders_kit() {
+        let c = Classifier::load(Path::new("/nonexistent")).unwrap();
+        for (path, expected) in [
+            (r"C:\Tools\Collection-MY-WEB01-2026-09-10-Wiskess\Timeline\x.csv", "responder:collection-archive"),
+            (r"Collection-MY-WEB01\Timeline\registry.csv", "responder:collection-archive"),
+            (r"D:\kape\kape.exe", "responder:collector"),
+            (r"\Users\testuser\Desktop\hayabusa\hayabusa.exe", "responder:parser"),
+        ] {
+            assert_eq!(c.classify_path(path).as_deref(), Some(expected), "{path}");
+        }
+    }
+
+    fn path_event(source: &str, description: &str) -> UnifiedEvent {
+        UnifiedEvent {
+            timestamp: "2026-06-24T10:58:22.919Z".into(),
+            source: source.into(),
+            event_type: "file_created".into(),
+            severity: "med".into(),
+            description: description.into(),
+            ..Default::default()
+        }
+    }
+
+    /// The regression: `MFTECmd.csv` carries a path relative to the volume root,
+    /// so after normalisation it has no drive letter — and `PATH_RE` used to
+    /// require one. Path classification therefore matched nothing on the largest
+    /// artifact in the collection, and nothing reported that.
+    #[test]
+    fn a_path_with_no_drive_letter_is_still_classified() {
+        let c = Classifier::load(Path::new("/nonexistent")).unwrap();
+        let mut events = vec![
+            path_event("mft", r"File created: \Windows\WinSxS\amd64_ntdsutil\ntdsutil.exe (91 bytes)"),
+            path_event("usnjrnl", r"FileCreate|Close: \Program Files\VMware\VMware Tools\7za.exe"),
+            path_event("mft", r"File created: \Windows\SoftwareDistribution\Download\x.exe (0 bytes)"),
+        ];
+        let (classified, _) = apply(&mut events, &c);
+        assert_eq!(classified, 3, "{:?}", events.iter().map(|e| &e.classification).collect::<Vec<_>>());
+        assert_eq!(events[0].classification, "os:component-store");
+        assert_eq!(events[1].classification, "vendor:vmware-tools");
+        assert_eq!(events[2].classification, "os:windows-update");
+    }
+
+    /// `mft_dump.csv` writes `/` separators and the rusty USN parser prefixes
+    /// `[root]`. Both have to reach the same rules as the Windows spelling.
+    #[test]
+    fn the_other_path_spellings_reach_the_same_rules() {
+        let c = Classifier::load(Path::new("/nonexistent")).unwrap();
+        assert_eq!(
+            c.classify_path("[root]/Windows/WinSxS/amd64_x/y.exe").as_deref(),
+            Some("os:component-store")
+        );
+        assert_eq!(
+            c.classify_path(r".\Program Files\Sophos\Sophos Agent\x.exe").as_deref(),
+            Some("vendor:sophos")
+        );
+    }
+
+    /// A webshell under a webroot is in no vendor tree, no component store and no
+    /// collection — so it stays unclassified and stays in the triage cut. That is
+    /// the whole point of widening the regex without widening the markers.
+    #[test]
+    fn a_relative_webroot_path_is_not_explained_away() {
+        let c = Classifier::load(Path::new("/nonexistent")).unwrap();
+        let mut events = vec![path_event(
+            "mft",
+            r"File created: \ColdFusion2018\cfusion\wwwroot\cf_scripts\scripts\ajax\shell.jsp (36984 bytes)",
+        )];
+        let (classified, _) = apply(&mut events, &c);
+        assert_eq!(classified, 0);
+        assert!(events[0].classification.is_empty(), "{}", events[0].classification);
     }
 
     /// The EDR blocklist that read as 23 host compromises.

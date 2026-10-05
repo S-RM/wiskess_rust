@@ -350,11 +350,18 @@ pub fn resolve_vt_key(cli_key: Option<&str>) -> Option<String> {
     None
 }
 
-/// Write the text + JSON hash-lookup reports into `out_dir`.
+/// Write `hash_lookup.txt` into `out_dir` and `hash_lookup.json` into `json_dir`.
+///
+/// The two are separated because they have different readers. The text report is
+/// for a human looking through the output directory; the JSON is one of the four
+/// files `worker.py` ingests, and it only ingests what is in the collection's
+/// `Timeline/` folder. When the two directories are the same — every standalone
+/// run — this is the behaviour it always had.
 pub fn write_reports(
     results: &HashMap<String, HashResult>,
     hostname: &str,
     out_dir: &Path,
+    json_dir: &Path,
 ) -> Result<()> {
     use std::collections::BTreeMap;
     let mut by_class: BTreeMap<&str, Vec<&HashResult>> = BTreeMap::new();
@@ -433,7 +440,7 @@ pub fn write_reports(
         })).collect::<Vec<_>>(),
     });
     std::fs::write(
-        out_dir.join("hash_lookup.json"),
+        json_dir.join("hash_lookup.json"),
         format!("{}\n", serde_json::to_string(&json)?),
     )?;
     Ok(())

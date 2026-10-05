@@ -1,11 +1,28 @@
 use anyhow::Result;
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 use std::path::Path;
 
 use crate::timeline_parser::config::{severity_order, PipelineConfig, TimeWindow};
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::detectors::ta_tools::TAToolDetector;
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{self, Columns, Field, DATETIME, MESSAGE};
+
+/// The sigma rule's own severity. Required, and this is the one that matters most
+/// in this file: every row is admitted or rejected on it, so an unresolved `Level`
+/// used to mean `unwrap_or(3)` — whichever column sat at index 3 — and in the
+/// current export that is `message_hayabusa`, which normalises to `info` and would
+/// have discarded every detection in the file.
+const LEVEL: Field = Field::required("level", &["Level"]);
+/// Something that says what fired. `message` in every observed export; `Details`
+/// is accepted so a future export that drops the summary line still produces
+/// readable events rather than empty ones.
+const MESSAGE_OR_DETAILS: Field = Field::required("message_or_details", &["message", "Details"]);
+const DETAILS: Field = Field::optional("details", &["Details"]);
+const EXTRA: Field = Field::optional("extra", &["ExtraFieldInfo"]);
+const TACTICS: Field = Field::optional("tactics", &["MitreTactics"]);
+const TAGS: Field = Field::optional("tags", &["MitreTags"]);
+const RULE_FILE: Field = Field::optional("rule_file", &["RuleFile"]);
 
 static MITRE_TACTIC_MAP: &[(&str, &str)] = &[
     ("Recon", "Reconnaissance"),
@@ -98,40 +115,19 @@ pub fn detect_timeframe_opts(
 
     let file = std::fs::File::open(filepath)?;
     let reader = BufReader::new(file);
-    let mut rdr = csv::Reader::from_reader(reader);
-
-    for result in rdr.records() {
-        let record = result?;
-        let headers = rdr.headers()?.clone();
-        let level_idx = headers.iter().position(|h| h == "Level");
-        let ts_idx = headers.iter().position(|h| h == "datetime");
-
-        let level = level_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let normalized = normalize_level(level);
-        if severity_order(normalized) >= min_sev {
-            if let Some(ts) = ts_idx.and_then(|i| record.get(i)) {
-                if !ts.is_empty() {
-                    timestamps.push(ts.to_string());
-                }
-            }
-        }
-        break;
-    }
-
-    let file = std::fs::File::open(filepath)?;
-    let reader = BufReader::new(file);
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(reader);
     let headers = rdr.headers()?.clone();
-    let level_idx = headers.iter().position(|h| h == "Level").unwrap_or(0);
-    let ts_idx = headers.iter().position(|h| h == "datetime").unwrap_or(0);
 
-    timestamps.clear();
+    // Only `datetime` and `Level` are needed to find the window, so the fields are
+    // declared narrowly rather than reusing the parse set — a `Details` column
+    // missing here is not a coverage failure of timeframe detection.
+    let cols = Columns::resolve("hayabusa", filepath, &headers, &[DATETIME, LEVEL]);
+
     for result in rdr.records() {
         let Ok(record) = result else { continue };
-        let level = record.get(level_idx).unwrap_or("");
-        let normalized = normalize_level(level);
+        let normalized = normalize_level(cols.get(&record, "level"));
         if severity_order(normalized) >= min_sev {
-            let ts = record.get(ts_idx).unwrap_or("");
+            let ts = cols.get(&record, "datetime");
             if !ts.is_empty() {
                 timestamps.push(ts.to_string());
             }
@@ -163,12 +159,7 @@ pub fn window_from_timestamps(mut timestamps: Vec<String>, prefer_recent: bool) 
 
     if timestamps.len() == 1 {
         let ts = &timestamps[0];
-        return Some(TimeWindow {
-            start: pad_time(ts, -2),
-            end: pad_time(ts, 2),
-            event_count: 1,
-            confidence: "low".to_string(),
-        });
+        return Some(TimeWindow::new(pad_time(ts, -2), pad_time(ts, 2), 1, "low"));
     }
 
     let mut clusters: Vec<Vec<&str>> = Vec::new();
@@ -206,12 +197,7 @@ pub fn window_from_timestamps(mut timestamps: Vec<String>, prefer_recent: bool) 
         else if best.len() >= 2 { "medium" }
         else { "low" };
 
-    Some(TimeWindow {
-        start: padded_start,
-        end: padded_end,
-        event_count: best.len(),
-        confidence: confidence.to_string(),
-    })
+    Some(TimeWindow::new(padded_start, padded_end, best.len(), confidence))
 }
 
 fn is_within_gap(ts1: &str, ts2: &str, hours: i64) -> bool {
@@ -254,40 +240,39 @@ pub fn parse(
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(reader);
     let headers = rdr.headers()?.clone();
 
-    let col = |name: &str| headers.iter().position(|h| h == name);
-    let ts_idx = col("datetime").unwrap_or(0);
-    let level_idx = col("Level").unwrap_or(3);
-    let msg_idx = col("message").unwrap_or(2);
-    let details_idx = col("Details");
-    let extra_idx = col("ExtraFieldInfo");
-    let _channel_idx = col("Channel");
-    let _eid_idx = col("EventID");
-    let tactics_idx = col("MitreTactics");
-    let tags_idx = col("MitreTags");
-    let rule_idx = col("RuleFile");
+    let cols = Columns::resolve(
+        "hayabusa",
+        filepath,
+        &headers,
+        &[DATETIME, LEVEL, MESSAGE_OR_DETAILS, MESSAGE, DETAILS, EXTRA, TACTICS, TAGS, RULE_FILE],
+    );
 
+    let mut rows = 0usize;
     for result in rdr.records() {
         let Ok(record) = result else { continue };
+        rows += 1;
 
-        let level_raw = record.get(level_idx).unwrap_or("");
-        let level = normalize_level(level_raw);
+        let level = normalize_level(cols.get(&record, "level"));
         if severity_order(level) < min_sev {
             continue;
         }
 
-        let ts = record.get(ts_idx).unwrap_or("").to_string();
-        let msg = record.get(msg_idx).unwrap_or("");
-        let details = details_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let extra = extra_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let tactics = tactics_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let tags = tags_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let rule_file = rule_idx.and_then(|i| record.get(i)).unwrap_or("");
+        let ts = cols.get(&record, "datetime").to_string();
+        let msg = cols.get(&record, "message");
+        let details = cols.get(&record, "details");
+        let extra = cols.get(&record, "extra");
+        let tactics = cols.get(&record, "tactics");
+        let tags = cols.get(&record, "tags");
+        let rule_file = cols.get(&record, "rule_file");
 
         let tactic = normalize_tactic(tactics);
+        let details_trunc = details.char_indices().nth(200).map_or(details, |(i, _)| &details[..i]);
         let mut description = msg.to_string();
-        if !details.is_empty() {
-            description.push_str(" | ");
-            description.push_str(details.char_indices().nth(200).map_or(details, |(i, _)| &details[..i]));
+        if !details_trunc.is_empty() {
+            if !description.is_empty() {
+                description.push_str(" | ");
+            }
+            description.push_str(details_trunc);
         }
 
         let scan_text = format!("{} {} {}", msg, details, extra);
@@ -342,6 +327,7 @@ pub fn parse(
         });
     }
 
+    columns::note_rows("hayabusa", rows);
     Ok(events)
 }
 

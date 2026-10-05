@@ -30,7 +30,21 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::BufReader;
 use std::path::Path;
 
+use crate::timeline_parser::detectors::{warn_skipped, SkippedRule};
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{Columns, Field, DATETIME};
+
+/// The packed `Name: value` blob RECmd writes for an Add/Remove Programs key.
+/// Required: it is the whole inventory, so a rename means no software list at all.
+const VALUE_DATA: Field = Field::required("value_data", &["ValueData"]);
+const VALUE_DATA2: Field = Field::optional("value_data2", &["ValueData2"]);
+/// Either of these identifies the Add/Remove Programs rows, and the code matches
+/// on whichever is present, so neither on its own is required.
+const CATEGORY: Field = Field::optional("category", &["Category"]);
+const DESCRIPTION: Field = Field::optional("description", &["Description", "description"]);
+const HIVE_PATH: Field = Field::optional("hive_path", &["HivePath"]);
+/// RegRipper's finding text, which is where the `[Uninstall] - …` lines live.
+const RR_DESCRIPTION: Field = Field::required("description", &["description", "Description"]);
 
 /// One installed product, as the registry recorded it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -133,6 +147,7 @@ struct ProductRule {
 pub struct SoftwareRules {
     eol: Vec<EolRule>,
     products: Vec<ProductRule>,
+    skipped: Vec<SkippedRule>,
 }
 
 impl SoftwareRules {
@@ -160,8 +175,14 @@ impl SoftwareRules {
             ) else {
                 continue;
             };
-            if let Ok(re) = Regex::new(p) {
-                out.eol.push(EolRule { re, name: n.into(), eol: e.into() });
+            match Regex::new(p) {
+                Ok(re) => out.eol.push(EolRule { re, name: n.into(), eol: e.into() }),
+                Err(err) => out.skipped.push(SkippedRule {
+                    section: "vulnerable_software.yaml: end_of_life".to_string(),
+                    reason: n.to_string(),
+                    pattern: p.to_string(),
+                    error: err.to_string(),
+                }),
             }
         }
         for r in doc.get("products").and_then(|v| v.as_sequence()).into_iter().flatten() {
@@ -171,8 +192,8 @@ impl SoftwareRules {
             ) else {
                 continue;
             };
-            if let Ok(re) = Regex::new(p) {
-                out.products.push(ProductRule {
+            match Regex::new(p) {
+                Ok(re) => out.products.push(ProductRule {
                     re,
                     name: n.into(),
                     category: r
@@ -185,10 +206,23 @@ impl SoftwareRules {
                         .and_then(|v| v.as_str())
                         .map(str::to_string),
                     note: r.get("note").and_then(|v| v.as_str()).unwrap_or("").into(),
-                });
+                }),
+                Err(err) => out.skipped.push(SkippedRule {
+                    section: "vulnerable_software.yaml: products".to_string(),
+                    reason: n.to_string(),
+                    pattern: p.to_string(),
+                    error: err.to_string(),
+                }),
             }
         }
+
+        warn_skipped("installed-software", &out.skipped, out.eol.len() + out.products.len());
         Ok(out)
+    }
+
+    /// Software patterns present in `vulnerable_software.yaml` that are not active.
+    pub fn skipped_rules(&self) -> &[SkippedRule] {
+        &self.skipped
     }
 
     pub fn counts(&self) -> (usize, usize, usize) {
@@ -308,15 +342,18 @@ pub fn from_registry_csv(path: &Path) -> Result<Vec<Installed>> {
     let file = std::fs::File::open(path)?;
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(BufReader::new(file));
     let headers = rdr.headers()?.clone();
-    let col = |n: &str| headers.iter().position(|h| h == n);
-    let (cat_i, vd_i, vd2_i, hive_i, desc_i) =
-        (col("Category"), col("ValueData"), col("ValueData2"), col("HivePath"), col("Description"));
+    let cols = Columns::resolve(
+        "software-registry",
+        path,
+        &headers,
+        &[VALUE_DATA, VALUE_DATA2, CATEGORY, DESCRIPTION, HIVE_PATH],
+    );
 
     let mut out = Vec::new();
     for result in rdr.records() {
         let Ok(rec) = result else { continue };
-        let category = cat_i.and_then(|i| rec.get(i)).unwrap_or("");
-        let description = desc_i.and_then(|i| rec.get(i)).unwrap_or("");
+        let category = cols.get(&rec, "category");
+        let description = cols.get(&rec, "description");
         // Match on either, so a wiskess build that renames the category but
         // keeps the description (or the reverse) still yields an inventory.
         if !category.eq_ignore_ascii_case("Installed Software")
@@ -325,7 +362,7 @@ pub fn from_registry_csv(path: &Path) -> Result<Vec<Installed>> {
             continue;
         }
 
-        let packed = vd_i.and_then(|i| rec.get(i)).unwrap_or("");
+        let packed = cols.get(&rec, "value_data");
         let fields = parse_packed_value(packed);
         // DisplayName is often empty on OS component keys; KeyName is the
         // fallback and is what an analyst would read off the hive anyway.
@@ -338,7 +375,7 @@ pub fn from_registry_csv(path: &Path) -> Result<Vec<Installed>> {
             continue;
         }
 
-        let ts = parse_packed_value(vd2_i.and_then(|i| rec.get(i)).unwrap_or(""));
+        let ts = parse_packed_value(cols.get(&rec, "value_data2"));
         out.push(Installed {
             name,
             version: fields.get("DisplayVersion").cloned().unwrap_or_default(),
@@ -349,7 +386,7 @@ pub fn from_registry_csv(path: &Path) -> Result<Vec<Installed>> {
                 .or_else(|| ts.get("Timestamp").cloned())
                 .unwrap_or_default(),
             source: "registry.csv".into(),
-            hive: hive_i.and_then(|i| rec.get(i)).unwrap_or("").to_string(),
+            hive: cols.get(&rec, "hive_path").to_string(),
         });
     }
     Ok(out)
@@ -360,14 +397,13 @@ pub fn from_regripper_csv(path: &Path) -> Result<Vec<Installed>> {
     let file = std::fs::File::open(path)?;
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(BufReader::new(file));
     let headers = rdr.headers()?.clone();
-    let col = |n: &str| headers.iter().position(|h| h == n);
-    let (desc_i, ts_i) = (col("description").or_else(|| col("Description")), col("datetime"));
+    let cols = Columns::resolve("software-regripper", path, &headers, &[DATETIME, RR_DESCRIPTION]);
 
     let mut out = Vec::new();
     for result in rdr.records() {
         let Ok(rec) = result else { continue };
-        let desc = desc_i.and_then(|i| rec.get(i)).unwrap_or("");
-        let Some(rest) = desc.trim().strip_prefix("[Uninstall] - ") else { continue };
+        let desc = cols.get(&rec, "description");
+        let Some(rest) = desc.strip_prefix("[Uninstall] - ") else { continue };
         let (name, version) = match rest.rsplit_once(" v.") {
             Some((n, v)) => (n.trim().to_string(), v.trim().to_string()),
             None => (rest.trim().to_string(), String::new()),
@@ -379,7 +415,7 @@ pub fn from_regripper_csv(path: &Path) -> Result<Vec<Installed>> {
             name,
             version,
             publisher: String::new(),
-            installed_at: ts_i.and_then(|i| rec.get(i)).unwrap_or("").to_string(),
+            installed_at: cols.get(&rec, "datetime").to_string(),
             source: "regripper.csv".into(),
             hive: String::new(),
         });

@@ -6,8 +6,39 @@ use std::path::Path;
 use crate::timeline_parser::config::PipelineConfig;
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::detectors::ta_tools::TAToolDetector;
+use crate::timeline_parser::detectors::Attack;
 use crate::timeline_parser::intel::geo::GeoReaders;
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{self, Columns, Field, DATETIME};
+
+/// Which of hindsight's record shapes this row is. Required: the parser dispatches
+/// on it, so an unresolved `data_type` matches no arm and the artifact goes silent.
+const DATA_TYPE: Field = Field::required("data_type", &["data_type"]);
+/// The visited/downloaded URL. Required for the same reason as in `browser_hist`.
+const URL: Field = Field::required("url", &["url", "URL"]);
+/// The download's save path, for `chrome:history:file_downloaded`.
+const VALUE: Field = Field::optional("value", &["value"]);
+/// The Chrome profile directory the record came out of — a **filesystem path**,
+/// not a user. See [`profile_user`].
+const PROFILE: Field = Field::optional("profile", &["profile"]);
+const MESSAGE_HINDSIGHT: Field = Field::optional("message_hindsight", &["message_hindsight"]);
+
+/// The account a Chrome profile path belongs to, or empty.
+///
+/// `user` used to be set to the last path segment of `profile`, which is the
+/// browser's own directory name (`Default`, `Profile 1`), not a person. On one host
+/// that produced a single Account Activity row of 55,977 events keyed on a
+/// directory. A profile path does name the account — it sits under
+/// `\Users\<name>\` — so that is what is extracted, and when it cannot be, the
+/// field is left empty rather than filled with something that is not a user.
+fn profile_user(profile: &str) -> String {
+    let normalised = profile.replace('/', "\\");
+    let lower = normalised.to_lowercase();
+    let Some(at) = lower.find("\\users\\") else { return String::new() };
+    let rest = &normalised[at + "\\users\\".len()..];
+    let name = rest.split('\\').next().unwrap_or("").trim();
+    if name.is_empty() { String::new() } else { name.to_string() }
+}
 
 /// Append IP-literal geo enrichment to a browser event's indicators, returning a
 /// severity bump ("high") when the host is an anonymising/hosting service.
@@ -103,32 +134,27 @@ pub fn parse(
         .from_reader(reader);
     let headers = rdr.headers()?.clone();
 
-    let col = |name: &str| headers.iter().position(|h| h.trim() == name);
+    let cols = Columns::resolve(
+        "hindsight",
+        filepath,
+        &headers,
+        &[DATETIME, DATA_TYPE, URL, VALUE, PROFILE, MESSAGE_HINDSIGHT],
+    );
 
-    let ts_idx = col("datetime").unwrap_or(0);
-    let url_idx = col("url");
-    let value_idx = col("value");
-    let data_type_idx = col("data_type");
-    let profile_idx = col("profile");
-    let message_hs_idx = col("message_hindsight");
-
+    let mut rows = 0usize;
     for result in rdr.records() {
         let Ok(record) = result else { continue };
+        rows += 1;
 
-        let ts = record.get(ts_idx).unwrap_or("").trim().to_string();
+        let ts = cols.get(&record, "datetime").to_string();
         if ts.is_empty() {
             continue;
         }
 
-        let data_type = data_type_idx
-            .and_then(|i| record.get(i))
-            .unwrap_or("")
-            .trim();
-
-        match data_type {
+        match cols.get(&record, "data_type") {
             "chrome:history:page_visited" => {
                 if let Some(ev) = process_page_visited(
-                    &record, ts, url_idx, profile_idx, message_hs_idx,
+                    &record, ts, &cols,
                     cfg, ioc_matcher, ta_detector, geo, &known_good, hostname,
                 ) {
                     events.push(ev);
@@ -136,7 +162,7 @@ pub fn parse(
             }
             "chrome:history:file_downloaded" => {
                 if let Some(ev) = process_file_downloaded(
-                    &record, ts, url_idx, value_idx, profile_idx,
+                    &record, ts, &cols,
                     cfg, ioc_matcher, ta_detector, geo, hostname,
                 ) {
                     events.push(ev);
@@ -144,7 +170,7 @@ pub fn parse(
             }
             "chrome:login_item:entry" => {
                 if let Some(ev) = process_login_item(
-                    &record, ts, url_idx, profile_idx, cfg, ioc_matcher, geo, hostname,
+                    &record, ts, &cols, cfg, ioc_matcher, geo, hostname,
                 ) {
                     events.push(ev);
                 }
@@ -153,15 +179,14 @@ pub fn parse(
         }
     }
 
+    columns::note_rows("hindsight", rows);
     Ok(events)
 }
 
 fn process_page_visited(
     record: &csv::StringRecord,
     ts: String,
-    url_idx: Option<usize>,
-    profile_idx: Option<usize>,
-    message_hs_idx: Option<usize>,
+    cols: &Columns,
     cfg: &PipelineConfig,
     ioc_matcher: &IOCMatcher,
     ta_detector: &TAToolDetector,
@@ -169,7 +194,7 @@ fn process_page_visited(
     known_good: &HashSet<&str>,
     hostname: &str,
 ) -> Option<UnifiedEvent> {
-    let url = url_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
+    let url = cols.get(record, "url");
     if url.is_empty() {
         return None;
     }
@@ -181,7 +206,15 @@ fn process_page_visited(
 
     let scan_text = format!("{} {}", url, domain);
     let ioc_hits = ioc_matcher.check(&scan_text);
-    let ta_hits: Vec<String> = ta_detector.scan(&scan_text).into_iter().map(|m| format!("TA_TOOL:{}", m.name)).collect();
+    let mut attack = Attack::default();
+    let ta_hits: Vec<String> = ta_detector
+        .scan(&scan_text)
+        .into_iter()
+        .map(|m| {
+            attack.from_tool(&m);
+            format!("TA_TOOL:{}", m.name)
+        })
+        .collect();
 
     let mut is_suspicious_domain = is_ip_literal;
     if !is_known_good && !domain.is_empty() {
@@ -227,40 +260,47 @@ fn process_page_visited(
         severity = "high".to_string();
     }
 
-    let title = message_hs_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
-    let profile = profile_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
-    let profile_short = profile.split('\\').last().unwrap_or(profile);
+    let title = cols.get(record, "message_hindsight");
+    let profile = cols.get(record, "profile");
 
     Some(UnifiedEvent {
         timestamp: ts,
         source: "hindsight".to_string(),
         event_type: "web_navigation".to_string(),
         severity,
-        description: format!("Visited: {} | {}", url, title),
+        description: describe(&format!("Visited: {} | {}", url, title), profile),
         indicators,
-        mitre_tactic: String::new(),
-        mitre_technique: String::new(),
-        user: profile_short.to_string(),
+        mitre_tactic: attack.tactic,
+        mitre_technique: attack.technique,
+        user: profile_user(profile),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight".to_string(),
         ..Default::default()
     })
 }
 
+/// Put the browser profile where it belongs — in the description, as context —
+/// rather than in the `user` field, where it is not an account.
+fn describe(base: &str, profile: &str) -> String {
+    if profile.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base} | Profile: {profile}")
+    }
+}
+
 fn process_file_downloaded(
     record: &csv::StringRecord,
     ts: String,
-    url_idx: Option<usize>,
-    value_idx: Option<usize>,
-    profile_idx: Option<usize>,
+    cols: &Columns,
     cfg: &PipelineConfig,
     ioc_matcher: &IOCMatcher,
     ta_detector: &TAToolDetector,
     geo: &GeoReaders,
     hostname: &str,
 ) -> Option<UnifiedEvent> {
-    let url = url_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
-    let save_path = value_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
+    let url = cols.get(record, "url");
+    let save_path = cols.get(record, "value");
 
     let filename = save_path
         .split(['/', '\\'])
@@ -296,19 +336,18 @@ fn process_file_downloaded(
         severity = "high".to_string();
     }
 
-    let profile = profile_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
-    let profile_short = profile.split('\\').last().unwrap_or(profile);
+    let profile = cols.get(record, "profile");
 
     Some(UnifiedEvent {
         timestamp: ts,
         source: "hindsight".to_string(),
         event_type: "file_download".to_string(),
         severity,
-        description: format!("Downloaded: {} → {}", url, save_path),
+        description: describe(&format!("Downloaded: {} → {}", url, save_path), profile),
         indicators,
         mitre_tactic: "Collection".to_string(),
         mitre_technique: "T1213".to_string(),
-        user: profile_short.to_string(),
+        user: profile_user(profile),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight_download".to_string(),
         ..Default::default()
@@ -318,14 +357,13 @@ fn process_file_downloaded(
 fn process_login_item(
     record: &csv::StringRecord,
     ts: String,
-    url_idx: Option<usize>,
-    profile_idx: Option<usize>,
+    cols: &Columns,
     cfg: &PipelineConfig,
     ioc_matcher: &IOCMatcher,
     geo: &GeoReaders,
     hostname: &str,
 ) -> Option<UnifiedEvent> {
-    let url = url_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
+    let url = cols.get(record, "url");
     let in_window = cfg.in_timewindow(&ts);
     let ioc_hits = ioc_matcher.check(url);
     let is_ip_literal = crate::timeline_parser::intel::geo::url_ip_literal(url).is_some();
@@ -352,19 +390,18 @@ fn process_login_item(
         severity = "high".to_string();
     }
 
-    let profile = profile_idx.and_then(|i| record.get(i)).unwrap_or("").trim();
-    let profile_short = profile.split('\\').last().unwrap_or(profile);
+    let profile = cols.get(record, "profile");
 
     Some(UnifiedEvent {
         timestamp: ts,
         source: "hindsight".to_string(),
         event_type: "saved_credential".to_string(),
         severity,
-        description: format!("Saved login: {}", url),
+        description: describe(&format!("Saved login: {}", url), profile),
         indicators,
         mitre_tactic: "Credential Access".to_string(),
         mitre_technique: "T1555.003".to_string(),
-        user: profile_short.to_string(),
+        user: profile_user(profile),
         hostname: hostname.to_string(),
         detection_rule: "browser_hindsight_login".to_string(),
         ..Default::default()

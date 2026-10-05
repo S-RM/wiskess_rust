@@ -41,10 +41,39 @@ mod tests {
             "expected a timeline parser log line, got: {log}"
         );
 
-        let report_exists = std::fs::read_dir(&timeline_dir)
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .any(|e| e.path().extension().map_or(false, |x| x == "md"));
-        assert!(report_exists, "expected a *_triage_report.md in Timeline/");
+        // The run writes into two directories, and which file goes where is the
+        // point. Triage/ is for a human opening the folder; Timeline/ is what the
+        // worker ingests, and it ingests by filename — every entry ending in
+        // `json`, nothing else. This used to assert the markdown report was in
+        // Timeline/, which nothing has ever written there.
+        let names = |dir: &std::path::Path| -> Vec<String> {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        };
+
+        let triage = names(&out_path.join("Triage"));
+        for suffix in ["_triage_report.md", "_supertimeline.csv", "_triage_timeline.csv"] {
+            assert!(
+                triage.iter().any(|n| n.ends_with(suffix)),
+                "expected a *{suffix} in Triage/, saw {triage:?}"
+            );
+        }
+
+        // All four ingestible documents, in the one directory the worker reads.
+        // Three of them were being written into Triage/ instead, where nothing
+        // looks, and the report NDJSON was not produced at all.
+        let ingested: Vec<String> = names(&timeline_dir)
+            .into_iter()
+            .filter(|n| n.ends_with("json") && !n.ends_with("jsonl"))
+            .collect();
+        for suffix in ["_triage.json", "_triage_report.json", "_restoration.json"] {
+            assert!(
+                ingested.iter().any(|n| n.ends_with(suffix)),
+                "expected a *{suffix} in Timeline/, saw {ingested:?}"
+            );
+        }
     }
 }

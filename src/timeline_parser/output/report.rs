@@ -6,15 +6,18 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::LazyLock;
 
-use crate::timeline_parser::config::{severity_order, PipelineConfig, TimeWindow};
+use crate::timeline_parser::config::{self, severity_order, PipelineConfig, TimeWindow};
 use crate::timeline_parser::detectors::classify::Automation;
+use crate::timeline_parser::detectors::SkippedRule;
 use crate::timeline_parser::detectors::restoration::{self, PHASE_POST, PHASE_PRE, PHASE_PROCESS, PHASE_RESPONDER};
+use crate::timeline_parser::parsers::columns::ColumnFailure;
 use crate::timeline_parser::parsers::host_info::HostIdentity;
 use crate::timeline_parser::detectors::ioc_matcher::IocCoverage;
 use crate::timeline_parser::detectors::restoration::{Continuity, GapKind};
 use crate::timeline_parser::detectors::software::{SoftwareInventory, Verdict};
 use crate::timeline_parser::intel::geo::GeoReaders;
 use crate::timeline_parser::parsers::wiskess_log::CollectionGap;
+use super::dedup::CapSummary;
 use super::event::UnifiedEvent;
 
 /// Max characters of an event description rendered in the report before truncating.
@@ -192,11 +195,125 @@ pub struct DetectionCoverage {
     pub ta_patterns: usize,
     pub path_rules: usize,
     pub software_rules: usize,
+    /// Rules that are in the shipped YAML but did not compile, from every pack.
+    ///
+    /// An empty rule pack is loud (the counts above go to zero); a pack that
+    /// loaded 13 of 14 rules is not, and used to print `13` as if that were the
+    /// number intended. These are named individually because "one rule short" is
+    /// only actionable if you know which rule.
+    pub skipped_rules: Vec<SkippedRule>,
+    /// One row per artifact the parser knows how to read, plus one per file it
+    /// chose not to read. See [`ArtifactCoverage`].
+    pub artifacts: Vec<ArtifactCoverage>,
+    /// Columns a parser asked for and did not find.
+    pub column_failures: Vec<ColumnFailure>,
+    /// CSVs in the timeline directory that no spec claims.
+    pub unrecognised_files: Vec<String>,
+    /// Detection data files `--data-dir` was expected to hold and does not.
+    ///
+    /// Every loader for these is deliberately forgiving on its own — a missing
+    /// `vendor_paths.yaml` falls back to the built-in list, missing hash lists mean
+    /// no offline reputation. Individually right, collectively silent: a data dir
+    /// that lost half its files produces a quieter report and no statement that it
+    /// did. See `config::EXPECTED_DATA_FILES`.
+    pub missing_data_files: Vec<String>,
+}
+
+/// What one artifact contributed: the file read, the rows in it, the events kept.
+///
+/// The report used to state its findings without ever stating what it had read,
+/// so an artifact that produced nothing looked identical to an artifact that was
+/// not there — and on the collection that prompted this work, eight of nineteen
+/// artifact families produced nothing, two of them from ~880,000 rows. Rows come
+/// from the parsers, events from the finished timeline, so every line here can be
+/// checked against the file it names.
+#[derive(Clone, Debug)]
+pub struct ArtifactCoverage {
+    pub key: &'static str,
+    /// The filename actually read, or `None` when the artifact is absent.
+    pub file: Option<String>,
+    /// `quiet` (carried whole) or `noisy` (filtered to detections).
+    pub volume: &'static str,
+    pub rows_read: usize,
+    pub events_emitted: usize,
+    /// `parsed` | `absent` | `column-mismatch` | `superseded`.
+    pub status: &'static str,
+}
+
+impl ArtifactCoverage {
+    /// Rows were read and nothing came out of a **quiet** artifact.
+    ///
+    /// With the baseline floor (`--no-quiet-baseline` off, the default) there is
+    /// no legitimate way for this to happen: every row of a quiet artifact becomes
+    /// an event at `info` or better. So it is an assertion, not a statistic — it
+    /// catches the 0-events-from-1,231-rows and 0-from-439,051 cases that started
+    /// this work, and every future instance of them, without anyone having to
+    /// notice the zero.
+    ///
+    /// Noisy artifacts are exempt: a detection-gated artifact legitimately keeps
+    /// nothing when nothing fired.
+    pub fn silently_dropped(&self) -> bool {
+        self.volume == "quiet" && self.rows_read > 0 && self.events_emitted == 0
+    }
 }
 
 impl DetectionCoverage {
+    /// Was any part of this run unable to see what it was pointed at?
+    ///
+    /// Covers both halves of the same failure: rules that could not fire, and
+    /// evidence that could not be read. Either one makes a quiet report a
+    /// statement about the parser rather than about the host.
     pub fn degraded(&self) -> bool {
-        self.ta_patterns == 0 || self.path_rules == 0
+        self.rules_degraded() || self.coverage_degraded()
+    }
+
+    /// A rule pack is empty, a rule in one did not compile, or a data file the
+    /// packs are loaded from is not there at all.
+    pub fn rules_degraded(&self) -> bool {
+        self.ta_patterns == 0
+            || self.path_rules == 0
+            || !self.skipped_rules.is_empty()
+            || !self.missing_data_files.is_empty()
+    }
+
+    /// Evidence was not fully read: a missing column, or a quiet artifact that
+    /// read rows and emitted nothing.
+    pub fn coverage_degraded(&self) -> bool {
+        !self.column_failures.is_empty()
+            || self.artifacts.iter().any(ArtifactCoverage::silently_dropped)
+    }
+
+    /// Every reason this run is not a clean result, in one line each. Used for the
+    /// `--strict` exit and for stderr, so the two cannot disagree with the report.
+    pub fn failure_lines(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.ta_patterns == 0 {
+            out.push(format!("no TA-tool patterns loaded from {}", self.data_dir));
+        }
+        if self.path_rules == 0 {
+            out.push(format!("no suspicious-path rules loaded from {}", self.data_dir));
+        }
+        for s in &self.skipped_rules {
+            out.push(format!("rule `{}` in {} did not compile: {}", s.reason, s.section, s.error));
+        }
+        for f in &self.missing_data_files {
+            out.push(format!(
+                "detection data file `{f}` is not in {} — whatever it holds did not load",
+                self.data_dir
+            ));
+        }
+        for f in &self.column_failures {
+            out.push(f.describe());
+        }
+        for a in self.artifacts.iter().filter(|a| a.silently_dropped()) {
+            out.push(format!(
+                "{}: {} row(s) read from {} and 0 events kept — a quiet artifact cannot legitimately do that",
+                a.key,
+                a.rows_read,
+                a.file.as_deref().unwrap_or("(unknown file)")
+            ));
+        }
+        out
     }
 }
 
@@ -210,17 +327,202 @@ fn write_detection_coverage<W: Write>(w: &mut W, d: &DetectionCoverage) -> Resul
     writeln!(w, "| Suspicious path/filename rules | {} |", d.path_rules)?;
     writeln!(w, "| Installed-software rules | {} |", d.software_rules)?;
     writeln!(w, "| Rule directory | `{}` |", d.data_dir)?;
+    writeln!(
+        w,
+        "| Data files present | {} of {} |",
+        config::EXPECTED_DATA_FILES.len() - d.missing_data_files.len(),
+        config::EXPECTED_DATA_FILES.len()
+    )?;
     writeln!(w)?;
 
-    if d.degraded() {
-        writeln!(w, "> **DETECTION RULES ARE MISSING — THIS REPORT IS NOT A CLEAN RESULT.**")?;
-        writeln!(w, ">")?;
-        writeln!(w, "> One or more rule packs failed to load from `{}`, so the corresponding \
-            detections could not fire. The timeline below is thinner than the evidence supports \
-            and must not be read as a quiet host. Point the parser at its rule directory with \
-            `--data-dir` or `WTP_DATA_DIR` and run it again.", d.data_dir)?;
+    if !d.missing_data_files.is_empty() {
+        writeln!(w, "### Detection data files that are not present")?;
+        writeln!(w)?;
+        for f in &d.missing_data_files {
+            writeln!(w, "- `{f}`")?;
+        }
         writeln!(w)?;
     }
+
+    if !d.skipped_rules.is_empty() {
+        writeln!(w, "### Rules that did not compile")?;
+        writeln!(w)?;
+        writeln!(w, "| Rule | Section | Pattern | Error |")?;
+        writeln!(w, "|------|---------|---------|-------|")?;
+        for s in &d.skipped_rules {
+            writeln!(
+                w,
+                "| {} | {} | `{}` | {} |",
+                s.reason,
+                s.section,
+                s.pattern.replace('|', "\\|"),
+                s.error.lines().next().unwrap_or("").replace('|', "\\|")
+            )?;
+        }
+        writeln!(w)?;
+    }
+
+    if d.degraded() {
+        if d.rules_degraded() {
+            writeln!(w, "> **DETECTION RULES ARE MISSING — THIS REPORT IS NOT A CLEAN RESULT.**")?;
+        } else {
+            writeln!(w, "> **EVIDENCE WAS NOT FULLY READ — THIS REPORT IS NOT A CLEAN RESULT.**")?;
+        }
+        writeln!(w, ">")?;
+        if d.ta_patterns == 0 || d.path_rules == 0 {
+            writeln!(w, "> One or more rule packs failed to load from `{}`, so the corresponding \
+                detections could not fire. The timeline below is thinner than the evidence supports \
+                and must not be read as a quiet host. Point the parser at its rule directory with \
+                `--data-dir` or `WTP_DATA_DIR` and run it again.", d.data_dir)?;
+        }
+        if !d.missing_data_files.is_empty() {
+            writeln!(w, "> {} detection data file(s) listed above are not in `{}`. Each loader \
+                falls back quietly when its file is absent — built-in vendor paths, no offline \
+                hash reputation — so this run is narrower than a complete one and nothing else \
+                in this report would have said so.", d.missing_data_files.len(), d.data_dir)?;
+        }
+        if !d.skipped_rules.is_empty() {
+            writeln!(w, "> {} rule(s) listed above are present in `{}` but could not be \
+                compiled, so they matched nothing on this run. Anything they alone would have \
+                detected is absent from the timeline, and its absence here is not evidence it \
+                did not happen.", d.skipped_rules.len(), d.data_dir)?;
+        }
+        if d.coverage_degraded() {
+            writeln!(w, "> Evidence was not fully read on this run — a required column was \
+                missing, or an artifact's rows produced no events. **Artefact Coverage** below \
+                names each one. Until they are fixed, this report is silent about whatever \
+                those files held.")?;
+        }
+        writeln!(w)?;
+    }
+    Ok(())
+}
+
+/// State what was read before anything derived from it.
+///
+/// Two hard rules live here rather than in a comment somewhere: a quiet artifact
+/// with rows and no events is an **error line**, and any column failure or
+/// silently-dropped artifact makes the whole report degraded. Both are checkable
+/// from the table itself, which is the point — the numbers in it come from
+/// opposite ends of the pipeline (`columns::note_rows` counts input rows, the
+/// finished timeline supplies the events), so they cannot both be wrong in the
+/// same direction.
+fn write_artifact_coverage<W: Write>(
+    w: &mut W,
+    d: &DetectionCoverage,
+    capped: &[CapSummary],
+) -> Result<()> {
+    writeln!(w, "## Artefact Coverage (what was read, and what it produced)")?;
+    writeln!(w)?;
+
+    if d.artifacts.is_empty() {
+        writeln!(w, "No artefact coverage was recorded for this run.")?;
+        writeln!(w)?;
+        return Ok(());
+    }
+
+    writeln!(w, "| Artefact | File | Volume | Rows read | Events kept | Status |")?;
+    writeln!(w, "|----------|------|--------|-----------|-------------|--------|")?;
+    for a in &d.artifacts {
+        writeln!(
+            w,
+            "| {} | {} | {} | {} | {} | {} |",
+            a.key,
+            a.file.as_deref().map(|f| format!("`{f}`")).unwrap_or_else(|| "—".to_string()),
+            a.volume,
+            if a.status == "absent" || a.status == "superseded" { "—".to_string() } else { a.rows_read.to_string() },
+            if a.status == "absent" || a.status == "superseded" { "—".to_string() } else { a.events_emitted.to_string() },
+            if a.silently_dropped() { "**LOST**" } else { a.status },
+        )?;
+    }
+    writeln!(w)?;
+
+    let lost: Vec<&ArtifactCoverage> =
+        d.artifacts.iter().filter(|a| a.silently_dropped()).collect();
+    if !lost.is_empty() {
+        writeln!(w, "### Rows read that produced no events")?;
+        writeln!(w)?;
+        writeln!(w, "Each of these is a **defect, not a finding**. These artefacts are carried \
+            whole — every row becomes an event at an `info` floor whether or not a rule fired — \
+            so rows in and nothing out means the rows could not be read, not that they held \
+            nothing.")?;
+        writeln!(w)?;
+        for a in lost {
+            writeln!(
+                w,
+                "- **{}**: {} row(s) in `{}`, 0 events.",
+                a.key,
+                a.rows_read,
+                a.file.as_deref().unwrap_or("(unknown file)")
+            )?;
+        }
+        writeln!(w)?;
+    }
+
+    if !d.column_failures.is_empty() {
+        writeln!(w, "### Columns that could not be found")?;
+        writeln!(w)?;
+        writeln!(w, "A column resolved by name, not by position — so a rename costs the field \
+            and says so, rather than silently reading the neighbouring column. Every value the \
+            parser wanted from one of these was read as empty.")?;
+        writeln!(w)?;
+        writeln!(w, "| Artefact | File | Column | Spellings tried | Header as found |")?;
+        writeln!(w, "|----------|------|--------|-----------------|-----------------|")?;
+        for f in &d.column_failures {
+            writeln!(
+                w,
+                "| {} | `{}` | `{}` | {} | {} |",
+                f.artifact,
+                f.file,
+                f.logical,
+                f.aliases.iter().map(|a| format!("`{a}`")).collect::<Vec<_>>().join(", "),
+                f.header
+                    .iter()
+                    .map(|h| format!("`{}`", h.replace('|', "\\|")))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )?;
+        }
+        writeln!(w)?;
+    }
+
+    if !d.unrecognised_files.is_empty() {
+        writeln!(w, "### Files this build does not recognise")?;
+        writeln!(w)?;
+        writeln!(w, "Present in the timeline directory and **not parsed**. A new Wiskess \
+            artefact announces itself here instead of vanishing.")?;
+        writeln!(w)?;
+        for f in &d.unrecognised_files {
+            writeln!(w, "- `{f}`")?;
+        }
+        writeln!(w)?;
+    }
+
+    // Stated here, in the section about what was read, rather than left to the
+    // `CAPPED:` marker events in the tables below. The marker is chronological, so
+    // it appears wherever its group happened to start; this is the whole list in
+    // one place, and it does not depend on the marker surviving whatever the table
+    // it lands in truncates.
+    if !capped.is_empty() {
+        writeln!(w, "### Event groups this report only samples")?;
+        writeln!(w)?;
+        writeln!(w, "A group of near-identical events is summarised **in this report only** — \
+            the supertimeline CSV/JSONL and `_triage.json` carry every one of them. Nothing \
+            below is a deletion; the counts say exactly how much of each group these tables \
+            are showing.")?;
+        writeln!(w)?;
+        writeln!(w, "| Group | Shown | Summarised | First summarised | Last summarised |")?;
+        writeln!(w, "|-------|-------|------------|------------------|-----------------|")?;
+        for c in capped {
+            writeln!(
+                w,
+                "| `{}` | {} | {} | {} | {} |",
+                c.key, c.kept, c.suppressed, c.first, c.last
+            )?;
+        }
+        writeln!(w)?;
+    }
+
     Ok(())
 }
 
@@ -239,6 +541,11 @@ pub struct ReportContext<'a> {
     pub automations: &'a [Automation],
     /// A restoration date the operator supplied, as opposed to one inferred.
     pub restoration_supplied: Option<&'a str>,
+    /// Event groups this report is showing only part of. The supertimeline holds
+    /// all of them; a reader of the report has no way to know that without being
+    /// told, and an invisible truncation is indistinguishable from the tool
+    /// having stopped.
+    pub capped: &'a [CapSummary],
 }
 
 /// Write the triage report and hand back its text.
@@ -254,7 +561,7 @@ pub fn generate_report(
 ) -> Result<String> {
     let ReportContext {
         window, identity, elapsed, gaps, geo, ioc_coverage, detection, continuity, software,
-        cfg, automations, restoration_supplied,
+        cfg, automations, restoration_supplied, capped,
     } = *ctx;
     let hostname = identity.name.as_str();
     let mut w: Vec<u8> = Vec::new();
@@ -287,9 +594,19 @@ pub fn generate_report(
     writeln!(w, "## Timeframe of Interest")?;
     writeln!(w)?;
     if let Some(win) = window {
+        // Counted from the finished timeline, not taken from `win.event_count`.
+        // That field is whatever the *window detector* counted when it picked the
+        // bounds — zero for a user-specified window — and printing it here read as
+        // "this run found no high-severity events in its own window" on a report
+        // that went on to list 175 of them.
+        let high_in_window = events
+            .iter()
+            .filter(|e| severity_order(&e.severity) >= severity_order("high"))
+            .filter(|e| win.contains(&e.timestamp))
+            .count();
         writeln!(w, "- **Start**: {}", win.start)?;
         writeln!(w, "- **End**: {}", win.end)?;
-        writeln!(w, "- **High-severity events in window**: {}", win.event_count)?;
+        writeln!(w, "- **High-severity events in window**: {}", high_in_window)?;
         writeln!(w, "- **Confidence**: {}", win.confidence)?;
     } else {
         writeln!(w, "- No specific timeframe detected (full range analysed)")?;
@@ -298,6 +615,7 @@ pub fn generate_report(
 
     write_identity(&mut w, identity)?;
     write_detection_coverage(&mut w, detection)?;
+    write_artifact_coverage(&mut w, detection, capped)?;
     write_continuity(&mut w, continuity)?;
     write_phases(&mut w, events, continuity, restoration_supplied)?;
     write_evidence_coverage(&mut w, events, continuity)?;
@@ -1531,6 +1849,28 @@ fn write_continuity<W: Write>(w: &mut W, c: &Continuity) -> Result<()> {
     }
     writeln!(w)?;
 
+    // An unreadable column is not a finding of absence, and the two must not
+    // render the same way. Without this line a run that never looked for a 1102
+    // reported the same "no log clearing" as a run that looked and found none.
+    if c.event_ids_unreadable {
+        writeln!(w, "> **The event-ID column could not be read, so shutdown, boot and \
+            log-clear records were NOT looked for.** Every gap below is classified on its \
+            timing alone, and the absence of a log-clear record below is an absence of \
+            *evidence*, not a finding. Re-export the event logs with a current EvtxECmd, or \
+            check the timeliner's column names.")?;
+        writeln!(w)?;
+    }
+
+    // The opposite defect, and it inflates rather than empties: an EventID only
+    // means what it means on the channel that defines it.
+    if c.channels_unreadable && !c.event_ids_unreadable {
+        writeln!(w, "> **There was no `Channel` column, so shutdown, boot and log-clear records \
+            were matched on the EventID alone.** EID 104, 41 and 13 are reused by providers with \
+            nothing to do with the machine's lifecycle, so any log-clear or downtime statement \
+            below may be a provider collision rather than an event. Treat them as unconfirmed.")?;
+        writeln!(w)?;
+    }
+
     if let Some(hours) = c.trailing_gap_hours {
         writeln!(w, "> **The record stops {}h before the host was collected.** The last parsed \
             event is {}, but the host's own hive says it was still logging at {}. Nothing was \
@@ -1582,6 +1922,9 @@ fn write_continuity<W: Write>(w: &mut W, c: &Continuity) -> Result<()> {
     }
     if !c.cleared_at.is_empty() {
         writeln!(w, "**Event log clearing recorded at**: {}", c.cleared_at.join(", "))?;
+        writeln!(w)?;
+    } else if !c.event_ids_unreadable {
+        writeln!(w, "No event-log clear record (EID 1102 / 104) was found.")?;
         writeln!(w)?;
     }
     Ok(())
@@ -1815,6 +2158,7 @@ mod tests {
             ta_patterns: 0,
             path_rules: 0,
             software_rules: 0,
+            ..Default::default()
         });
         assert!(out.contains("NOT A CLEAN RESULT"), "{out}");
         assert!(out.contains("--data-dir"), "{out}");
@@ -1828,9 +2172,211 @@ mod tests {
             ta_patterns: 117,
             path_rules: 14,
             software_rules: 48,
+            ..Default::default()
         });
         assert!(out.contains("| Threat-actor tool patterns | 117 |"), "{out}");
         assert!(!out.contains("NOT A CLEAN RESULT"), "{out}");
+    }
+
+    /// The half-loaded case, which is the one that used to pass unremarked: the
+    /// counts all look plausible, and one rule matched nothing all run.
+    #[test]
+    fn a_rule_that_did_not_compile_is_named_and_degrades_the_report() {
+        let out = render_detection(&DetectionCoverage {
+            data_dir: "tools/threat_intel".into(),
+            ta_patterns: 117,
+            path_rules: 13,
+            software_rules: 48,
+            skipped_rules: vec![SkippedRule {
+                section: "suspicious_executable_paths".into(),
+                reason: "programdata_root_execution".into(),
+                pattern: r"ProgramData\\(?!Microsoft)[^\\]+\.exe".into(),
+                error: "look-around is not supported".into(),
+            }],
+            ..Default::default()
+        });
+        assert!(out.contains("NOT A CLEAN RESULT"), "{out}");
+        assert!(out.contains("programdata_root_execution"), "{out}");
+        assert!(out.contains("look-around is not supported"), "{out}");
+        // The missing-pack advice does not apply — every pack loaded.
+        assert!(!out.contains("--data-dir` or `WTP_DATA_DIR"), "{out}");
+    }
+
+    fn render_artifacts(d: &DetectionCoverage) -> String {
+        render_artifacts_capped(d, &[])
+    }
+
+    fn render_artifacts_capped(d: &DetectionCoverage, capped: &[CapSummary]) -> String {
+        let mut buf: Vec<u8> = Vec::new();
+        write_artifact_coverage(&mut buf, d, capped).unwrap();
+        String::from_utf8(buf).unwrap()
+    }
+
+    /// A truncation the reader cannot see is the defect. The run said "showing 100
+    /// of 165" on stderr and the report said nothing at all.
+    #[test]
+    fn a_summarised_group_is_named_in_the_report_with_its_counts() {
+        let out = render_artifacts_capped(
+            &loaded(vec![ArtifactCoverage {
+                key: "mft",
+                file: Some("MFTECmd.csv".into()),
+                volume: "noisy",
+                rows_read: 100,
+                events_emitted: 100,
+                status: "parsed",
+            }]),
+            &[CapSummary {
+                key: "rclone:mft".into(),
+                kept: 100,
+                suppressed: 65,
+                first: "2026-01-01T00:00:00.000Z".into(),
+                last: "2026-01-22T04:07:36.672Z".into(),
+            }],
+        );
+        assert!(out.contains("Event groups this report only samples"), "{out}");
+        assert!(out.contains("rclone:mft"), "{out}");
+        assert!(out.contains("| 100 | 65 |"), "{out}");
+        assert!(out.contains("2026-01-22T04:07:36.672Z"), "{out}");
+    }
+
+    /// And nothing at all when nothing was summarised — an empty table reads as a
+    /// finding of its own.
+    #[test]
+    fn a_report_that_summarised_nothing_says_nothing() {
+        let out = render_artifacts(&loaded(vec![ArtifactCoverage {
+            key: "mft",
+            file: Some("MFTECmd.csv".into()),
+            volume: "noisy",
+            rows_read: 10,
+            events_emitted: 10,
+            status: "parsed",
+        }]));
+        assert!(!out.contains("only samples"), "{out}");
+    }
+
+    fn loaded(artifacts: Vec<ArtifactCoverage>) -> DetectionCoverage {
+        DetectionCoverage {
+            data_dir: "tools/threat_intel".into(),
+            ta_patterns: 117,
+            path_rules: 14,
+            software_rules: 48,
+            artifacts,
+            ..Default::default()
+        }
+    }
+
+    fn covered(
+        key: &'static str,
+        volume: &'static str,
+        rows: usize,
+        events: usize,
+    ) -> ArtifactCoverage {
+        ArtifactCoverage {
+            key,
+            file: Some(format!("{key}.csv")),
+            volume,
+            rows_read: rows,
+            events_emitted: events,
+            status: "parsed",
+        }
+    }
+
+    /// The assertion this table exists for. 1,231 jump-list rows and no events was
+    /// indistinguishable from a host with no jump lists.
+    #[test]
+    fn a_quiet_artifact_with_rows_and_no_events_is_an_error_not_a_zero() {
+        let d = loaded(vec![covered("jump-lists", "quiet", 1231, 0)]);
+        assert!(d.coverage_degraded(), "a quiet artefact that kept nothing degrades the run");
+        assert!(d.degraded());
+        let out = render_artifacts(&d);
+        assert!(out.contains("**LOST**"), "{out}");
+        assert!(out.contains("1231 row(s) in `jump-lists.csv`, 0 events"), "{out}");
+        assert!(out.contains("defect, not a finding"), "{out}");
+        assert!(d.failure_lines().iter().any(|l| l.contains("jump-lists")), "{:?}", d.failure_lines());
+    }
+
+    /// A noisy artefact keeping nothing is a legitimate result — it is
+    /// detection-gated, and nothing fired.
+    #[test]
+    fn a_noisy_artifact_with_rows_and_no_events_is_not_an_error() {
+        let d = loaded(vec![covered("hayabusa", "noisy", 9577, 0)]);
+        assert!(!d.coverage_degraded(), "detection-gated artefacts may legitimately keep nothing");
+        assert!(!d.degraded());
+        let out = render_artifacts(&d);
+        assert!(!out.contains("**LOST**"), "{out}");
+    }
+
+    /// Absent is not the same as empty, and neither is superseded: both print a
+    /// dash rather than a zero, because a zero invites the reader to draw a
+    /// conclusion from a file that was never read.
+    #[test]
+    fn an_absent_artifact_is_not_reported_as_zero_rows() {
+        let d = loaded(vec![
+            ArtifactCoverage {
+                key: "prefetch",
+                file: None,
+                volume: "quiet",
+                rows_read: 0,
+                events_emitted: 0,
+                status: "absent",
+            },
+            ArtifactCoverage {
+                key: "usnjrnl",
+                file: Some("usnjrnl-j-file.csv".into()),
+                volume: "noisy",
+                rows_read: 0,
+                events_emitted: 0,
+                status: "superseded",
+            },
+        ]);
+        let out = render_artifacts(&d);
+        assert!(out.contains("| prefetch | — | quiet | — | — | absent |"), "{out}");
+        assert!(out.contains("`usnjrnl-j-file.csv`"), "{out}");
+        assert!(out.contains("superseded |"), "{out}");
+        assert!(!d.degraded(), "{out}");
+    }
+
+    /// A column that could not be found is named with the header as observed —
+    /// the one fact needed to fix it — and degrades the report.
+    #[test]
+    fn a_missing_column_is_named_with_the_header_it_was_looking_at() {
+        let mut d = loaded(vec![ArtifactCoverage {
+            key: "event-logs",
+            file: Some("event-logs.csv".into()),
+            volume: "noisy",
+            rows_read: 840_821,
+            events_emitted: 11,
+            status: "column-mismatch",
+        }]);
+        d.column_failures = vec![ColumnFailure {
+            artifact: "event-logs".into(),
+            file: "event-logs.csv".into(),
+            logical: "event_id".into(),
+            aliases: vec!["event_id".into(), "EventId".into()],
+            header: vec!["datetime".into(), "EventIdentifier2".into()],
+        }];
+        assert!(d.degraded());
+        assert!(d.coverage_degraded());
+        assert!(!d.rules_degraded(), "the rule packs were fine");
+        let out = render_artifacts(&d);
+        assert!(out.contains("`event_id`"), "{out}");
+        assert!(out.contains("`EventIdentifier2`"), "{out}");
+        assert!(out.contains("column-mismatch"), "{out}");
+
+        // And the banner says which of the two kinds of degradation it was.
+        let banner = render_detection(&d);
+        assert!(banner.contains("EVIDENCE WAS NOT FULLY READ"), "{banner}");
+        assert!(banner.contains("Artefact Coverage"), "{banner}");
+    }
+
+    /// A Wiskess output this build does not know about is stated, not dropped.
+    #[test]
+    fn an_unrecognised_file_is_listed_but_does_not_degrade_the_run() {
+        let mut d = loaded(vec![covered("mft", "noisy", 100, 4)]);
+        d.unrecognised_files = vec!["some-new-artefact.csv".into()];
+        let out = render_artifacts(&d);
+        assert!(out.contains("some-new-artefact.csv"), "{out}");
+        assert!(!d.degraded(), "not knowing a file is a gap to report, not a failed parse");
     }
 
     /// Zero rules and zero matches are different findings here too.

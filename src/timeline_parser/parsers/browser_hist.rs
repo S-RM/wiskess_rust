@@ -7,6 +7,17 @@ use crate::timeline_parser::config::PipelineConfig;
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::intel::geo::GeoReaders;
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{self, Columns, Field, DATETIME};
+
+/// The visited URL. Required: it is the row's whole subject, and `unwrap_or(1)`
+/// here used to resolve to `timestamp_desc` on a renamed header — every domain
+/// would then have been extracted from a sentence like
+/// `browser-hist - x.csv: VisitTime`.
+const URL: Field = Field::required("url", &["URL", "url"]);
+const TITLE: Field = Field::optional("title", &["Title", "title"]);
+/// BrowsingHistoryView spells it `User Profile`; the timeliner's snake_case form
+/// folds to the same key, so both resolve from one alias.
+const USER_PROFILE: Field = Field::optional("user_profile", &["User Profile", "Profile"]);
 
 static KNOWN_GOOD_DOMAINS: &[&str] = &[
     "microsoft.com", "windows.com", "windowsupdate.com", "office.com",
@@ -70,19 +81,20 @@ pub fn parse(
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(reader);
     let headers = rdr.headers()?.clone();
 
-    let col = |name: &str| headers.iter().position(|h| h == name);
-    let ts_idx = col("datetime").unwrap_or(0);
-    let url_idx = col("URL").unwrap_or(1);
-    let title_idx = col("Title");
-    let profile_idx = col("User Profile");
+    let cols = Columns::resolve("browser-hist", filepath, &headers, &[DATETIME, URL, TITLE, USER_PROFILE]);
 
+    let mut rows = 0usize;
     for result in rdr.records() {
         let Ok(record) = result else { continue };
+        rows += 1;
 
-        let ts = record.get(ts_idx).unwrap_or("").to_string();
-        let url = record.get(url_idx).unwrap_or("");
-        let title = title_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let user_profile = profile_idx.and_then(|i| record.get(i)).unwrap_or("");
+        let ts = cols.get(&record, "datetime").to_string();
+        let url = cols.get(&record, "url");
+        let title = cols.get(&record, "title");
+        let user_profile = cols.get(&record, "user_profile");
+        if ts.is_empty() || url.is_empty() {
+            continue;
+        }
 
         let domain = extract_domain(url);
         let base_domain = domain.split('.').next().unwrap_or(&domain);
@@ -109,15 +121,23 @@ pub fn parse(
             }
         }
 
-        if ioc_hits.is_empty() && !is_suspicious_domain && !cfg.in_timewindow(&ts) {
-            continue;
-        }
-        if is_known_good && ioc_hits.is_empty() {
+        // `browser-hist` is a Quiet artifact, so an unremarkable visit is
+        // background rather than absent: it is carried at an `info` floor, below
+        // the curated cut, so the timeline can say what the user was doing either
+        // side of the visit that matters. A known-good domain is treated the same
+        // way as Amcache's self-reported `ProductName` — an allowlist explains a
+        // row, it does not license deleting it.
+        let has_detection = !ioc_hits.is_empty() || is_suspicious_domain;
+        let baseline = !has_detection || (is_known_good && ioc_hits.is_empty());
+        if baseline && !cfg.emit_quiet_baseline {
             continue;
         }
 
         let mut indicators: Vec<String> = ioc_hits;
-        let mut severity = "low".to_string();
+        let mut severity = if baseline { "info" } else { "low" }.to_string();
+        if baseline {
+            indicators.push("BROWSER:record".to_string());
+        }
 
         if let Some(ref ip) = ip_host {
             indicators.push(format!("IP:{}", ip));
@@ -156,9 +176,15 @@ pub fn parse(
             user: user_profile.to_string(),
             hostname: hostname.to_string(),
             detection_rule: "browser_analysis".to_string(),
+            classification: if is_known_good && baseline {
+                "vendor:known-good-domain".to_string()
+            } else {
+                String::new()
+            },
             ..Default::default()
         });
     }
 
+    columns::note_rows("browser-hist", rows);
     Ok(events)
 }

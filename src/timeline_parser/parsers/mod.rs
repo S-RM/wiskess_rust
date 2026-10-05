@@ -1,7 +1,8 @@
 pub mod amcache;
 pub mod appcompatcache;
+pub mod artifacts;
 pub mod browser_hist;
-pub mod discovery;
+pub mod columns;
 pub mod hindsight;
 pub mod event_logs;
 pub mod hayabusa;
@@ -10,6 +11,7 @@ pub mod jump_lists;
 pub mod lnk_files;
 pub mod mft;
 pub mod network;
+pub mod passthrough;
 pub mod registry;
 pub mod regripper;
 pub mod usnjrnl;

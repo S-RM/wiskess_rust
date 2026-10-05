@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::timeline_parser::config::severity_order;
 use super::event::UnifiedEvent;
+use super::report::DetectionCoverage;
 
 const CSV_HEADER: &str =
     "Timestamp_UTC,Source,EventType,Severity,Description,Indicators,MitreTactic,MitreTechnique,User,Hostname,DetectionRule,Classification,ExecutionEvidence,Phase";
@@ -62,6 +63,18 @@ const STRONG_PREFIXES: &[&str] = &[
     // rows would bury the 38 that matter. An out-of-hours logon that is *also*
     // rare arrives through this prefix anyway.
     "RARE_LOGON:",
+    // The same argument, from User Access Logging: a client or account that
+    // reached a server role once or twice is the interesting case, and the
+    // severity of a UAL summary row does not express that. The operator asked for
+    // every access count below ten by name — this is the prefix that puts them in
+    // the curated timeline rather than only in the supertimeline.
+    "NET:rare_access_count",
+    "NET:anonymous_logon_ual",
+    // The marker standing in for a group the report table truncated. It carries
+    // the count and the span of what was left out, and a suppression the analyst
+    // cannot see is the bug it exists to replace — so it belongs in the curated
+    // cut, which is the file that gets read.
+    "CAPPED:",
 ];
 
 /// Is this event part of the curated triage timeline? High/crit severity, an
@@ -98,10 +111,34 @@ pub fn is_triage_hit(e: &UnifiedEvent) -> bool {
     })
 }
 
-/// Evidence strong enough to outrank a benign classification: a supplied-IOC
-/// match or a malicious hash verdict. A path allowlist is spoofable; these are
-/// statements about the content, not about where it sits.
+/// Evidence strong enough to outrank a benign classification.
+///
+/// A supplied-IOC match or a malicious hash verdict qualifies unconditionally:
+/// a path allowlist is spoofable, and these are statements about the *content*,
+/// not about where it sits.
+///
+/// A `high`-or-worse severity plus a TA-tool or path-rule hit also qualifies,
+/// and that is a deliberate widening. The case is a webshell written into a
+/// product's own web-served tree: the tree is a legitimate vendor path, so
+/// `classify()` correctly labels the row `vendor:<product>`, and the row then
+/// left the triage cut carrying `PATH:script_in_web_served_tree` at `high` —
+/// which is to say the classification silenced the detection that contradicted
+/// it. The severity is load-bearing here rather than encoded in the indicator
+/// string because severity is now raised correctly by [`crate::timeline_parser::config::raise`];
+/// before that fix a `high` path rule could not lift an event past `med` and this
+/// test would have matched nothing.
+///
+/// **The trade:** a `high` TA-tool name matching inside a vendor tree — a
+/// legitimately-shipped `psexec.exe` in an admin toolkit's install directory —
+/// now reaches the curated timeline where it did not before. That is the right
+/// way round: a false positive an analyst dismisses in one line costs less than a
+/// webshell that never appears.
 fn overrides_explanation(e: &UnifiedEvent) -> bool {
+    if severity_order(&e.severity) >= severity_order("high")
+        && e.indicators.iter().any(|i| i.starts_with("TA_TOOL:") || i.starts_with("PATH:"))
+    {
+        return true;
+    }
     e.indicators.iter().any(|i| {
         i.starts_with("IOC:")
             || i.starts_with("IOC_HASH:")
@@ -165,6 +202,7 @@ pub fn write_opensearch_ndjson(
     events: &[UnifiedEvent],
     out_dir: &Path,
     hostname: &str,
+    coverage: &DetectionCoverage,
 ) -> Result<(usize, PathBuf)> {
     let filename = format!("{hostname}_triage.json");
     let path = out_dir.join(&filename);
@@ -253,6 +291,68 @@ pub fn write_opensearch_ndjson(
             writeln!(w)?;
             written += 1;
         }
+    }
+
+    // What was read, as a document — always, whether or not the run was clean.
+    //
+    // This file is what the operator's downstream tools read, and several of them
+    // read nothing else. A consumer looking at a thin timeline cannot otherwise
+    // tell whether the host was quiet or the parser was blind, and the tags
+    // document above is gated on there *being* findings — precisely the case where
+    // that question matters most. `degraded: true` means: do not read the absence
+    // of an event here as the absence of the activity.
+    {
+        let artifacts: Vec<serde_json::Value> = coverage
+            .artifacts
+            .iter()
+            .map(|a| {
+                json!({
+                    "artifact": a.key,
+                    "file": a.file,
+                    "volume": a.volume,
+                    "rows_read": a.rows_read,
+                    "events_emitted": a.events_emitted,
+                    "status": a.status,
+                    // The assertion, pre-evaluated: a quiet artefact cannot
+                    // legitimately read rows and keep nothing.
+                    "rows_lost": a.silently_dropped(),
+                })
+            })
+            .collect();
+        let problems = coverage.failure_lines();
+        let mut doc = serde_json::Map::new();
+        doc.insert("datetime".into(), json!(generated));
+        if let Some(ms) = normalise_time(&generated).1 {
+            doc.insert("timestamp".into(), json!(ms));
+        }
+        doc.insert("timestamp_desc".into(), json!(format!("triage_coverage - {filename}")));
+        doc.insert("hostname".into(), json!(hostname));
+        doc.insert("doc_type".into(), json!("triage_coverage"));
+        doc.insert("degraded".into(), json!(coverage.degraded()));
+        doc.insert("events_total".into(), json!(events.len()));
+        doc.insert("artifacts".into(), json!(artifacts));
+        doc.insert("problems".into(), json!(problems));
+        doc.insert("unrecognised_files".into(), json!(coverage.unrecognised_files));
+        doc.insert("ta_patterns".into(), json!(coverage.ta_patterns));
+        doc.insert("path_rules".into(), json!(coverage.path_rules));
+        doc.insert(
+            "message".into(),
+            json!(if problems.is_empty() {
+                format!(
+                    "{hostname}: all {} artefact(s) read, {} event(s) kept",
+                    coverage.artifacts.iter().filter(|a| a.status == "parsed").count(),
+                    events.len()
+                )
+            } else {
+                format!(
+                    "{hostname}: THIS RUN DID NOT READ ALL OF ITS EVIDENCE — {}",
+                    problems.join("; ")
+                )
+            }),
+        );
+        serde_json::to_writer(&mut w, &doc)?;
+        writeln!(w)?;
+        written += 1;
     }
 
     w.flush()?;
@@ -387,13 +487,25 @@ mod opensearch_tests {
         }
     }
 
+    /// A run whose rule packs loaded and whose artefacts were all read, so the
+    /// coverage document these tests carry is not itself a finding.
+    fn clean() -> DetectionCoverage {
+        DetectionCoverage {
+            data_dir: "tools/threat_intel".into(),
+            ta_patterns: 117,
+            path_rules: 16,
+            software_rules: 48,
+            ..Default::default()
+        }
+    }
+
     fn write_as(tag: &str, events: &[UnifiedEvent]) -> (serde_json::Value, std::path::PathBuf) {
         // Per-test directory: these run in parallel and a shared path meant one
         // test read another's file.
         let dir = std::env::temp_dir()
             .join(format!("os-ndjson-{}-{tag}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let (_, path) = write_opensearch_ndjson(events, &dir, "MY-DC02").unwrap();
+        let (_, path) = write_opensearch_ndjson(events, &dir, "MY-DC02", &clean()).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         let first = text.lines().next().unwrap().to_string();
         (serde_json::from_str(&first).unwrap(), path)
@@ -546,9 +658,13 @@ mod opensearch_tests {
     fn the_event_ndjson_does_not_repeat_the_narrative() {
         let dir = std::env::temp_dir().join(format!("os-ndjson-{}-norepeat", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let (_, path) =
-            write_opensearch_ndjson(&[ev("2026-05-05T09:50:31.422Z", "hayabusa", "high")], &dir, "H")
-                .unwrap();
+        let (_, path) = write_opensearch_ndjson(
+            &[ev("2026-05-05T09:50:31.422Z", "hayabusa", "high")],
+            &dir,
+            "H",
+            &clean(),
+        )
+        .unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         for d in text.lines().map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap()) {
             assert_ne!(d["doc_type"], "triage_report");

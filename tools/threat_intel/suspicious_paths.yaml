@@ -1,10 +1,36 @@
+# Suspicious path and filename rules.
+#
+# Patterns are Rust `regex` crate syntax, compiled case-insensitively. That crate
+# has **no lookaround support** — no `(?!...)`, no `(?<=...)`. A pattern using one
+# does not fail loudly, it just never loads, so use `exclude_pattern` /
+# `exclude_parent` instead. `every_shipped_rule_compiles` in
+# src/detectors/suspicious_paths.rs asserts this file compiles in full.
+#
+# Paths are normalised before matching (see detectors/file_classes.rs):
+# forward slashes become backslashes, a `[root]` prefix is stripped, and a
+# relative `.\` becomes `\`. So write rules in Windows form and anchor on a
+# separator (`[\\/]segment[\\/]`) rather than on a drive letter — MFT rows in
+# this collection format carry no drive letter at all.
+#
+# Optional per-rule fields:
+#   exclude_pattern  a second regex; a match on it vetoes the rule
+#   require_ext      list of extensions the rule applies to (default: any)
+#   exclude_parent   parent-path fragments that veto it (case-insensitive)
+
 suspicious_executable_paths:
   - pattern: "\\\\(Users|Documents and Settings)\\\\[^\\\\]+\\\\(AppData\\\\Local\\\\Temp|Downloads|Desktop)\\\\[^\\\\]+\\.(exe|dll|bat|ps1|vbs|js|hta|scr|com|pif)"
     reason: user_temp_execution
     severity: med
     mitre: T1204
 
-  - pattern: "\\\\ProgramData\\\\(?!Microsoft\\\\Windows Defender|Microsoft\\\\Windows\\\\Start Menu|Package Cache)[^\\\\]+\\.(exe|dll|bat|ps1)"
+  # The pattern already requires the file to sit *directly* under ProgramData
+  # (`[^\\]+` admits no separator), so the vendor subdirectories this rule used to
+  # exclude by lookahead — Microsoft\Windows Defender, Microsoft\Windows\Start
+  # Menu, Package Cache — could never have matched it in the first place. The
+  # lookahead was therefore doing nothing except preventing the rule from
+  # compiling at all. Vendor trees are excluded at the right layer, by
+  # classify.rs / vendor_paths.yaml.
+  - pattern: "\\\\ProgramData\\\\[^\\\\]+\\.(exe|dll|bat|ps1)"
     reason: programdata_nonstandard_exe
     severity: med
     mitre: T1059
@@ -49,20 +75,76 @@ suspicious_executable_paths:
     severity: med
     mitre: T1036.005
 
+  # --- Web shells -----------------------------------------------------------
+  #
+  # A server-side script written into a directory the web server serves from is
+  # the single most reliable webshell signal available in filesystem metadata,
+  # and nothing here covered it: `.jsp` appeared in no extension list and no
+  # pattern, so JSP shells dropped into a ColdFusion webroot produced no event at
+  # all — the row was discarded on extension before any rule ran.
+  #
+  # Vocabulary was cross-checked against the upstream Sigma rule
+  # `file_event_win_webshell_creation_detect.yml`, which would **not** have caught
+  # that case: its Tomcat/JSP branch is commented out upstream, it has no
+  # ColdFusion coverage, and it is level `medium`. Hence hand-authored, and hence
+  # `high`.
+  #
+  # The exclusion is per-rule rather than global because `user_temp_execution` and
+  # `windows_temp_execution` above exist precisely to match the directories it
+  # names. `xampp` is excluded as a developer install, not a served production
+  # tree.
+  - pattern: "[\\\\/](wwwroot|inetpub|webapps|htdocs|public_html|www|html|CFIDE|cfusion|tomcat|jboss|wildfly|weblogic|websphere)[\\\\/].*\\.(jsp|jspx|jspf|jsv|jsw|soap|asp|aspx|ashx|asmx|ascx|cfm|cfml|cfc|ph[p345tmlar]*|war|jar|class|java|exe|dll|vbs|js|hta|sh|py)$"
+    exclude_pattern: "[\\\\/](AppData[\\\\/]Local[\\\\/]Temp|Windows[\\\\/]Temp|xampp)[\\\\/]"
+    reason: script_in_web_served_tree
+    severity: high
+    mitre: T1505.003
+
+  # A servlet container writes `<name>_jsp.java` and `<name>_jsp.class` into its
+  # work directory only when the JSP has been **requested and compiled**. Unlike
+  # the rule above — which says a shell was written — this says one was *served*.
+  # It is the strongest webshell evidence in the MFT, and it survives the shell
+  # itself being deleted.
+  - pattern: "[\\\\/](work[\\\\/]Catalina|org[\\\\/]apache[\\\\/]jsp)[\\\\/].*_jsp\\.(java|class)$"
+    reason: jsp_compiled_by_servlet_container
+    severity: high
+    mitre: T1505.003
+
+  # ColdFusion's admin tree is a routine post-exploitation target: an upload here
+  # is administrative access, not content.
+  - pattern: "[\\\\/]CFIDE[\\\\/](administrator|adminapi|scripts)[\\\\/]"
+    reason: coldfusion_admin_tree_write
+    severity: high
+    mitre: T1505.003
+
+  # `WEB-INF` is never served to clients, so a script appearing inside it is
+  # either a deployment or someone hiding one where a scan of the served tree
+  # will not find it.
+  - pattern: "[\\\\/]WEB-INF[\\\\/].*\\.(jsp|jspx|class|war)$"
+    reason: script_under_web_inf
+    severity: high
+    mitre: T1505.003
+
 suspicious_filenames:
+  # `require_ext` and `exclude_parent` reproduce, per rule, what used to be a
+  # hard-coded gate applied to *every* filename rule. Keeping them here preserves
+  # these two rules exactly; omitting them below is what repairs the third.
   - pattern: "(svchost|lsass|csrss|winlogon|services|smss|explorer|spoolsv|taskhost)\\.(exe|dll)"
-    context: "NOT in \\\\Windows\\\\System32"
+    require_ext: [".exe", ".dll", ".scr", ".com"]
+    exclude_parent: ["system32", "syswow64", "winsxs"]
     reason: masquerading_system_binary
     severity: high
     mitre: T1036.005
 
   - pattern: "(cmd|powershell|pwsh)\\.(exe|dll)"
-    context: "NOT in \\\\Windows\\\\System32|\\\\Windows\\\\SysWOW64"
+    require_ext: [".exe", ".dll", ".scr", ".com"]
+    exclude_parent: ["system32", "syswow64", "winsxs", "windowspowershell", "powershell\\7"]
     reason: masquerading_shell
     severity: high
     mitre: T1036.005
 
-  - pattern: "\\.(exe|dll|scr|com)\\.txt$"
+  # No `require_ext`: a double extension by definition does not end in `.exe`, so
+  # the old global "must end in .exe" gate meant this rule could never fire.
+  - pattern: "\\.(exe|dll|scr|com|ps1|bat|vbs|js)\\.(txt|log|jpg|png|pdf|doc|docx)$"
     reason: double_extension
     severity: high
     mitre: T1036.007
@@ -72,33 +154,12 @@ suspicious_filenames:
     severity: high
     mitre: T1036.006
 
-archive_exfiltration_patterns:
-  - pattern: "\\.(zip|rar|7z|tar|gz|cab)$"
-    context: "FileCreate in user directories"
-    reason: archive_creation_potential_staging
-    severity: low
-    mitre: T1560.001
-
-  - pattern: "\\.(zip|rar|7z)$"
-    context: "FileCreate AND FileDelete within 1 hour"
-    reason: archive_create_delete_antiforensics
-    severity: high
-    mitre: T1070.004
-
-usnjrnl_suspicious_reasons:
-  - update_reason: "FileCreate"
-    extensions: [".exe", ".dll", ".bat", ".ps1", ".vbs", ".js", ".hta", ".scr", ".com"]
-    reason: executable_created
-    severity: med
-
-  - update_reason: "FileDelete|Close"
-    extensions: [".exe", ".dll", ".bat", ".ps1", ".evtx", ".log"]
-    reason: suspicious_file_deletion
-    severity: med
-    mitre: T1070.004
-
-  - update_reason: "RenameNewName"
-    extensions: [".exe", ".dll"]
-    reason: executable_renamed
-    severity: med
-    mitre: T1036
+# Removed: `archive_exfiltration_patterns` and `usnjrnl_suspicious_reasons`.
+#
+# Both were read by no code — the loader only ever looked at the two sections
+# above — while reading as live configuration. Their content now lives where it is
+# actually applied: ARCHIVE_EXT and SCRIPT_EXT in src/detectors/file_classes.rs
+# (compiled in, because they gate whether a row becomes an event at all and a
+# missing --data-dir must not be able to empty them), and the USN update-reason
+# matching in src/parsers/usnjrnl.rs, which has to handle two different reason
+# vocabularies and so cannot be a plain string list.

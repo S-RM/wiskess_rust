@@ -27,6 +27,7 @@ use std::io::BufReader;
 use std::path::Path;
 
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{Columns, Field, DATETIME, EVENT_ID};
 
 /// Below this a break in the record is ordinary quiet, not a gap. A full day of
 /// total silence on a Windows host is not: even an idle server writes service,
@@ -51,26 +52,61 @@ pub const RECENT_INSTALL_DAYS: i64 = 90;
 /// How far either side of a gap a lifecycle record still counts as bracketing it.
 const BRACKET_HOURS: i64 = 3;
 
+/// A lifecycle EventID and the channel that gives it its meaning.
+///
+/// **An EventID is only unique within its provider.** `event_logs.rs` scopes its
+/// critical-EID rules by channel for that reason; this scan is a second,
+/// independent pass over the same file and had none of that scoping, so every
+/// unrelated reuse of these numbers counted as a machine lifecycle record.
+/// Measured on one live export of 840,821 rows: 36 rows of EID 1102 emitted by
+/// the Start-menu population provider and 155 rows of EID 104 spread across five
+/// `.../Operational` channels — 191 phantom "the log was cleared" timestamps in
+/// `restoration.json`, none of them a log clear. `classify()` checks clearing
+/// first, so any real gap within `BRACKET_HOURS` of one of those would have been
+/// reported as anti-forensics.
+///
+/// The same export held 106 rows of EID 41 (Server Manager, Terminal Services,
+/// Windows Update) and 22 of EID 13 (VSS, Start-menu) — every one of which would
+/// have been read as a power loss or a shutdown, and a phantom shutdown is the
+/// more dangerous of the two errors: it *explains away* a real gap as downtime.
+///
+/// Nothing outside the `System` channel is a boot or a shutdown, and nothing
+/// outside `Security`/`System` is a log clear.
+type Lifecycle = (&'static str, &'static str);
+
 /// Event IDs that say the machine was shut down deliberately or lost power.
-const SHUTDOWN_EIDS: &[&str] = &[
-    "6006", // event log service stopped — the clean end of a session
-    "1074", // shutdown initiated by a process or user
-    "6008", // previous shutdown was unexpected
-    "41",   // kernel power: rebooted without a clean shutdown
-    "13",   // kernel general: shutting down
+const SHUTDOWN_EIDS: &[Lifecycle] = &[
+    ("6006", "System"), // event log service stopped — the clean end of a session
+    ("1074", "System"), // shutdown initiated by a process or user
+    ("6008", "System"), // previous shutdown was unexpected
+    ("41", "System"),   // kernel power: rebooted without a clean shutdown
+    ("13", "System"),   // kernel general: shutting down
 ];
 
 /// Event IDs that say the machine came back up.
-const BOOT_EIDS: &[&str] = &[
-    "6005", // event log service started — the clean start of a session
-    "12",   // kernel general: starting up
+const BOOT_EIDS: &[Lifecycle] = &[
+    ("6005", "System"), // event log service started — the clean start of a session
+    ("12", "System"),   // kernel general: starting up
 ];
 
 /// Event IDs that say the record was destroyed rather than merely absent.
-const CLEARED_EIDS: &[&str] = &[
-    "1102", // security log cleared
-    "104",  // a non-security log cleared
+const CLEARED_EIDS: &[Lifecycle] = &[
+    ("1102", "Security"), // the audit log was cleared
+    ("104", "System"),    // another log was cleared — recorded in System either way
 ];
+
+/// Does this row match one of `table`, on both the EventID and the channel that
+/// defines it?
+///
+/// When the export carries no `Channel` column there is nothing to scope with,
+/// and matching on the EventID alone is the lesser failure — a missed
+/// restoration is worse than a noisy one — but the caller says so on stderr and
+/// the report repeats it.
+fn lifecycle_matches(table: &[Lifecycle], eid: &str, channel: &str, channel_known: bool) -> bool {
+    table
+        .iter()
+        .any(|(id, ch)| *id == eid && (!channel_known || channel.trim().eq_ignore_ascii_case(ch)))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GapKind {
@@ -173,6 +209,22 @@ pub struct Continuity {
     /// which nothing was observed — the same finding as an interior gap, at the
     /// edge where it is easiest to miss.
     pub trailing_gap_hours: Option<i64>,
+    /// The event-ID column could not be resolved, so shutdown/boot/log-clear
+    /// records **were not looked for**.
+    ///
+    /// This is not the same as their absence, and the two must never render the
+    /// same way. The column was called `EventId` here and `event_id` in the
+    /// export, so every gap was classified with no lifecycle evidence at all and
+    /// `cleared_at: []` was reported as though the log had never been cleared.
+    pub event_ids_unreadable: bool,
+    /// There was no `Channel` column, so the lifecycle EIDs were matched on the
+    /// number alone and every value derived from them may be inflated.
+    ///
+    /// The opposite failure to `event_ids_unreadable`, and it has to be said out
+    /// loud for the same reason: EID 104 and 41 are reused by providers that have
+    /// nothing to do with the machine's lifecycle, so an unscoped match turns
+    /// routine records into log clears and power losses.
+    pub channels_unreadable: bool,
 }
 
 impl Continuity {
@@ -293,10 +345,29 @@ pub fn scan_event_logs(filepath: &Path) -> Result<Continuity> {
     let file = std::fs::File::open(filepath)?;
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(BufReader::new(file));
     let headers = rdr.headers()?.clone();
-    let col = |name: &str| headers.iter().position(|h| h == name);
-    let ts_idx = col("datetime").unwrap_or(0);
-    // EvtxECmd writes `EventId`; some reconstructions carry `EventID`.
-    let eid_idx = col("EventId").or_else(|| col("EventID"));
+    // `EventId`, `EventID` and `event_id` are all in circulation; the resolver
+    // folds separators and case so all three land on one logical name. Until it
+    // did, this scan found no 1102, no boot and no shutdown on any current
+    // export, and reported the empty lists as a clean bill of health.
+    let cols = Columns::resolve(
+        "restoration",
+        filepath,
+        &headers,
+        &[DATETIME, EVENT_ID, Field::optional("channel", &["Channel"])],
+    );
+    let eids_readable = cols.has("event_id");
+    // Used to scope the lifecycle EIDs to the channel that defines them; see
+    // `Lifecycle`. Absent on legacy exports, and then we say so rather than
+    // quietly counting Start-menu records as log clears.
+    let channel_known = cols.has("channel");
+    if eids_readable && !channel_known {
+        eprintln!(
+            "[WARN] restoration: no 'Channel' column in {} - shutdown/boot/log-clear records \
+             cannot be scoped to a channel and will match on EventID alone. Expect false \
+             positives: EID 104, 41 and 13 are reused by unrelated providers.",
+            filepath.display()
+        );
+    }
 
     let mut days: BTreeMap<NaiveDate, (NaiveDateTime, NaiveDateTime)> = BTreeMap::new();
     let mut shutdowns: Vec<NaiveDateTime> = Vec::new();
@@ -306,7 +377,7 @@ pub fn scan_event_logs(filepath: &Path) -> Result<Continuity> {
 
     for result in rdr.records() {
         let Ok(record) = result else { continue };
-        let Some(dt) = record.get(ts_idx).and_then(parse_ts) else { continue };
+        let Some(dt) = parse_ts(cols.get(&record, "datetime")) else { continue };
         if !plausible(&dt) {
             continue;
         }
@@ -319,14 +390,14 @@ pub fn scan_event_logs(filepath: &Path) -> Result<Continuity> {
             })
             .or_insert((dt, dt));
 
-        if let Some(eid) = eid_idx.and_then(|i| record.get(i)).map(str::trim) {
-            if SHUTDOWN_EIDS.contains(&eid) {
-                shutdowns.push(dt);
-            } else if BOOT_EIDS.contains(&eid) {
-                boots.push(dt);
-            } else if CLEARED_EIDS.contains(&eid) {
-                cleared.push(dt);
-            }
+        let eid = cols.get(&record, "event_id");
+        let channel = cols.get(&record, "channel");
+        if lifecycle_matches(SHUTDOWN_EIDS, eid, channel, channel_known) {
+            shutdowns.push(dt);
+        } else if lifecycle_matches(BOOT_EIDS, eid, channel, channel_known) {
+            boots.push(dt);
+        } else if lifecycle_matches(CLEARED_EIDS, eid, channel, channel_known) {
+            cleared.push(dt);
         }
     }
 
@@ -340,6 +411,8 @@ pub fn scan_event_logs(filepath: &Path) -> Result<Continuity> {
         series_first: days.values().next().map(|(lo, _)| iso(lo)),
         series_last: days.values().next_back().map(|(_, hi)| iso(hi)),
         cleared_at: cleared.iter().map(iso).collect(),
+        event_ids_unreadable: !eids_readable,
+        channels_unreadable: !channel_known,
         ..Default::default()
     };
 
@@ -689,6 +762,13 @@ pub fn write_restoration_json(
         "os_install_is_recent": c.install_is_recent,
         "trailing_gap_hours": c.trailing_gap_hours,
         "log_cleared_at": c.cleared_at,
+        // A consumer reading `log_cleared_at: []` has to be able to tell "none
+        // found" from "never looked for". This is that field.
+        "lifecycle_records_unreadable": c.event_ids_unreadable,
+        // And the other direction: matched on the EventID alone, so anything here
+        // may include a provider that reuses the number. False positives are
+        // possible; a consumer that acts on `log_cleared_at` needs to know which.
+        "lifecycle_records_unscoped": c.channels_unreadable,
         "candidates": c.candidates.iter().map(|k| serde_json::json!({
             "resumes": k.resumes,
             "stops": k.stops,
@@ -721,38 +801,56 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    /// Build an `event-logs.csv` from `(datetime, EventId)` pairs.
-    fn csv_of(dir: &tempfile::TempDir, rows: &[(&str, &str)]) -> std::path::PathBuf {
+    /// Build an `event-logs.csv` from `(datetime, EventId, Channel)` rows.
+    ///
+    /// The channel is explicit on every row, and deliberately not defaulted: a
+    /// lifecycle EID is only a lifecycle record on the channel that defines it,
+    /// so a test that does not say which channel it is on is not testing the
+    /// rule.
+    fn csv_of(dir: &tempfile::TempDir, rows: &[(&str, &str, &str)]) -> std::path::PathBuf {
         let p = dir.path().join("event-logs.csv");
         let mut f = std::fs::File::create(&p).unwrap();
         writeln!(f, "datetime,timestamp_desc,EventId,Channel").unwrap();
+        for (ts, eid, channel) in rows {
+            writeln!(f, "{ts},event-logs - EvtxECmd-All.csv: TimeCreated,{eid},{channel}").unwrap();
+        }
+        p
+    }
+
+    /// The same file without a `Channel` column at all — a legacy export.
+    fn csv_without_channel(dir: &tempfile::TempDir, rows: &[(&str, &str)]) -> std::path::PathBuf {
+        let p = dir.path().join("event-logs.csv");
+        let mut f = std::fs::File::create(&p).unwrap();
+        writeln!(f, "datetime,timestamp_desc,EventId").unwrap();
         for (ts, eid) in rows {
-            writeln!(f, "{ts},event-logs - EvtxECmd-All.csv: TimeCreated,{eid},System").unwrap();
+            writeln!(f, "{ts},event-logs - EvtxECmd-All.csv: TimeCreated,{eid}").unwrap();
         }
         p
     }
 
     /// A day of events, so a series looks like a real host rather than a
     /// sequence of isolated records.
-    fn day(d: &str) -> Vec<(String, String)> {
+    fn day(d: &str) -> Vec<(String, String, String)> {
         vec![
-            (format!("{d}T01:00:00.000Z"), "7036".to_string()),
-            (format!("{d}T13:00:00.000Z"), "7036".to_string()),
-            (format!("{d}T23:00:00.000Z"), "7036".to_string()),
+            (format!("{d}T01:00:00.000Z"), "7036".into(), "System".into()),
+            (format!("{d}T13:00:00.000Z"), "7036".into(), "System".into()),
+            (format!("{d}T23:00:00.000Z"), "7036".into(), "System".into()),
         ]
     }
 
-    fn series(days: &[&str], extra: &[(&str, &str)]) -> Vec<(String, String)> {
-        let mut rows: Vec<(String, String)> = days.iter().flat_map(|d| day(d)).collect();
-        rows.extend(extra.iter().map(|(a, b)| (a.to_string(), b.to_string())));
+    fn series(days: &[&str], extra: &[(&str, &str, &str)]) -> Vec<(String, String, String)> {
+        let mut rows: Vec<(String, String, String)> = days.iter().flat_map(|d| day(d)).collect();
+        rows.extend(
+            extra.iter().map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string())),
+        );
         rows.sort();
         rows
     }
 
-    fn scan(rows: &[(String, String)]) -> Continuity {
+    fn scan(rows: &[(String, String, String)]) -> Continuity {
         let dir = tempfile::tempdir().unwrap();
-        let borrowed: Vec<(&str, &str)> =
-            rows.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        let borrowed: Vec<(&str, &str, &str)> =
+            rows.iter().map(|(a, b, c)| (a.as_str(), b.as_str(), c.as_str())).collect();
         let p = csv_of(&dir, &borrowed);
         scan_event_logs(&p).unwrap()
     }
@@ -795,7 +893,10 @@ mod tests {
     fn a_gap_bracketed_by_shutdown_and_boot_is_downtime_not_restoration() {
         let c = scan(&series(
             &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
-            &[("2026-05-02T23:30:00.000Z", "6006"), ("2026-05-09T00:30:00.000Z", "6005")],
+            &[
+                ("2026-05-02T23:30:00.000Z", "6006", "System"),
+                ("2026-05-09T00:30:00.000Z", "6005", "System"),
+            ],
         ));
         assert_eq!(c.gaps.len(), 1, "{:?}", c.gaps);
         assert_eq!(c.gaps[0].kind, GapKind::Downtime);
@@ -812,13 +913,78 @@ mod tests {
         let c = scan(&series(
             &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
             &[
-                ("2026-05-02T23:30:00.000Z", "6006"),
-                ("2026-05-02T23:45:00.000Z", "1102"),
-                ("2026-05-09T00:30:00.000Z", "6005"),
+                ("2026-05-02T23:30:00.000Z", "6006", "System"),
+                ("2026-05-02T23:45:00.000Z", "1102", "Security"),
+                ("2026-05-09T00:30:00.000Z", "6005", "System"),
             ],
         ));
         assert_eq!(c.gaps[0].kind, GapKind::LogCleared);
         assert!(c.gaps[0].kind.is_finding());
+        assert_eq!(c.cleared_at, vec!["2026-05-02T23:45:00Z"]);
+        assert!(!c.channels_unreadable);
+    }
+
+    /// The false positive this scan generated on a real export: EID 1102 on a
+    /// Start-menu channel, and EID 104 on five `.../Operational` channels, are
+    /// not log clears. Unscoped, they filled `log_cleared_at` with 191 entries
+    /// and — because `classify()` checks clearing first — stood ready to relabel
+    /// any genuine gap as anti-forensics.
+    #[test]
+    fn a_lifecycle_eid_on_the_wrong_channel_is_not_a_lifecycle_record() {
+        let c = scan(&series(
+            &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
+            &[
+                // The numbers the impostors use, on the channels they use them on.
+                ("2026-05-02T23:40:00.000Z", "1102", "Microsoft-Windows-ShellCommon-StartLayoutPopulation/Operational"),
+                ("2026-05-02T23:41:00.000Z", "104", "Microsoft-Windows-Kernel-Cache/Operational"),
+                ("2026-05-02T23:42:00.000Z", "104", "Microsoft-Windows-Diagnosis-Scripted/Operational"),
+                ("2026-05-02T23:43:00.000Z", "41", "Microsoft-Windows-ServerManager-MgmtProvider/Operational"),
+                ("2026-05-02T23:44:00.000Z", "13", "Application"),
+                ("2026-05-09T00:30:00.000Z", "12", "Microsoft-Windows-StateRepository/Operational"),
+            ],
+        ));
+        assert!(c.cleared_at.is_empty(), "impostor log clears: {:?}", c.cleared_at);
+        // And the gap is still what it is: unexplained, not downtime. A phantom
+        // shutdown is the worse error of the two — it explains a real gap away.
+        assert_eq!(c.gaps.len(), 1, "{:?}", c.gaps);
+        assert_eq!(c.gaps[0].kind, GapKind::PossibleRestoration);
+    }
+
+    /// The scoped forms of the same records still count. Without this the fix
+    /// above would be indistinguishable from deleting the detector.
+    #[test]
+    fn the_same_eids_on_their_own_channels_still_count() {
+        let c = scan(&series(
+            &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
+            &[
+                ("2026-05-02T23:40:00.000Z", "104", "System"),
+                ("2026-05-09T00:30:00.000Z", "6005", "System"),
+            ],
+        ));
+        assert_eq!(c.cleared_at, vec!["2026-05-02T23:40:00Z"]);
+        assert_eq!(c.gaps[0].kind, GapKind::LogCleared);
+    }
+
+    /// A legacy export with no `Channel` column cannot be scoped. Matching on the
+    /// EventID alone is the lesser failure — a missed restoration is worse than a
+    /// noisy one — but the run has to say which of the two it is doing.
+    #[test]
+    fn a_missing_channel_column_is_reported_not_assumed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut rows: Vec<(String, String)> = ["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"]
+            .iter()
+            .flat_map(|d| day(d))
+            .map(|(ts, eid, _)| (ts, eid))
+            .collect();
+        rows.push(("2026-05-02T23:45:00.000Z".to_string(), "1102".to_string()));
+        rows.sort();
+        let borrowed: Vec<(&str, &str)> =
+            rows.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        let p = csv_without_channel(&dir, &borrowed);
+        let c = scan_event_logs(&p).unwrap();
+        assert!(c.channels_unreadable);
+        assert!(!c.event_ids_unreadable);
+        // Still found, because unscoped matching is the documented fallback.
         assert_eq!(c.cleared_at, vec!["2026-05-02T23:45:00Z"]);
     }
 
@@ -845,7 +1011,7 @@ mod tests {
     fn a_gap_far_from_the_end_of_the_record_is_only_unexplained() {
         let c = scan(&series(
             &["2026-01-01", "2026-01-02", "2026-01-20", "2026-01-21"],
-            &[("2026-05-10T12:00:00.000Z", "7036")],
+            &[("2026-05-10T12:00:00.000Z", "7036", "System")],
         ));
         let kinds: Vec<GapKind> = c.gaps.iter().map(|g| g.kind).collect();
         assert_eq!(kinds, vec![GapKind::Unexplained, GapKind::PossibleRestoration]);
@@ -861,7 +1027,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = csv_of(
             &dir,
-            &[("2026-05-01T22:00:00.000Z", "7036"), ("2026-05-02T07:00:00.000Z", "7036")],
+            &[
+                ("2026-05-01T22:00:00.000Z", "7036", "System"),
+                ("2026-05-02T07:00:00.000Z", "7036", "System"),
+            ],
         );
         assert!(scan_event_logs(&p).unwrap().gaps.is_empty());
     }
@@ -871,7 +1040,10 @@ mod tests {
     #[test]
     fn a_1970_timestamp_does_not_manufacture_a_gap() {
         let mut rows = series(&["2026-05-01", "2026-05-02"], &[]);
-        rows.insert(0, ("1970-01-21T03:00:00.000Z".to_string(), "7036".to_string()));
+        rows.insert(
+            0,
+            ("1970-01-21T03:00:00.000Z".to_string(), "7036".into(), "System".into()),
+        );
         let c = scan(&rows);
         assert!(c.gaps.is_empty(), "{:?}", c.gaps);
         assert_eq!(c.series_first.as_deref(), Some("2026-05-01T01:00:00Z"));
@@ -1141,7 +1313,10 @@ mod tests {
     fn downtime_produces_no_timeline_event() {
         let c = scan(&series(
             &["2026-05-01", "2026-05-02", "2026-05-09", "2026-05-10"],
-            &[("2026-05-02T23:30:00.000Z", "6006"), ("2026-05-09T00:30:00.000Z", "6005")],
+            &[
+                ("2026-05-02T23:30:00.000Z", "6006", "System"),
+                ("2026-05-09T00:30:00.000Z", "6005", "System"),
+            ],
         ));
         assert!(to_events(&c, "H").is_empty());
     }

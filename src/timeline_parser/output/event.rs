@@ -88,13 +88,70 @@ impl ExecutionEvidence {
 }
 
 impl UnifiedEvent {
+    /// The identity of this event, for adjacent-duplicate removal.
+    ///
+    /// This used to hash `timestamp`, `source` and the **first 100 characters** of
+    /// the description. On this evidence that is a data-loss bug rather than a
+    /// tuning choice: an MFT create reads
+    /// `File created: .\<45 chars of product tree>\<…>\<name>.jsp (36984 bytes)`,
+    /// so every file written into the same deep directory in the same second
+    /// hashed identically and all but one was deleted — precisely the same-second
+    /// batch a dropper produces.
+    ///
+    /// Everything that distinguishes two events is therefore hashed: the whole
+    /// description, the verb (`event_type`), the rule that fired, and the
+    /// indicator set, which is what separates a row a detection fired on from an
+    /// otherwise identical one it did not.
+    ///
+    /// Cost is one pass over short strings per event, and `dedup_by_key` only
+    /// compares neighbours, so this stays O(n).
     pub fn dedup_key(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.timestamp.hash(&mut hasher);
         self.source.hash(&mut hasher);
-        let desc_prefix: String = self.description.chars().take(100).collect();
-        desc_prefix.hash(&mut hasher);
+        self.event_type.hash(&mut hasher);
+        self.detection_rule.hash(&mut hasher);
+        self.description.hash(&mut hasher);
+        self.indicators.hash(&mut hasher);
         hasher.finish()
+    }
+
+    /// Replace any control character in this event's text with a space.
+    ///
+    /// `columns::get` trims a terminator, which is the common shape, but not a
+    /// control character in the *middle* of a cell — and Amcache's `ProductName`
+    /// is arbitrary bytes written by whoever built the binary. One real row read
+    /// `Product: 熀\r\u{1}\u{0}\u{1}o桓牯`, and that single `NUL` in a 131 MB
+    /// supertimeline is enough for `grep` to declare the whole file binary and
+    /// print nothing — including for every unrelated row in it. An embedded
+    /// newline does the same to any line-oriented reader, quoted or not.
+    ///
+    /// So this is not cosmetic and it is not only about corruption: a field an
+    /// attacker controls must not be able to decide whether the analyst's tools
+    /// can read the output. Run once over the final vector, so the CSV, the
+    /// JSONL, the OpenSearch NDJSON and the report all get it.
+    pub fn sanitise(&mut self) {
+        fn clean(s: &mut String) {
+            if s.chars().any(char::is_control) {
+                *s = s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+            }
+        }
+        clean(&mut self.timestamp);
+        clean(&mut self.source);
+        clean(&mut self.event_type);
+        clean(&mut self.severity);
+        clean(&mut self.description);
+        clean(&mut self.mitre_tactic);
+        clean(&mut self.mitre_technique);
+        clean(&mut self.user);
+        clean(&mut self.hostname);
+        clean(&mut self.detection_rule);
+        clean(&mut self.classification);
+        clean(&mut self.execution_evidence);
+        clean(&mut self.phase);
+        for i in &mut self.indicators {
+            clean(i);
+        }
     }
 
     /// Is this event explained by something that is not an actor?
@@ -107,5 +164,48 @@ impl UnifiedEvent {
             || self.classification.starts_with("vendor:")
             || self.classification.starts_with("os:")
             || self.classification.starts_with("responder:")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shape observed in a live Amcache export: an interior `NUL` and a bare
+    /// `CR` inside a `ProductName`, in a row that is otherwise ordinary. One of
+    /// them anywhere in the file costs every other row its greppability.
+    #[test]
+    fn a_control_character_never_reaches_an_output_field() {
+        let mut e = UnifiedEvent {
+            description: "Amcache: c:\\dir\\app.exe | Product: a\r\u{0}\u{1}b".to_string(),
+            user: "domain.local\\testuser\u{0}".to_string(),
+            indicators: vec!["HASH:aa\u{0}bb".to_string()],
+            ..Default::default()
+        };
+        e.sanitise();
+        assert_eq!(e.description, "Amcache: c:\\dir\\app.exe | Product: a   b");
+        assert_eq!(e.user, "domain.local\\testuser ");
+        assert_eq!(e.indicators[0], "HASH:aa bb");
+        for field in [&e.description, &e.user, &e.indicators[0]] {
+            assert!(!field.chars().any(char::is_control), "{field:?}");
+        }
+    }
+
+    /// It must not rewrite anything else — a path is full of characters that look
+    /// like escapes and are not.
+    #[test]
+    fn ordinary_text_is_left_exactly_as_it_was() {
+        let before = UnifiedEvent {
+            description: "File created: \\inetpub\\wwwroot\\uploads\\shell.jsp (36984 bytes)"
+                .to_string(),
+            user: "domain.local\\svcweb".to_string(),
+            indicators: vec!["PATH:script_in_web_served_tree".to_string()],
+            ..Default::default()
+        };
+        let mut after = before.clone();
+        after.sanitise();
+        assert_eq!(after.description, before.description);
+        assert_eq!(after.user, before.user);
+        assert_eq!(after.indicators, before.indicators);
     }
 }

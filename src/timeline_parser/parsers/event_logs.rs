@@ -12,7 +12,11 @@ use crate::timeline_parser::detectors::classify::{
 use crate::timeline_parser::detectors::compromised::CompromisedEntities;
 use crate::timeline_parser::detectors::ioc_matcher::IOCMatcher;
 use crate::timeline_parser::detectors::ta_tools::TAToolDetector;
+use crate::timeline_parser::detectors::Attack;
 use crate::timeline_parser::output::event::UnifiedEvent;
+use crate::timeline_parser::parsers::columns::{
+    self, Columns, Field, DATETIME, EVENT_ID, MESSAGE, USER_NAME,
+};
 
 /// Matches the `(1.2.3.4)` source IP that EvtxECmd appends to the `RemoteHost`
 /// column, e.g. `MY-DC02 (192.168.40.3)`.
@@ -252,17 +256,32 @@ pub fn parse_correlated(
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(reader);
     let headers = rdr.headers()?.clone();
 
-    let col = |name: &str| headers.iter().position(|h| h == name);
-    let ts_idx = col("datetime").unwrap_or(0);
-    let eid_idx = col("EventId").or_else(|| col("EventID")).unwrap_or(1);
-    let msg_idx = col("message").unwrap_or(2);
-    let user_idx = col("UserName").unwrap_or(3);
-    let payload_idx = col("Payload");
-    let remote_idx = col("RemoteHost");
+    // This block used to be `col("EventId").unwrap_or(1)` and
+    // `col("UserName").unwrap_or(3)`. The current export spells them `event_id`
+    // and `user_name`, so the event ID was read out of `timestamp_desc` and the
+    // username out of `event_id` — every EID parsed as 0, no critical EID ever
+    // matched, no logon was correlated, and 840,821 rows produced 11 events. The
+    // resolver has no positional fallback for exactly this reason, and says so on
+    // stderr when a required column is missing.
+    let cols = Columns::resolve(
+        "event-logs",
+        filepath,
+        &headers,
+        &[
+            DATETIME,
+            EVENT_ID,
+            MESSAGE,
+            USER_NAME,
+            Field::optional("payload", &["Payload"]),
+            Field::optional("remote_host", &["RemoteHost"]),
+            Field::optional("channel", &["Channel"]),
+        ],
+    );
+    let mut rows = 0usize;
     // Used to scope critical-EID rules to the channel that defines them; see
     // `CriticalEID::channel`. Absent on legacy exports, handled below.
-    let channel_idx = col("Channel");
-    if channel_idx.is_none() {
+    let has_channel = cols.has("channel");
+    if !has_channel {
         eprintln!(
             "[WARN] {}: no 'Channel' column - critical-EID rules cannot be scoped to a \
              channel and will match on EventID alone. Expect false positives such as \
@@ -275,13 +294,15 @@ pub fn parse_correlated(
     for result in rdr.records() {
         let Ok(record) = result else { continue };
 
-        let ts = record.get(ts_idx).unwrap_or("").to_string();
-        let eid_str = record.get(eid_idx).unwrap_or("");
+        rows += 1;
+
+        let ts = cols.get(&record, "datetime").to_string();
+        let eid_str = cols.get(&record, "event_id");
         let event_id: u32 = eid_str.parse().unwrap_or(0);
-        let msg = record.get(msg_idx).unwrap_or("");
-        let user = record.get(user_idx).unwrap_or("").to_string();
-        let payload = payload_idx.and_then(|i| record.get(i)).unwrap_or("");
-        let remote_host = remote_idx.and_then(|i| record.get(i)).unwrap_or("").to_string();
+        let msg = cols.get(&record, "message");
+        let user = cols.get(&record, "user_name").to_string();
+        let payload = cols.get(&record, "payload");
+        let remote_host = cols.get(&record, "remote_host").to_string();
 
         // Resolve the logon channel + remote endpoint once (used for session
         // tracking, lateral detection, and compromised-IP correlation).
@@ -306,12 +327,12 @@ pub fn parse_correlated(
         // The raw RemoteHost is `Host (IP)`, so match on the extracted src_ip too.
         let ip_compromised = compromised.is_ip_compromised(&remote_host)
             || compromised.is_ip_compromised(&src_ip);
-        let channel = channel_idx.and_then(|i| record.get(i)).unwrap_or("");
+        let channel = cols.get(&record, "channel");
         // A critical EID only counts on the channel that gives it its meaning.
         // Without a Channel column we cannot check, and fall back to EID-only
         // (warned about once, above) rather than losing the detection entirely.
         let is_critical_eid = match critical.get(&event_id) {
-            Some(rule) => channel_idx.is_none() || channel_matches(rule, channel),
+            Some(rule) => !has_channel || channel_matches(rule, channel),
             None => false,
         };
         let is_in_window = cfg.in_timewindow(&ts);
@@ -555,6 +576,17 @@ pub fn parse_correlated(
             mitre_tactic = "Lateral Movement".to_string();
             mitre_technique = "T1021.001".to_string();
         }
+        // A TA tool named in the message is the only ATT&CK signal an ordinary EID
+        // carries, and it was being thrown away. It fills in *behind* the critical-EID
+        // table and the session re-classification above, never over them.
+        if !ta_hits.is_empty() && (mitre_tactic.is_empty() || mitre_technique.is_empty()) {
+            let mut attack = Attack::from_artifact(&mitre_tactic, &mitre_technique);
+            for hit in &ta_hits {
+                attack.from_tool(hit);
+            }
+            mitre_tactic = attack.tactic;
+            mitre_technique = attack.technique;
+        }
 
         let description = if msg.is_empty() {
             format!("EventID {}", event_id)
@@ -610,6 +642,7 @@ pub fn parse_correlated(
     let automations = classify::classify_group_membership(&mut events, &group_changes);
 
     let baseline_logons = emitted_logons.iter().filter(|(i, _)| *i != usize::MAX).count();
+    columns::note_rows("event-logs", rows);
     Ok(EventLogOutput { events, logons, automations, baseline_logons, off_hours_logons, rare_logons })
 }
 

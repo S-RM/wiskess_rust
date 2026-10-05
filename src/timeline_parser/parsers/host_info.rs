@@ -1,6 +1,17 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::timeline_parser::parsers::columns::{Columns, Field, MESSAGE};
+
+/// The host stamped on every row of a normalised timeline CSV.
+///
+/// Optional on purpose: this is asked of several files speculatively, and a file
+/// that does not carry it is not a coverage failure — it is just not the place the
+/// hostname lives. Resolving it through [`Columns`] rather than a local
+/// lowercase comparison is what makes `Computer_Name` and `host-name` match too.
+const HOSTNAME_COL: Field =
+    Field::optional("hostname", &["hostname", "Computer", "ComputerName", "Computer_Name"]);
+
 /// Resolve the host this collection came from.
 ///
 /// Order, most to least authoritative:
@@ -202,14 +213,14 @@ fn hostname_from_csv_column(path: &Path) -> Option<String> {
         .from_reader(std::io::BufReader::new(file));
 
     let headers = rdr.headers().ok()?.clone();
-    let idx = headers.iter().position(|h| {
-        let h = h.trim().to_lowercase();
-        h == "hostname" || h == "computer" || h == "computername"
-    })?;
+    let cols = Columns::resolve("host-identity", path, &headers, &[HOSTNAME_COL]);
+    if !cols.has("hostname") {
+        return None;
+    }
 
     let mut counts: HashMap<String, usize> = HashMap::new();
     for record in rdr.records().flatten().take(5000) {
-        let v = record.get(idx).unwrap_or("").trim();
+        let v = cols.get(&record, "hostname");
         // "-" and "N/A" are how these tools spell "no value".
         if v.is_empty() || v == "-" || v.eq_ignore_ascii_case("n/a") {
             continue;
@@ -234,10 +245,13 @@ pub fn host_info_fields(path: &Path) -> HashMap<String, String> {
     let Ok(content) = std::fs::read_to_string(path) else { return out };
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(content.as_bytes());
     let Ok(headers) = rdr.headers().cloned() else { return out };
-    let Some(msg_idx) = headers.iter().position(|h| h.trim() == "message") else { return out };
+    let cols = Columns::resolve("host-information", path, &headers, &[MESSAGE]);
+    if !cols.has("message") {
+        return out;
+    }
 
     for record in rdr.records().flatten() {
-        let msg = record.get(msg_idx).unwrap_or("").trim();
+        let msg = cols.get(&record, "message");
         if let Some((key, value)) = msg.split_once(": ") {
             let value = value.trim();
             if !key.is_empty() && !value.is_empty() {
@@ -254,9 +268,12 @@ fn parse_host_info_csv(path: &Path) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;
     let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(content.as_bytes());
     let headers = rdr.headers().ok()?.clone();
-    let msg_idx = headers.iter().position(|h| h.trim() == "message")?;
+    let cols = Columns::resolve("host-information", path, &headers, &[MESSAGE]);
+    if !cols.has("message") {
+        return None;
+    }
     for result in rdr.records().flatten() {
-        let msg = result.get(msg_idx).unwrap_or("").trim();
+        let msg = cols.get(&result, "message");
         // Lines like "Hostname Registry: WKS-0001" or "Hostname Event Logs: WKS-0001"
         if msg.starts_with("Hostname") {
             if let Some((_, after)) = msg.split_once(':') {
