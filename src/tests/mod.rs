@@ -27,3 +27,5 @@ pub mod velo_extract_tests;
 pub mod github_token_tests;
 #[cfg(test)]
 pub mod timeline_parser_tests;
+#[cfg(test)]
+pub mod regripper_patch_tests;

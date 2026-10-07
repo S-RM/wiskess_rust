@@ -45,6 +45,9 @@ enum Commands {
         /// Check installation was successful
         #[arg(short, long, action = ArgAction::SetTrue)]
         check_install: bool,
+        /// Update tools already installed: newer github releases, git pull of cloned repos and package upgrades
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        update: bool,
     },
     /// launch the webui
     Gui {},
@@ -216,13 +219,14 @@ fn main() {
         Commands::Setup {
             github_token,
             verbose,
-            check_install
+            check_install,
+            update
         } => {
             if !check_install {
                 // check the github_token is set, matches the regex and is accepted by the GitHub API
                 let github_token = setup::ensure_valid_github_token(github_token, silent);
                 // don't run setup if user only wants to check the wiskess has installed
-                scripts::run_setup(&tool_path, github_token, verbose);
+                scripts::run_setup(&tool_path, github_token, verbose, update);
             }
             // check if setup has been run, or if any binaries are missing
             setup::check_installed(&tool_path);

@@ -7,7 +7,7 @@
 //! timeline where every malicious action is immediately preceded by the remote
 //! logon that established the session.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::timeline_parser::config::severity_order;
 use crate::timeline_parser::output::event::UnifiedEvent;
@@ -29,6 +29,56 @@ fn within_lookback(logon_ts: &str, finding_ts: &str) -> bool {
         }
         // Unparseable timestamps: keep the cheap ordering check only.
         _ => logon_ts <= finding_ts,
+    }
+}
+
+/// Milliseconds since the epoch for an RFC3339 timestamp, None if it doesn't parse.
+fn parse_ms(ts: &str) -> Option<i64> {
+    chrono::DateTime::parse_from_rfc3339(ts).ok().map(|d| d.timestamp_millis())
+}
+
+/// Logons a finding can be matched to, sorted by time.
+#[derive(Default)]
+struct LogonIndex<'a> {
+    parsed: Vec<(i64, &'a SessionLogon)>,
+    // Unparseable timestamps keep the plain string ordering check of within_lookback.
+    unparsed: Vec<&'a SessionLogon>,
+}
+
+impl<'a> LogonIndex<'a> {
+    fn push(&mut self, l: &'a SessionLogon) {
+        match parse_ms(&l.timestamp) {
+            Some(ms) => self.parsed.push((ms, l)),
+            None => self.unparsed.push(l),
+        }
+    }
+
+    fn sort(&mut self) {
+        self.parsed.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.timestamp.cmp(&b.1.timestamp)));
+        self.unparsed.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    }
+
+    /// The most recent logon at or before `finding_ts` and within the lookback.
+    fn latest_before(&self, finding_ts: &str) -> Option<&'a SessionLogon> {
+        let from_parsed = match parse_ms(finding_ts) {
+            // Only the latest logon at or before the finding can be the answer:
+            // if it is outside the lookback, every earlier one is too.
+            Some(f) => {
+                let end = self.parsed.partition_point(|p| p.0 <= f);
+                end.checked_sub(1)
+                    .map(|i| self.parsed[i])
+                    .filter(|p| (f - p.0) / 3_600_000 <= MAX_LOOKBACK_HOURS)
+                    .map(|p| p.1)
+            }
+            None => self.parsed.iter().rev().find(|p| p.1.timestamp.as_str() <= finding_ts).map(|p| p.1),
+        };
+        let from_unparsed = self.unparsed.iter().rev()
+            .find(|l| within_lookback(&l.timestamp, finding_ts))
+            .copied();
+        match (from_parsed, from_unparsed) {
+            (Some(a), Some(b)) => Some(if b.timestamp > a.timestamp { b } else { a }),
+            (a, b) => a.or(b),
+        }
     }
 }
 
@@ -118,8 +168,20 @@ pub fn add_precursor_logons(
         return 0;
     }
 
-    let mut sorted: Vec<&SessionLogon> = logons.iter().collect();
-    sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    // Index the logons by what a finding matches on - the user, or RDP for a
+    // finding with no user - each list sorted by time, so a finding is one binary
+    // search. Scanning every logon per finding is findings x logons, which on a
+    // DC's volume of type-3 logons runs for hours.
+    let mut by_user: HashMap<String, LogonIndex> = HashMap::new();
+    let mut rdp = LogonIndex::default();
+    for l in logons {
+        by_user.entry(clean_user(&l.user)).or_default().push(l);
+        if l.logon_type == 10 {
+            rdp.push(l);
+        }
+    }
+    by_user.values_mut().for_each(LogonIndex::sort);
+    rdp.sort();
 
     // Timestamps of logons already represented on the timeline (avoid dupes).
     let existing_logon_ts: HashSet<&str> = events
@@ -143,16 +205,8 @@ pub fn add_precursor_logons(
         // by `super admin`), match that user's RDP/SMB session. When it doesn't
         // (e.g. a USN file-create with no owner), only an interactive RDP logon
         // is a defensible entry point — never the constant type-3 background.
-        let precursor = sorted.iter().rev().find(|l| {
-            if !within_lookback(&l.timestamp, &e.timestamp) {
-                return false;
-            }
-            if !target_user.is_empty() {
-                clean_user(&l.user) == target_user
-            } else {
-                l.logon_type == 10
-            }
-        });
+        let index = if target_user.is_empty() { Some(&rdp) } else { by_user.get(&target_user) };
+        let precursor = index.and_then(|i| i.latest_before(&e.timestamp));
 
         if let Some(l) = precursor {
             if existing_logon_ts.contains(l.timestamp.as_str()) {
@@ -215,5 +269,85 @@ mod tests {
         ];
         let added = add_precursor_logons(&mut events, &logons, "H");
         assert_eq!(added, 0); // logon already on timeline
+    }
+
+    fn logon(ts: String, logon_type: u8, user: &str, ip: &str) -> SessionLogon {
+        SessionLogon { timestamp: ts, logon_type, user: user.into(), src_ip: ip.into(), src_host: String::new() }
+    }
+
+    /// The pre-index search: walk every logon, newest first, for each finding.
+    fn naive_precursors(events: &[UnifiedEvent], logons: &[SessionLogon]) -> Vec<Option<String>> {
+        let mut sorted: Vec<&SessionLogon> = logons.iter().collect();
+        sorted.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        events.iter().filter(|e| is_finding(e)).map(|e| {
+            let target_user = clean_user(&e.user);
+            sorted.iter().rev().find(|l| {
+                within_lookback(&l.timestamp, &e.timestamp)
+                    && if !target_user.is_empty() { clean_user(&l.user) == target_user } else { l.logon_type == 10 }
+            }).map(|l| format!("{}|{}", l.timestamp, l.src_ip))
+        }).collect()
+    }
+
+    /// Test the indexed search picks the same precursor as the full scan, across
+    /// users, logon types, the 48h boundary and unparseable timestamps
+    #[test]
+    fn indexed_search_matches_full_scan() {
+        let users = ["corp\\alice", "bob", "Carol (S-1-5-21-1)", ""];
+        let mut logons = Vec::new();
+        for i in 0..400i64 {
+            let h = (i * 7) % 300;
+            let ts = format!("2026-05-{:02}T{:02}:{:02}:00Z", 1 + h / 24, h % 24, (i * 13) % 60);
+            let lt = if i % 5 == 0 { 10 } else { 3 };
+            logons.push(logon(ts, lt, users[(i % 4) as usize], &format!("10.0.0.{}", i % 250)));
+        }
+        logons.push(logon("not-a-time".into(), 10, "bob", "9.9.9.9"));
+        logons.push(logon("2026-05-03 10:00:00".into(), 10, "alice", "8.8.8.8"));
+
+        let mut events = Vec::new();
+        for i in 0..300i64 {
+            let h = (i * 11) % 320;
+            let ts = format!("2026-05-{:02}T{:02}:{:02}:30Z", 1 + h / 24, h % 24, (i * 17) % 60);
+            events.push(ev(&ts, "file_created", "high", users[(i % 4) as usize]));
+        }
+        events.push(ev("garbage", "service_installed", "high", "bob"));
+        events.push(ev("2026-05-04 12:00:00", "service_installed", "high", "alice"));
+        // either side of the lookback edge: 48h59m truncates to 48h and is in, 49h is out
+        events.push(ev("2026-05-20T00:00:00Z", "x", "high", "edge"));
+        logons.push(logon("2026-05-17T23:00:00Z".into(), 10, "edge", "1.1.1.1"));
+        events.push(ev("2026-05-22T00:00:00Z", "x", "high", "edge2"));
+        logons.push(logon("2026-05-19T23:01:00Z".into(), 10, "edge2", "2.2.2.2"));
+        events.push(ev("2026-05-25T00:00:00Z", "x", "high", "edge3"));
+        logons.push(logon("2026-05-22T23:00:00Z".into(), 10, "edge3", "3.3.3.3"));
+
+        let expected: HashSet<String> = naive_precursors(&events, &logons).into_iter().flatten().collect();
+        let mut got = events.clone();
+        add_precursor_logons(&mut got, &logons, "H");
+        let got: HashSet<String> = got.iter()
+            .filter(|e| e.event_type == "precursor_logon")
+            .map(|e| {
+                let ip = e.indicators.iter().find_map(|i| i.strip_prefix("LOGON_FROM:")).unwrap_or("");
+                format!("{}|{}", e.timestamp, ip)
+            })
+            .collect();
+        assert!(!expected.is_empty());
+        assert_eq!(got, expected);
+        assert!(got.contains("2026-05-19T23:01:00Z|2.2.2.2")); // 48h59m back
+        assert!(!got.iter().any(|g| g.ends_with("|3.3.3.3"))); // 49h back
+    }
+
+    /// Test DC scale - many type-3 logons and many unattributed findings - finishes quickly
+    #[test]
+    fn scales_to_dc_logon_volume() {
+        let logons: Vec<SessionLogon> = (0..300_000i64)
+            .map(|i| logon(
+                format!("2026-05-{:02}T{:02}:{:02}:{:02}Z", 1 + (i / 14_400) % 28, (i / 600) % 24, (i / 10) % 60, i % 60),
+                3, "machine$", "10.0.0.1"))
+            .collect();
+        let mut events: Vec<UnifiedEvent> = (0..100_000i64)
+            .map(|i| ev(&format!("2026-05-{:02}T{:02}:00:00Z", 1 + (i % 28), i % 24), "file_created", "high", ""))
+            .collect();
+        let start = std::time::Instant::now();
+        add_precursor_logons(&mut events, &logons, "H");
+        assert!(start.elapsed().as_secs() < 5, "took {:?}", start.elapsed());
     }
 }

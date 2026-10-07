@@ -114,7 +114,51 @@ def make_symlink(target_dir: str, program: str, script_os: str):
     print(f'[!] No link created for {program} at path: {target_file}')
 
 
-def get_release(token: str, url: str, script_os: str):
+RELEASE_TAG_FILE = '.wiskess_release'
+
+
+def read_release_tag(target_dir: str) -> str:
+  # the release tag recorded when the files were downloaded, empty if unknown
+  try:
+    with open(os.path.join(target_dir, RELEASE_TAG_FILE), 'r') as f:
+      return f.read().strip()
+  except OSError:
+    return ''
+
+
+def write_release_tag(target_dir: str, tag: str):
+  with open(os.path.join(target_dir, RELEASE_TAG_FILE), 'w') as f:
+    f.write(tag)
+
+
+def update_release(response, target_dir: str, program: str, tag: str):
+  # download to a new folder and only swap it in once complete, so a failed
+  # download or a locked file (i.e. the binary is running) leaves the old version working
+  installed = read_release_tag(target_dir) or 'unknown'
+  print(f'[+] Updating {program} from release: {installed} to: {tag}')
+  new_dir = f'{target_dir}.new'
+  old_dir = f'{target_dir}.old'
+  for d in (new_dir, old_dir):
+    shutil.rmtree(d, ignore_errors=True)
+  os.makedirs(new_dir)
+  try:
+    get_files(response, new_dir)
+  except Exception as e:
+    print(f'[!] Update of {program} failed, keeping release: {installed}. Error: {e}')
+    shutil.rmtree(new_dir, ignore_errors=True)
+    return
+  write_release_tag(new_dir, tag)
+  try:
+    os.rename(target_dir, old_dir)
+  except OSError as e:
+    print(f'[!] Unable to replace {target_dir}, is {program} running? Keeping release: {installed}. Error: {e}')
+    shutil.rmtree(new_dir, ignore_errors=True)
+    return
+  os.rename(new_dir, target_dir)
+  shutil.rmtree(old_dir, ignore_errors=True)
+
+
+def get_release(token: str, url: str, script_os: str, update: bool = False):
     repo = urlparse(url).path
     repo = re.sub('\\.git$', '', repo)
     program = repo.split('/')[-1]
@@ -130,13 +174,18 @@ def get_release(token: str, url: str, script_os: str):
     target_dir = os.path.join(os.getcwd(), program)
 
     if response.status_code == 200:
-      # make dir from file stub and copy file there
+      tag = response.json().get('tag_name', '')
       if not os.path.exists(target_dir):
+        # make dir from file stub and download the files there
         os.makedirs(target_dir)
-        # download the files to target dir
         get_files(response, target_dir)
+        write_release_tag(target_dir, tag)
+      elif not update:
+        print(f'[ ] Target directory {target_dir} exists, use setup --update or remove the folder if wanting to redownload.')
+      elif read_release_tag(target_dir) == tag:
+        print(f'[ ] {program} is up to date at release: {tag}')
       else:
-        print(f'[ ] Target directory {target_dir} exists, remove the folder if wanting to redownload.')
+        update_release(response, target_dir, program, tag)
     else:
       print(f'[!] Unable to get the repo from link: {url}')
       print('[ ] Please check the link exists')
@@ -153,9 +202,10 @@ def main():
     parser.add_argument('token', help='your API token')
     parser.add_argument('url', help='the url of the git repo')
     parser.add_argument('script_os', help='the os of the env')
+    parser.add_argument('--update', action='store_true', help='redownload if a newer release than the one installed exists')
     args = parser.parse_args()
 
-    get_release(args.token, args.url, args.script_os)
+    get_release(args.token, args.url, args.script_os, args.update)
 
 
 if __name__ == '__main__':

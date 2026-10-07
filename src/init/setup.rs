@@ -199,7 +199,7 @@ fn start_setup_log(setup_log_path: &PathBuf) {
     );
 }
 
-pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Result<()> {
+pub fn setup_linux(v: bool, github_token: String, tool_path: &Path, update: bool) -> io::Result<()> {
     // Setup progress bars    
     let m = MultiProgress::new();
     let pb = prog_spin_init(960, &m, "magenta");
@@ -233,6 +233,11 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
         "jq",
     ];    
     prog_spin_msg(&pb2, "Installing APT packages...".to_string());
+    // refresh the package lists so apt-get install upgrades packages already installed
+    if update {
+        let (code, output, error) = run_script::run_script!("apt-get -y update", &vec![], &options).unwrap();
+        outmsg.push_str(&output_script(v, code, output, error));
+    }
     for pkg in apt_pkgs.iter() {
         let msg = format!("Getting: {}", pkg);
         prog_spin_msg(&pb3, msg.to_string());    
@@ -329,6 +334,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
 
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
+    let update_arg = if update { "--update" } else { "" };
     let urls = vec![
         "https://github.com/countercept/chainsaw",
         "https://github.com/Yamato-Security/hayabusa",
@@ -347,9 +353,9 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
              url="$2"
              tool_path="$3"
              . $tool_path/venv/bin/activate
-             python ./setup_get_git.py $github_token $url linux
+             python ./setup_get_git.py $github_token $url linux $4
              "#,
-             &vec![github_token.clone(), url.to_string(), tool_path_str.to_string()],
+             &vec![github_token.clone(), url.to_string(), tool_path_str.to_string(), update_arg.to_string()],
              &options
         ).unwrap();
         outmsg.push_str(&output_script(v, code, output, error));
@@ -365,15 +371,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
         prog_spin_msg(&pb3, msg.to_string());    
-    	let (code, output, error) = run_script::run_script!(
-            r#" 
-             repo="$1"
-             git clone $repo
-             "#,
-             &vec![repo.to_string()],
-             &options
-        ).unwrap();
-        outmsg.push_str(&output_script(v, code, output, error));
+        outmsg.push_str(&output_script(v, 0, git_clone_or_pull(repo, update), String::new()));
     }
 
     prog_spin_msg(&pb2, "Git cloning srum-dump and installing requirements...".to_string());
@@ -504,7 +502,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path) -> io::Resul
     Ok(())
 }
 
-pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<()> {
+pub fn setup_win(v: bool, github_token: String, tool_path: &Path, update: bool) -> io::Result<()> {
     // Setup progress bars    
     let m = MultiProgress::new();
     let pb = prog_spin_init(960, &m, "magenta");
@@ -536,11 +534,14 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     let (code, output, error) = run_script::run_script!(
         r#"
         @echo off
-        choco install -y git 7zip fd osfmount awscli jq arsenalimagemounter python pwsh dotnet-9.0-runtime
+        choco %1 -y git 7zip fd osfmount awscli jq arsenalimagemounter python pwsh dotnet-9.0-runtime
         choco install -y --force ripgrep
         set PATH=%PATH%;C:\Program Files\Git\cmd\
         RefreshEnv.cmd
-        "#
+        "#,
+        // upgrade also installs any package that is missing
+        &vec![if update { "upgrade" } else { "install" }.to_string()],
+        &ScriptOptions::new()
     ).unwrap();
     file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
     
@@ -587,6 +588,7 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     }
 
     prog_spin_msg(&pb2, "Getting latest releases of tools from github...".to_string());
+    let update_arg = if update { "--update" } else { "" };
     let urls = vec![
         "https://github.com/countercept/chainsaw",
         "https://github.com/Yamato-Security/hayabusa",
@@ -604,9 +606,9 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     	let (code, output, error) = run_script::run_script!(
             r#"
             @echo off
-            py ./setup_get_git.py %1 %2 windows
+            py ./setup_get_git.py %1 %2 windows %3
             "#,
-            &vec![github_token.clone(), url.to_string()],
+            &vec![github_token.clone(), url.to_string(), update_arg.to_string()],
             &options
         ).unwrap();
         file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
@@ -624,18 +626,14 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     for repo in repos.iter() {
         let msg = format!("Cloning: {}", repo);
         prog_spin_msg(&pb3, msg.to_string());    
-    	let (code, output, error) = run_script::run_script!(
-            r#"
-            @echo off
-            set PATH=%PATH%;C:\Program Files\Git\cmd\
-            git clone "%1"
-            "#,
-            &vec![repo.to_string()],
-            &options
-        ).unwrap();
-        file_ops::log_msg(&setup_log_path, output_script(v, code, output, error));
+        file_ops::log_msg(&setup_log_path, output_script(v, 0, git_clone_or_pull(repo, update), String::new()));
     }
- 
+
+    // same shellbags/comdlg32 infinite-loop patch as setup_linux, done in Rust as perl is not on Windows
+    prog_spin_msg(&pb3, "Patching regripper plugins".to_string());
+    let plugin_dir = tool_path.join("RegRipper3.0").join("plugins");
+    file_ops::log_msg(&setup_log_path, patch_regripper_plugins(&plugin_dir).join("\n"));
+
     prog_spin_stop(&pb3, "".to_string());
 
     prog_spin_msg(&pb2, "Installing Loki and dependencies...".to_string());
@@ -680,6 +678,83 @@ pub fn setup_win(v: bool, github_token: String, tool_path: &Path) -> io::Result<
     prog_spin_stop(&pb, msg);
 
 Ok(())
+}
+
+/// Folder name git clone makes for a repo url, i.e. RegRipper3.0 from .../RegRipper3.0.git
+pub fn repo_dir_name(repo: &str) -> String {
+    let name = repo.trim_end_matches('/').rsplit('/').next().unwrap_or(repo);
+    name.strip_suffix(".git").unwrap_or(name).to_string()
+}
+
+/// Clone the repo into the current directory, or when update is set and it is already
+/// cloned, fast-forward it to the latest commit. Returns the output for the setup log.
+fn git_clone_or_pull(repo: &str, update: bool) -> String {
+    // choco has just installed git, so it may not be on this process's PATH yet
+    let git = if cfg!(windows) && std::process::Command::new("git").arg("--version").output().is_err() {
+        r"C:\Program Files\Git\cmd\git.exe"
+    } else {
+        "git"
+    };
+    let dir = repo_dir_name(repo);
+    let mut cmds: Vec<Vec<&str>> = vec![];
+    if !Path::new(&dir).join(".git").exists() {
+        cmds.push(vec!["clone", repo]);
+    } else if update {
+        // undo the wiskess plugin patches so the pull can't conflict, they are re-applied after
+        if dir.eq_ignore_ascii_case("RegRipper3.0") {
+            cmds.push(vec!["-C", &dir, "checkout", "--", "plugins/shellbags.pl", "plugins/shellbags_tln.pl", "plugins/comdlg32.pl"]);
+        }
+        cmds.push(vec!["-C", &dir, "pull", "--ff-only"]);
+    } else {
+        return format!("[ ] {dir} already cloned, use setup --update to pull the latest");
+    }
+    let mut out = String::new();
+    for args in cmds {
+        match std::process::Command::new(git).args(&args).output() {
+            Ok(o) => out.push_str(&format!("[ ] git {}\n{}{}",
+                args.join(" "),
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr))),
+            Err(e) => out.push_str(&format!("[!] Unable to run git {}: {e}\n", args.join(" "))),
+        }
+    }
+    out
+}
+
+/// Bound the 0xbeef / short name scans in shellbags.pl, shellbags_tln.pl and comdlg32.pl to the
+/// shell item length, so a malformed item can't spin rip at 100% CPU forever. Mirrors the perl
+/// patch in setup_linux. Idempotent - patched loops no longer match. Returns a log line per file.
+pub fn patch_regripper_plugins(plugin_dir: &Path) -> Vec<String> {
+    let patches = [
+        (r#"while\s*\(\$tag\)\s*\{(\s*if \(unpack\("v",substr\(\$data,\$ofs \+ \$cnt,2\)\) == 0xbeef\))"#,
+         "while ($$tag && $$ofs + $$cnt + 2 <= length($$data)) {${1}"),
+        (r#"while\s*\(\$tag\)\s*\{(\s*if \(unpack\("v",substr\(\$data,\$ofs,2\)\) == 0xbeef\))"#,
+         "while ($$tag && $$ofs + 2 <= length($$data)) {${1}"),
+        (r#"while\s*\(\$tag\)\s*\{(\s*my \$s = substr\(\$data,\$ofs_shortname \+ \$cnt,1\);)"#,
+         "while ($$tag && $$ofs_shortname + $$cnt < length($$data)) {${1}"),
+    ];
+    if !plugin_dir.is_dir() {
+        return vec![format!("No regripper plugin directory found: {}", plugin_dir.display())];
+    }
+    let mut msgs = vec![];
+    for f in ["shellbags.pl", "shellbags_tln.pl", "comdlg32.pl"] {
+        let path = plugin_dir.join(f);
+        // plugins can contain non-utf8 bytes, so patch as bytes
+        let Ok(data) = std::fs::read(&path) else { continue };
+        let mut patched = data.clone();
+        for (re, rep) in patches.iter() {
+            patched = regex::bytes::Regex::new(re).unwrap().replace_all(&patched, rep.as_bytes()).into_owned();
+        }
+        if patched == data {
+            msgs.push(format!("Already patched: {}", path.display()));
+        } else {
+            match std::fs::write(&path, &patched) {
+                Ok(_) => msgs.push(format!("Patched: {}", path.display())),
+                Err(e) => msgs.push(format!("Failed to patch {}: {}", path.display(), e)),
+            }
+        }
+    }
+    msgs
 }
 
 /// check_installed see if the packages are installed, otherwise inform user how to install

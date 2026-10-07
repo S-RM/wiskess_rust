@@ -2,12 +2,12 @@ use std::{env,path::Path};
 use crate::{configs::config, ops::{exe_ops, file_ops}};
 use super::setup;
 
-pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
+pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool, update: bool) {
     println!("[+] Running setup...");
     match env::consts::OS {
         "windows" => {
             // Run the setup for windows
-            match setup::setup_win(verbose, github_token, tool_path) {
+            match setup::setup_win(verbose, github_token, tool_path, update) {
                 Ok(_) => {},
                 Err(e) => print!(r#"[!] Some error occured: {e}. Some reasons might be:
     * Not running as admin or equivalent - please run in an elevated terminal
@@ -16,7 +16,7 @@ pub fn run_setup(tool_path: &Path, github_token: String, verbose: bool) {
             };
 	    },
         "linux" => {
-            let _ = setup::setup_linux(verbose, github_token, tool_path);
+            let _ = setup::setup_linux(verbose, github_token, tool_path, update);
         },
         &_ => todo!()
     }
