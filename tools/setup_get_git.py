@@ -79,16 +79,20 @@ def make_symlink(target_dir: str, program: str, script_os: str):
       print(f'[!] Target file already exists and is not a symlink, so not creating link.')
       return
 
+  fallback_mime_regex = None
   if script_os == 'windows':
     file_type_regex = re.compile('x-(?:dos-executable|dosexec|msdownload)')
     file_mime_regex = re.compile('PE32\\+ executable \\(console\\) x86-64.*?, for MS Windows')
   elif script_os == 'linux':
     file_type_regex = re.compile('x(?:-pie|)-executable|application/x-sharedlib')
     file_mime_regex = re.compile('ELF 64-bit LSB (shared object|pie executable), x86-64')
+    # Go releases, i.e. velociraptor, aren't PIE. Only used when there is no pie/shared object match
+    fallback_mime_regex = re.compile('ELF 64-bit LSB executable, x86-64')
   else:
     file_type_regex = re.compile('(?:application|x-.*-exec)')
     file_mime_regex = re.compile('x86-64')
 
+  fallback_file = ''
   for root, dirs, files in os.walk(target_dir):
     if root.count(os.sep) - target_dir.count(os.sep) < 2:
       for f in files:
@@ -101,7 +105,12 @@ def make_symlink(target_dir: str, program: str, script_os: str):
           source_file = f_path
           break
         else:
+          if fallback_mime_regex and not fallback_file and file_type_regex.search(file_type) and fallback_mime_regex.search(file_mime):
+            fallback_file = f_path
           print(f'[ ] Skipping file: {f_path}, with type: {file_type} and mime: {file_mime}. Not a match for {script_os} executable.')
+  if source_file == '' and fallback_file != '':
+    print(f'[+] No pie executable found, creating link for: {fallback_file}. Target file: {target_file}')
+    source_file = fallback_file
   if source_file != '' and source_file != target_file:
     os.symlink(source_file, target_file)
     # make the source executable
