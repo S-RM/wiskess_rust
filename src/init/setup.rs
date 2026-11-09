@@ -445,7 +445,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path, update: bool
     outmsg.push_str(&output_script(v, code, output, error));
 
     prog_spin_msg(&pb2, "Installing eztools...".to_string());
-    let ez_path = &tool_path.join("Get-ZimmermanTools").join("net9");
+    let ez_path = &tool_path.join("Get-ZimmermanTools").join("net");
     let ez_path_str = &ez_path.clone().into_os_string().into_string().unwrap();
     make_folders(&ez_path);
     let eztools = vec![
@@ -482,7 +482,7 @@ pub fn setup_linux(v: bool, github_token: String, tool_path: &Path, update: bool
             r#"
              ezpath="$1"
              eztool="$2"
-             wget -nv "https://download.ericzimmermanstools.com/net9/$eztool.zip" -O "$ezpath/$eztool.zip"
+             wget -nv "https://download.ericzimmermanstools.com/net/$eztool.zip" -O "$ezpath/$eztool.zip"
              7z x -r -aoa "$ezpath/$eztool.zip" -o"$ezpath/"
              rm "$ezpath/$eztool.zip"
              "#,
@@ -773,13 +773,13 @@ pub fn check_installed(tool_path: &Path) {
         "azcopy\\azcopy.exe",
         "chainsaw\\chainsaw.exe",
         "evtx\\evtx.exe",
-        "Get-ZimmermanTools\\net9\\MFTECmd.exe",
-        "Get-ZimmermanTools\\net9\\AmcacheParser.exe",
-        "Get-ZimmermanTools\\net9\\SrumECmd.exe",
-        "Get-ZimmermanTools\\net9\\SumECmd.exe",
-        "Get-ZimmermanTools\\net9\\SBECmd.exe",
-        "Get-ZimmermanTools\\net9\\LECmd.exe",
-        "Get-ZimmermanTools\\net9\\JLECmd.exe",
+        "Get-ZimmermanTools\\net\\MFTECmd.exe",
+        "Get-ZimmermanTools\\net\\AmcacheParser.exe",
+        "Get-ZimmermanTools\\net\\SrumECmd.exe",
+        "Get-ZimmermanTools\\net\\SumECmd.exe",
+        "Get-ZimmermanTools\\net\\SBECmd.exe",
+        "Get-ZimmermanTools\\net\\LECmd.exe",
+        "Get-ZimmermanTools\\net\\JLECmd.exe",
         "RustyUsn\\RustyUsn.exe",
         "RegRipper3.0\\rip.exe",
         "mft\\mft.exe",
