@@ -59,7 +59,7 @@ def get_reg_val(find_value, dict_tln):
                         ).select(
                         pl.col("ValueData")
                         ).collect()
-                    value = pl.concat(value).unique(maintain_order=True).str.concat(", ").item()
+                    value = pl.concat(value).unique(maintain_order=True).str.join(", ").item()
                     return value
                 except Exception as e:
                     print(f'Ran into an error when trying to get the value from the registry.')
